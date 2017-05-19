@@ -1,0 +1,22 @@
+{
+  "name": "lemuria",
+  "version": "1.0.0",
+  "description": "Communications module",
+  "main": "lemuria.js",
+  "dependencies": {
+    "sqlite3": "latest",
+    "body-parser": "latest",
+    "express": "latest",
+    "request": "latest",
+    "moment-timezone": "latest"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "SPEC",
+  "license": "ISC",
+  "devDependencies": {
+    "chai": "latest",
+    "chai-http": "latest"
+  }
+}

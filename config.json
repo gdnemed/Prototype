@@ -1,0 +1,5 @@
+{
+		"api_listen":{"host":"localhost","port":8081},
+		"coms_listen":{"host":"localhost","port":8082},
+		"node_id":1
+}
