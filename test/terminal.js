@@ -1,4 +1,5 @@
 var net = require('net');
+var msgpack = require("msgpack-lite");
 var express = require('express');
 var bodyParser = require('body-parser');
 var api;
@@ -13,21 +14,26 @@ init();
 function init(){
   client.connect(8082, '127.0.0.1', function() {
   	console.log('Connected');
-    send({serial:'c32a034',cmd:1,protocol:'0.1'});
+    var bin=Buffer.from('c8f6','hex');
+    var init_str={serial:'c32a034',cmd:1,protocol:'0.1',bin:bin};
+    send(init_str);
   });
 
   client.on('data', function(data_buffer) {
-    var data=data_buffer.toString('utf-8');
-  	console.log(data);
-    var j=JSON.parse(data);
+    console.log(data_buffer);
+    var  j=msgpack.decode(data_buffer);
+    //var data=data_buffer.toString('utf-8');
+    //var j=JSON.parse(data);
+  	console.log(j);
+
     if (j.ack){
 
     }
     else{
        switch(j.cmd){
-        case 2:cards['c'+j.card]=j.id;
+        case 2:for (var i=0;i<j.cards.length;i++) cards['c'+j.cards[i].card]=j.cards[i].id;
         break;
-        case 3:records['r'+j.id]=true;
+        case 3:for (var i=0;i<j.cards.length;i++) records['r'+j.records[i].id]=true;
         break;
       }
       client.write(JSON.stringify({seq:j.seq,cmd:j.cmd,ack:1}));
@@ -43,7 +49,11 @@ function init(){
 
 function send(data){
   data.seq=sequence;
-  client.write(JSON.stringify(data));
+  //client.write(JSON.stringify(data));
+  var m=msgpack.encode(data);
+  console.log(data);
+  console.log(m);
+  client.write(m);
   sequence++;
 }
 
@@ -64,11 +74,11 @@ function init_api_server(){
 }
 
 function get_records(req,res){
-
+  res.jsonp(records);
 }
 
 function get_cards(req,res){
-
+  res.jsonp(cards);
 }
 
 function get_clocking(req,res){

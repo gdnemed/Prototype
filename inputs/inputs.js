@@ -15,11 +15,33 @@ function init_db(customer){
   "(id integer, tmp integer, gmt integer, reception integer, "+
   "owner integer, result integer, source integer, serial text)");
   db.run("CREATE TABLE if not exists input_data_str_"+node_id+"_201705 "+
-  "(id integer, property integer, value text)");
+  "(id integer, property integer, value text)",function(){
+    db.run("CREATE INDEX if not exists i_input_data_str_"+
+    node_id+"_201705_p on input_data_str_"+node_id+"_201705 (property)");
+    db.run("CREATE INDEX if not exists i_input_data_str_"+
+    node_id+"_201705_i on input_data_str_"+node_id+"_201705 (id)");
+  });
   db.run("CREATE TABLE if not exists input_data_num_"+node_id+"_201705 "+
-  "(id integer, property integer, value integer)");
+  "(id integer, property integer, value integer)",function(){
+    db.run("CREATE INDEX if not exists i_input_data_num_"+
+    node_id+"_201705_p on input_data_num_"+node_id+"_201705 (property)");
+    db.run("CREATE INDEX if not exists i_input_data_num_"+
+    node_id+"_201705_i on input_data_num_"+node_id+"_201705 (id)");
+  });
   db.run("CREATE TABLE if not exists input_data_bin_"+node_id+"_201705 "+
-  "(id integer, property integer, value blob)");
+  "(id integer, property integer, value blob)",function(){
+    db.run("CREATE INDEX if not exists i_input_data_bin_"+
+    node_id+"_201705_p on input_data_bin_"+node_id+"_201705 (property)");
+    db.run("CREATE INDEX if not exists i_input_data_bin_"+
+    node_id+"_201705_i on input_data_bin_"+node_id+"_201705 (id)");
+  });
+  db.run("CREATE TABLE if not exists input_rel_"+node_id+"_201705 "+
+  "(id integer, relation integer, entity integer)",function(){
+    db.run("CREATE INDEX if not exists i_input_rel_"+
+    node_id+"_201705_r on input_rel_"+node_id+"_201705 (relation)");
+    db.run("CREATE INDEX if not exists i_input_rel_"+
+    node_id+"_201705_i on input_rel_"+node_id+"_201705 (id)");
+  });
   db.run("CREATE TABLE if not exists local_id(id integer)",[],function(err){
     if (err){
       console.log(err.message);
@@ -57,24 +79,52 @@ exports.get_inputs=function(customer,callback){
   });
 }
 
+exports.get_inputs_complete=function(customer,callback){
+  var db=dbs[customer];
+  db.all("SELECT tmp,owner record,result,a.card, 'lect1' reader from input_"+
+node_id+"_201705 i left join (select id,value card from input_data_str_"+
+node_id+"_201705 where property='card') a on a.id=i.id", callback);
+}
+
 exports.create_clocking=function(clocking,customer,callback){
   if (current_id==null) {
     callback(new Error('Service unavailable'));
     return;
   }
   var db=dbs[customer];
+  console.log(clocking);
   var params=[current_id,clocking.tmp,clocking.gmt,clocking.reception,
     clocking.owner,clocking.source,clocking.result,clocking.serial];
   current_id++;
-  db.run("INSERT INTO input_"+node_id+"_201705 "+
-  "(id,tmp,gmt,reception,owner,source,result,serial) VALUES (?,?,?,?,?,?,?,?)",
-    params,
-    function(err){
-      if (err)  callback(err);
-      else if (clocking.card) set_input_data(customer, params[0],'card',clocking.card,callback);
-      else callback();
+  db.run("UPDATE local_id set id=?",[current_id],function(err){
+    if (err){
+      console.log(err.message);
+      process.exit(0);
     }
-  );
+  });
+  db.run("BEGIN TRANSACTION",function(err){
+    if (err) callback(err);
+    else{
+      db.run("INSERT INTO input_"+node_id+"_201705 "+
+      "(id,tmp,gmt,reception,owner,source,result,serial) VALUES (?,?,?,?,?,?,?,?)",
+        params,
+        function(err){
+          if (err){
+            db.run("ROLLBACK");
+            callback(err);
+          }
+          else if (clocking.card) set_input_data(customer, params[0],'card',clocking.card,callback);
+          else db.run("COMMIT",function(err){
+            if (err){
+              db.run("ROLLBACK");
+              callback(err);
+            }
+            else callback();
+          });
+        }
+      );
+    }
+  });
 }
 
 function set_input_data(customer,id,property,value,callback){
@@ -82,6 +132,16 @@ function set_input_data(customer,id,property,value,callback){
   db.run("INSERT INTO input_data_str_"+node_id+"_201705 (id,property,value) values (?,?,?)",
     [id,property,value],
     function(err){
-      callback(err);
+      if (err){
+        db.run("ROLLBACK");
+        callback(err);
+      }
+      else db.run("COMMIT",function(err){
+        if (err){
+          db.run("ROLLBACK");
+          callback(err);
+        }
+        else callback();
+      });
     });
 }

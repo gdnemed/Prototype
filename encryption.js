@@ -1,30 +1,41 @@
 const crypto = require('crypto');
-const hash;
-const key_generator;
+var hash;
+var key_generator;
 var cipher;
 var decipher;
 var public_key;
 var speakers={};
 
-init('aes-256-ctr','d6F3Efeq',crypto.randomBytes(16));
+var crypt_parameters={
+  hash:'sha256',
+  hash_hmac:false,
+  cipher:'aes-256-ctr',//'aes-128-cbc',
+  key_type:'ECDH',
+  ECDHCurve:'secp521r1'
+}
 
-function init(algorithm,password,iv){
-  key_generator = crypto.createECDH('secp521r1');
+init('d6F3Efeq'/*,crypto.randomBytes(16)*/);
+
+function init(password,iv){
+  //Keys generators
+  if (crypt_parameters.ECDHCurve)
+    key_generator = crypto.createECDH(crypt_parameters.ECDHCurve);
+  else key_generator = crypto.createDiffieHellman(2048);
   key_generator.generateKeys();
   public_key=key_generator.getPublicKey();
 
-  hash = crypto.createHash('sha256');
+  //Hash function
+  if (crypt_parameters.hash_hmac) hash = crypto.createHmac(crypt_parameters.hash,password);
+  else hash = crypto.createHash(crypt_parameters.hash);
 
-  hash.update('some data to hash');
-  console.log(hash.digest('hex'));
-
+  //Ciphers
   if (iv){
-    cipher = crypto.createCipheriv(algorithm,password,iv);
-    decipher = crypto.createDecipher(algorithm,password,iv);
+    cipher = crypto.createCipheriv(crypt_parameters.cipher,password,iv);
+    decipher = crypto.createDecipher(crypt_parameters.cipher,password,iv);
   }
   else{
-    cipher = crypto.createCipher(algorithm,password);
-    decipher = crypto.createDecipher(algorithm,password);
+    cipher = crypto.createCipher(crypt_parameters.cipher,password);
+    decipher = crypto.createDecipher(crypt_parameters.cipher,password);
   }
 }
 
@@ -41,7 +52,7 @@ function decrypt(text){
   return dec;
 }
 
-function hast_data(data){
+function hash_data(data){
   hash.update(data);
   return hash.digest('hex');
 }

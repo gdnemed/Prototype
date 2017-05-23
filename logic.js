@@ -44,7 +44,7 @@ exports.post_record=function(req,res){
         if (err) res.status(500).end(err.message);
         else {
           //send to terminals
-          coms_service.global_send('record_insert',{id:id});
+          coms_service.global_send('record_insert',{records:[{id:e.code}]});
           //now, properties
           set_record_language(customer,id,req.body,function(err){
             if (err) res.status(500).end(err.message);
@@ -76,30 +76,43 @@ exports.delete_record=function(req,res){
 
 exports.get_cards=function(req,res){
   var customer='SPEC';
-  objects_service.get_simple_relation(customer,parseInt(req.params.id),'identifies',false,'card',function(err,rows){
-    if(err)	res.status(500).end(err.message);
-		else {
-      var l=[];
-      for (var i=0;i<rows.length;i++)   l.push(rows[i].code);
-      res.status(200).jsonp(l);
+  objects_service.get_entity(customer,'record','code',req.params.id,function(err,rows){
+    if (err)res.status(500).end(err.message);
+    else if (rows==null||rows.length==0) res.status(404).end();
+    else {
+      objects_service.get_simple_relation(customer,rows[0].id,'identifies',false,'card',function(err,rows){
+        if(err)	res.status(500).end(err.message);
+    		else {
+          var l=[];
+          for (var i=0;i<rows.length;i++)   l.push(rows[i].code);
+          res.status(200).jsonp(l);
+        }
+      });
     }
   });
+
 }
 
 exports.post_cards=function(req,res){
   var customer='SPEC';
-  var id=parseInt(req.params.id);
-  objects_service.get_simple_relation(customer,id,'identifies',false,'card',function(err,rows){
-    if(err) res.status(500).end(err.message);
-		else {
-      var l=[];
-      for (var i=0;i<req.body.length;i++)   l.push({type:'card',code:req.body[i],node:1});
-      objects_service.process_relations(customer,{id:id,type:'record'},
-      'identifies',false,'code',rows,l,function(r,result){
-        if(r!=null)	res.status(500).end(r.message);
-    		else{
-          res.status(200).end();
-          send_cards(result);
+  objects_service.get_entity(customer,'record','code',req.params.id,function(err,rows){
+    if (err)res.status(500).end(err.message);
+    else if (rows==null||rows.length==0) res.status(404).end();
+    else {
+      var id=rows[0].id;
+      objects_service.get_simple_relation(customer,id,'identifies',false,'card',function(err,rows){
+        if(err) res.status(500).end(err.message);
+    		else {
+          var l=[];
+          for (var i=0;i<req.body.length;i++)   l.push({type:'card',code:req.body[i],node:1});
+          objects_service.process_relations(customer,{id:id,type:'record'},
+          'identifies',false,'code',rows,l,function(r,result){
+            if(r!=null)	res.status(500).end(r.message);
+        		else{
+              res.status(200).end();
+              send_cards(result);
+            }
+          });
         }
       });
     }
@@ -109,12 +122,14 @@ exports.post_cards=function(req,res){
 function send_cards(result){
   for (var i=0;i<result.inserts.length;i++){
     var ins=result.inserts[i];
-    coms_service.global_send('card_insert',{card:ins.field,id:ins.id2});
+    coms_service.global_send('card_insert',{cards:[{card:ins.field,id:ins.id2}]});
   }
 }
 
 exports.get_fingerprints=function(req,res){
   var customer='SPEC';
+
+  //TODO: search by code
   objects_service.get_property(customer,'fingerprint',parseInt(req.params.id),function(err,rows){
     if(err)	res.status(500).end(err.message);
 		else  {
@@ -127,6 +142,8 @@ exports.get_fingerprints=function(req,res){
 
 exports.post_fingerprints=function(req,res){
   var customer='SPEC';
+
+  //TODO: search by code
   var id=parseInt(req.params.id);
   objects_service.get_simple_property(customer,'fingerprint',id,function(err,rows){
     if(err) res.status(500).end(err.message);
@@ -141,7 +158,7 @@ exports.post_fingerprints=function(req,res){
 
 exports.get_clockings=function(req,res){
   var customer='SPEC';
-  inputs_service.get_inputs(customer,function(err, rows){
+  inputs_service.get_inputs_complete(customer,function(err, rows){
     if(err)	res.status(500).end(err.message);
     else  res.status(200).jsonp(rows);
   });

@@ -8,7 +8,8 @@
     "body-parser": "latest",
     "express": "latest",
     "request": "latest",
-    "moment-timezone": "latest"
+    "moment-timezone": "latest",
+    "msgpack-lite": "latest"
   },
   "scripts": {
     "test": "mocha"

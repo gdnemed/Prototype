@@ -1,4 +1,5 @@
 var moment = require("moment-timezone");
+var msgpack = require("msgpack-lite");
 
 exports.send=function(socket,command,data){
 	switch(command){
@@ -6,7 +7,8 @@ exports.send=function(socket,command,data){
 		case 'record_insert':data.cmd=3;break;
 	}
 	data.seq=socket.spec_info.seq;
-	var str=JSON.stringify(data);
+	//var str=JSON.stringify(data);
+	var str=msgpack.encode(data);
 	socket.write(str);
 	socket.spec_info.seq++;
 }
@@ -14,7 +16,9 @@ exports.send=function(socket,command,data){
 exports.ack=function(frame,socket){exports.nack(frame,socket,1);}
 
 exports.nack=function(frame,socket,code){
-	var str=JSON.stringify({seq:frame.seq,ack:code,cmd:frame.cmd});
+	var j={seq:frame.seq,ack:code,cmd:frame.cmd};
+	//var str=JSON.stringify(j);
+	var str=msgpack.encode(j);
 	socket.write(str);
 }
 
@@ -30,9 +34,9 @@ exports.receive=function(data,socket,inputs_service){
 function new_clocking(data,socket,inputs_service){
 	var info=socket.spec_info;
 	var clocking={serial:info.serial,owner:data.id,card:data.card,result:data.resp,source:0};
-	clocking.reception = moment.tz(new Date().getTime(),"GMT").format('YYYYMMDDHHMMSS');;
-	clocking.gmt=moment.tz(data.tmp,"GMT").format('YYYYMMDDHHMMSS');
-	clocking.tmp= moment.tz(data.tmp,info.timezone).format('YYYYMMDDHHMMSS');
+	clocking.reception = moment.tz(new Date().getTime(),"GMT").format('YYYYMMDDHHmmss');
+	clocking.gmt=moment.tz(data.tmp,"GMT").format('YYYYMMDDHHmmss');
+	clocking.tmp= moment.tz(data.tmp,info.timezone).format('YYYYMMDDHHmmss');
 
 	inputs_service.create_clocking(clocking,info.customer,function(err){
 		if (err){

@@ -1,4 +1,5 @@
 var net=require('net');
+var msgpack = require("msgpack-lite");
 var clients = {};
 var server;
 var idsense;
@@ -39,7 +40,8 @@ function on_close(err,socket){
 }
 
 function receive(data_buffer,socket){
-	var data=JSON.parse(data_buffer.toString('utf-8'));
+	//var data=JSON.parse(data_buffer.toString('utf-8'));
+	var data=msgpack.decode(data_buffer);
 	var info=socket.spec_info;
 	console.log('socket '+info.name);
 	console.log(data);
