@@ -79,11 +79,14 @@ exports.get_inputs=function(customer,callback){
   });
 }
 
+//this is so specific fot test
 exports.get_inputs_complete=function(customer,callback){
   var db=dbs[customer];
-  db.all("SELECT tmp,owner record,result,a.card, 'lect1' reader from input_"+
+  db.all("select b.*,c.card record from (SELECT i.id,tmp,result,a.card, 'lect1' reader from input_"+
 node_id+"_201705 i left join (select id,value card from input_data_str_"+
-node_id+"_201705 where property='card') a on a.id=i.id", callback);
+node_id+"_201705 where property='card') a on a.id=i.id) b left join "+
+"(select id,value card from input_data_str_"+
+node_id+"_201705 where property='record') c on b.id=c.id", callback);
 }
 
 exports.create_clocking=function(clocking,customer,callback){
@@ -92,7 +95,6 @@ exports.create_clocking=function(clocking,customer,callback){
     return;
   }
   var db=dbs[customer];
-  console.log(clocking);
   var params=[current_id,clocking.tmp,clocking.gmt,clocking.reception,
     clocking.owner,clocking.source,clocking.result,clocking.serial];
   current_id++;
@@ -102,6 +104,9 @@ exports.create_clocking=function(clocking,customer,callback){
       process.exit(0);
     }
   });
+  var properties=[];
+  if (clocking.card) properties.push({property:'card',value:clocking.card});
+  if (clocking.record) properties.push({property:'record',value:clocking.record});
   db.run("BEGIN TRANSACTION",function(err){
     if (err) callback(err);
     else{
@@ -113,35 +118,34 @@ exports.create_clocking=function(clocking,customer,callback){
             db.run("ROLLBACK");
             callback(err);
           }
-          else if (clocking.card) set_input_data(customer, params[0],'card',clocking.card,callback);
-          else db.run("COMMIT",function(err){
-            if (err){
-              db.run("ROLLBACK");
-              callback(err);
-            }
-            else callback();
-          });
+          else set_input_data(db, params[0],properties,0,callback);
         }
       );
     }
   });
 }
 
-function set_input_data(customer,id,property,value,callback){
-  var db=dbs[customer];
-  db.run("INSERT INTO input_data_str_"+node_id+"_201705 (id,property,value) values (?,?,?)",
-    [id,property,value],
-    function(err){
-      if (err){
-        db.run("ROLLBACK");
-        callback(err);
-      }
-      else db.run("COMMIT",function(err){
+function set_input_data(db,id,properties,i,callback){
+  if (i>=properties.length) commit(db,callback);
+  else{
+    db.run("INSERT INTO input_data_str_"+node_id+"_201705 (id,property,value) values (?,?,?)",
+      [id,properties[i].property,properties[i].value],
+      function(err){
         if (err){
           db.run("ROLLBACK");
           callback(err);
         }
-        else callback();
+        else set_input_data(db,id,properties,i+1,callback);
       });
-    });
+  }
+}
+
+function commit(db,callback){
+  db.run("COMMIT",function(err){
+    if (err){
+      db.run("ROLLBACK");
+      callback(err);
+    }
+    else callback();
+  });
 }

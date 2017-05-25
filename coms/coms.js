@@ -1,13 +1,15 @@
 var net=require('net');
 var msgpack = require("msgpack-lite");
 var clients = {};
+var tables_versions={records:0,cards:0,time_types:0};
+
 var server;
 var idsense;
-var inputs_service;
+var logic_service;
 
-exports.init=function(listen,inputs){
+exports.init=function(listen,logic){
 	idsense=require('./idsense');
-	inputs_service=inputs;
+	logic_service=logic;
 	server = net.createServer(listen_function).listen(listen.port, listen.host);
 	console.log('coms listening at '+listen.host+":"+listen.port);
 }
@@ -47,12 +49,14 @@ function receive(data_buffer,socket){
 	console.log(data);
 	//each type of terminal, needs its own processing
 	switch(info.type){
-		case 'idSense':idsense.receive(data,socket,inputs_service);
+		case 'idSense':idsense.receive(data,socket,logic_service);
 			break;
 		default:generic_receive(data,socket);
 	}
 }
 
+/**Receive function when terminal type and serial are still unknown.
+*/
 function generic_receive(frame,socket){
 	var info=socket.spec_info;
 	info.type='idSense';
@@ -62,6 +66,7 @@ function generic_receive(frame,socket){
 	info.timezone='Europe/Madrid';
 	info.seq=1;
 	info.identified=true;
+	info.tables_versions={records:0,cards:0,time_types:0};
   if (info.serial!=null && frame.cmd==1){
   	//Change position in the map. Now we use id
   	clients['id'+info.serial]=socket;
@@ -71,6 +76,8 @@ function generic_receive(frame,socket){
 				break;
 			default:
 		}
+		logic_service.init_terminal(info.serial);
+		//check_versions(info) <-with versions
   }
 }
 
@@ -83,13 +90,13 @@ exports.global_send=function(command,data){
 	}
 }
 
-exports.send=function(id,command,data,res){
-	var socket=clients['id'+id];
+exports.send=function(serial,command,data,callback){
+	var socket=clients['id'+serial];
 	if (socket){
 		send_data(socket,command,data);
-		res.status(200).end();
+		callback();
 	}
-	else res.status(404).end();
+	else callback('Serial not found');
 }
 
 function send_data(socket,command,data){
@@ -97,5 +104,18 @@ function send_data(socket,command,data){
 	switch(socket.spec_info.type){
 		case 'idSense':idsense.send(socket,command,data);
 			break;
+	}
+}
+
+/**Compares server versions of the tables with terminal versions.
+If the table of the terminal it out of date, starts an upload process.
+*/
+function check_versions(spec_info){
+	for (var tab in tables_versions) {
+    if (tables_versions.hasOwnProperty(tab)) {
+			var sv=tables_versions[tab];
+			var tv=spec_info.tables_versions[tab];
+			if (tv<sv) logic_service.get_pending_registers(tab,tv,spec_info.customer,node_id,spec_info.serial);
+    }
 	}
 }
