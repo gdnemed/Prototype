@@ -4,9 +4,19 @@ const START_OF_TIME=19900101000000;
 const END_OF_TIME=99991231235959;
 
 var sqlite = require('sqlite3');
+var structured = require('./structured');
+
 var dbs={};
 var node_id;
 var state_service;
+
+var properties={
+  'language':{type:'str'}
+}
+
+var relations={
+  'identifies':{}
+}
 
 exports.init=function(node,customers,state){
   node_id=node;
@@ -62,9 +72,10 @@ exports.get_entities=function(customer,type,transform,callback){
 	});
 }
 
-exports.get_entity=function(customer,type,field,value,callback){
+exports.get_entity=function(customer,type,field,value,transform,callback){
   var db=dbs[customer];
-  db.all("SELECT * from entity_"+node_id+" where "+field+"=?"+(type?" and type=?":""),
+  db.all("SELECT "+(transform?transform:"*")+
+  " from entity_"+node_id+" where "+field+"=?"+(type?" and type=?":""),
     type?[value,type]:[value],
     function(err, rows){
   		if(err) callback(err);
@@ -97,9 +108,9 @@ exports.update_entity=function(customer,e,callback){
   );
 }
 
-exports.delete_entity=function(customer,id,callback){
+exports.delete_entity=function(customer,field,id,callback){
   var db=dbs[customer];
-  db.run("delete from entity_"+node_id+" where id=?",
+  db.run("delete from entity_"+node_id+" where "+field+"=?",
     [id],
     function(err){callback(err);}
   );
@@ -213,33 +224,66 @@ exports.get_relations=function(customer,callback){
 	});
 }
 
+/**Gets every entity related to entity 'entity' through relation 'relation', following
+direction 1->2 if 'forward' or 2->1 otherwise.
+type_related can be specified if only elements of a concrete type should be taken.
+*/
 exports.get_simple_relation=function(customer,entity,relation,forward,type_related,callback){
   var db=dbs[customer];
   db.all("SELECT id"+(forward?"2,node":"1")+" from relation_"+node_id+
-  " where relation=? and id"+(forward?1:2)+"=?",
-    [relation,entity],
+  " where relation=?"+(entity?" and id"+(forward?1:2)+"=?":""),
+    entity?[relation,entity]:[relation],
     function(err, rows){
   		if(err)	callback(err);
-  		else get_entities_related(customer,rows,0,[],type_related,forward,callback);
+  		else get_entities_related(customer,rows,0,[],type_related,forward,null,callback);
   	});
 }
 
-function get_entities_related(customer,rows,i,l,type_related,forward,callback){
-  if (i==rows.length) callback(null,l);
+/**Gets entity related to element i of 'rows' array (which stores the relation)
+and, if it is of type 'type_related', adds it to array l or, if l is null, puts
+its properties in rows.
+*/
+function get_entities_related(customer,rows,i,l,type_related,forward,transform,callback){
+  if (i==rows.length) callback(null,l?l:rows);
   else{
     exports.get_entity(customer,null,'id',
-      forward?rows[i].id2:rows[i].id1,
+      forward?rows[i].id2:rows[i].id1,transform,
       function(err,a){
         if (err) callback(err)
         else{
+          console.log(a);
           for (var j=0;j<a.length;j++){
-            if (type_related && a[j].type!=type_related) continue;
-            l.push(a[j]);
+            if (l){
+                if (type_related && a[j].type!=type_related) continue;
+                l.push(a[j]);
+            }
+            else{
+              delete rows[i].id1;
+              delete rows[i].id2;
+              delete rows[i].node;
+              for (var p in a[j]){
+                if (a[j].hasOwnProperty(p))
+                  rows[i][p]=a[j][p];
+              }
+            }
           }
-          get_entities_related(customer,rows,i+1,l,type_related,forward,callback);
+          get_entities_related(customer,rows,i+1,l,type_related,forward,transform,callback);
         }
       });
   }
+}
+
+/**Gets both elements of a relation
+*/
+exports.get_both_relation=function(customer,relation,transform1,transform2,callback){
+  var db=dbs[customer];
+  db.all("SELECT "+(transform1?transform1:"*")+
+  ",id2,node from relation_"+node_id+",entity_"+node_id+" where relation=? and id=id1",
+    [relation],
+    function(err, rows){
+  		if(err)	callback(err);
+  		else get_entities_related(customer,rows,0,null,null,true,transform2,callback);
+  	});
 }
 
 exports.delete_relation=function(customer,relation,id1,id2,callback){
@@ -291,7 +335,7 @@ function relations_inserts(customer,entity,relation,forward,field,rows_db,rows_a
   else{
     if (!rows_db.find(function(a){rows_api[i][field]==a[field]})){
       //Search if new related entity exists
-      exports.get_entity(customer,entity.type,field,rows_api[i][field],function(err,rows){
+      exports.get_entity(customer,entity.type,field,rows_api[i][field],'id',function(err,rows){
         if (err) callback(err);
         else if (rows!=null && rows.length>0)
           put_related_entity(customer,entity,relation,forward,field,rows_db,rows_api,i,result,callback);
@@ -321,4 +365,12 @@ function put_related_entity(customer,entity,relation,forward,field,rows_db,rows_
         relations_inserts(customer,entity,relation,forward,field,rows_db,rows_api,i+1,result,callback);
       });
 }
-////////////////////////////////////7
+////////////////////////////////////
+
+exports.get_query=function(req,res){
+  var db=dbs['SPEC'];
+  structured.structured_get(db,req.body,function(err,ret){
+    if(err)	res.status(500).end(err.message);
+		else res.status(200).jsonp(ret);
+  });
+}

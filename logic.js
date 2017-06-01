@@ -24,51 +24,58 @@ exports.post_record=function(req,res){
     return;
   }
   var e={type:'record',code:req.body.id,name:req.body.name};
-  objects_service.get_entity(customer,'record','code',e.code,function(err,entity_array){
+  objects_service.get_entity(customer,'record','code',e.code,'id',function(err,entity_array){
     if (err){
       res.status(500).end(err.message);
       return;
     }
     if (entity_array && entity_array.length>0){
+      //Update
       e.id=entity_array[0].id;
       objects_service.update_entity(customer,e,function(err,id){
         if (err) res.status(500).end(err.message);
-        else {
-          //now, properties
-          set_record_language(customer,e.id,req.body,function(){res.status(200).end()});
-        }
+        else set_properties(customer,e,req,res,200);
       });
     }
     else{
+      //Insert
       objects_service.insert_entity(customer,e,function(err,id){
         if (err) res.status(500).end(err.message);
         else {
-          //send to terminals
-          coms_service.global_send('record_insert',{records:[{id:e.code}]});
-          //now, properties
-          set_record_language(customer,id,req.body,function(err){
-            if (err) res.status(500).end(err.message);
-            else res.status(201).end(String(id));
-          });
+          e.id=id;
+          set_properties(customer,e,req,res,201);
         }
       });
     }
   });
 }
 
-function set_record_language(customer,id,data,callback){
-  if (data.language){
-    var property={property:'language',value:data.language};
-    objects_service.insert_property(customer,id,property,function(err){
+function set_properties(customer,e,req,res,code_result){
+  var l=[];
+  if (req.body.language) l.push({property:'language',value:req.body.language});
+  set_property(customer,e.id,l,0,function(err){
+    if (err) res.status(500).end(err.message);
+    else {
+      res.status(code_result).end(String(e.id));
+      //send to terminals
+      console.log('send '+e.code);
+      coms_service.global_send('record_insert',{records:[{id:e.code}]});
+    }
+  });
+}
+
+function set_property(customer,id,l,i,callback){
+  if (i>=l.length) callback();
+  else {
+    objects_service.insert_property(customer,id,l[i],function(err){
       if (err) res.status(500).end(err.message);
-      else callback();
+      else set_property(customer,id,l,i+1,callback);
     });
   }
-  else callback();
 }
 
 exports.delete_record=function(req,res){
-  objects_service.delete_entity(customer,parseInt(req.params.id),function(err,rows){
+  objects_service.delete_entity(customer,'code',req.params.id,function(err,rows){
     if(err)	res.status(500).end(err.message);
 		else  res.status(200).end();
   });
@@ -76,7 +83,7 @@ exports.delete_record=function(req,res){
 
 exports.get_cards=function(req,res){
   var customer='SPEC';
-  objects_service.get_entity(customer,'record','code',req.params.id,function(err,rows){
+  objects_service.get_entity(customer,'record','code',req.params.id,'id',function(err,rows){
     if (err)res.status(500).end(err.message);
     else if (rows==null||rows.length==0) res.status(404).end();
     else {
@@ -95,7 +102,7 @@ exports.get_cards=function(req,res){
 
 exports.post_cards=function(req,res){
   var customer='SPEC';
-  objects_service.get_entity(customer,'record','code',req.params.id,function(err,rows){
+  objects_service.get_entity(customer,'record','code',req.params.id,'id',function(err,rows){
     if (err)res.status(500).end(err.message);
     else if (rows==null||rows.length==0) res.status(404).end();
     else {
@@ -156,6 +163,27 @@ exports.post_fingerprints=function(req,res){
   });
 }
 
+exports.post_enroll=function(req,res){
+  var customer='SPEC';
+  objects_service.get_entity(customer,'record','code',req.params.id,'id',function(err,rows){
+    if (err)res.status(500).end(err.message);
+    else if (rows==null||rows.length==0) res.status(404).end();
+    else {
+      var id=rows[0].id;
+      objects_service.get_simple_property(customer,'enroll',id,function(err,rows){
+        if(err) res.status(500).end(err.message);
+    		else {
+          var f=objects_service.process_properties(customer,id,'enroll',rows,[req.body.enroll],function(r){
+            if(r!=null)	res.status(500).end(r.message);
+        		else res.status(200).end();
+          });
+        }
+      });
+    }
+  });
+}
+
+
 exports.get_clockings=function(req,res){
   var customer='SPEC';
   inputs_service.get_inputs_complete(customer,function(err, rows){
@@ -164,6 +192,13 @@ exports.get_clockings=function(req,res){
   });
 }
 
+exports.get_clockings_debug=function(req,res){
+  var customer='SPEC';
+  inputs_service.get_inputs(customer,function(err, r){
+    if(err)	res.status(500).end(err.message);
+    else  res.status(200).jsonp({input:r[0],input_data_str:r[1]});
+  });
+}
 
 exports.get_entities=function(req,res){
   var customer='SPEC';
@@ -187,4 +222,40 @@ exports.get_relations=function(req,res){
     if(err)	res.status(500).end(err.message);
     else  res.status(200).jsonp(rows);
   });
+}
+
+exports.init_terminal=function(serial){
+  var customer='SPEC';
+  objects_service.get_entities(customer,'record','CAST(code as integer) id',function(err, rows){
+    if(err)	console.log(err.message);
+    else  coms_service.global_send('record_insert',{records:rows});
+  });
+  objects_service.get_both_relation(customer,'identifies','code card','CAST(code as integer) id',function(err, rows){
+    if(err)	console.log(err.message);
+    else  coms_service.global_send('card_insert',{cards:rows});
+  });
+}
+
+exports.create_clocking=function(clocking,customer,callback){
+  objects_service.get_entity(customer,'record','code',clocking.record,'id',function(err,rows){
+    if (err) callback(err);
+    else{
+      console.log(rows);
+      if (rows && rows.length>0) clocking.owner=rows[0].id;
+      inputs_service.create_clocking(clocking,customer,callback);
+    }
+  });
+}
+
+/**Upload process
+*/
+exports.get_pending_registers=function(tab,tv,customer,node,serial){
+  switch(tab){
+    //TODO: Falta el where amb la versió
+    case 'record':objects_service.get_entities(customer,'record','CAST(code as integer) id',
+        function(err, rows){
+          coms_service.send_data(serial,'record_insert',{records:rows});
+        });
+    break;
+  }
 }

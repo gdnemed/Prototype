@@ -20,7 +20,6 @@ function init(){
   });
 
   client.on('data', function(data_buffer) {
-    console.log(data_buffer);
     var  j=msgpack.decode(data_buffer);
     //var data=data_buffer.toString('utf-8');
     //var j=JSON.parse(data);
@@ -33,10 +32,11 @@ function init(){
        switch(j.cmd){
         case 2:for (var i=0;i<j.cards.length;i++) cards['c'+j.cards[i].card]=j.cards[i].id;
         break;
-        case 3:for (var i=0;i<j.cards.length;i++) records['r'+j.records[i].id]=true;
+        case 3:for (var i=0;i<j.records.length;i++) records['r'+j.records[i].id]=true;
         break;
       }
-      client.write(JSON.stringify({seq:j.seq,cmd:j.cmd,ack:1}));
+      //client.write(JSON.stringify({seq:j.seq,cmd:j.cmd,ack:1}));
+      client.write(msgpack.encode({seq:j.seq,cmd:j.cmd,ack:1}));
     }
   });
 
@@ -52,7 +52,6 @@ function send(data){
   //client.write(JSON.stringify(data));
   var m=msgpack.encode(data);
   console.log(data);
-  console.log(m);
   client.write(m);
   sequence++;
 }
