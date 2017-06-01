@@ -1,4 +1,4 @@
-var sqlite = require('sqlite3');
+var utilsDb = require('../utils/db.js');
 var dbs={};
 var node_id;
 var current_id;
@@ -10,7 +10,7 @@ exports.init=function(customers){
 }
 
 function init_db(customer){
-  var db = new sqlite.Database('./db/'+customer+'/state.db');
+  var db = utilsDb.createDatabase(customer, 'state');
   db.run("CREATE TABLE if not exists settings (var text, code text)");
   db.run("CREATE TABLE if not exists global_id(id integer)",[],function(err){
     if (err){

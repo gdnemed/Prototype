@@ -1,3 +1,5 @@
+var utilsDb = require('../utils/db.js');
+
 const START_OF_TIME=19900101000000;
 const END_OF_TIME=99991231235959;
 
@@ -14,7 +16,8 @@ exports.init=function(node,customers,state){
 }
 
 function init_db(customer){
-  var db = new sqlite.Database('./db/'+customer+'/objects_'+node_id+'.db');
+  var db = utilsDb.createDatabase(customer, 'objects', node_id);
+
   db.run("CREATE TABLE if not exists entity_"+node_id+
   " (id integer, type text, name text, name2 text, intname text, document text, code text)",[],function(){
     db.run("CREATE UNIQUE INDEX if not exists i_entity_"+node_id+"_id on entity_"+node_id+" (id)");
