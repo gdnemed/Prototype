@@ -11,7 +11,7 @@ exports.init=function(customers){
 
 function init_db(customer){
   var db = new sqlite.Database('./db/'+customer+'/state.db');
-  db.run("CREATE TABLE if not exists settings (var text, code text)");
+  db.run("CREATE TABLE if not exists settings (setting text, value text)");
   db.run("CREATE TABLE if not exists global_id(id integer)",[],function(err){
     if (err){
       console.log(err.message);
@@ -44,6 +44,65 @@ exports.new_id=function(customer,callback){
     db.run("UPDATE global_id set id=id+1",[],function(err,rows){
       current_id++;
       callback(err,current_id);
+    });
+  }
+}
+
+exports.get_settings=function(req,res){
+  select_settings('SPEC',function(err,result){
+    if (err)res.status(500).end(err.message);
+    else res.status(200).jsonp(result);
+  });
+}
+
+select_settings=function(customer,callback){
+  var db=dbs[customer];
+  db.all("SELECT setting,value from settings",[],function(err,rows){
+    if (err)  callback(err);
+    else {
+      var ret={};
+      for (var i=0;i<rows.length;i++) ret[rows[i].setting]=rows[i].value;
+      callback(null,ret);
+    }
+  });
+}
+
+exports.post_settings=function(req,res){
+  update_settings('SPEC',req.body,function(err,result){
+    if (err)res.status(500).end(err.message);
+    else res.status(200).jsonp(result);
+  });
+}
+
+update_settings=function(customer,settings,callback){
+  var db=dbs[customer];
+  var l=[];
+  for (var property in settings) {
+    if (settings.hasOwnProperty(property))
+      l.push({setting:property,value:settings[property]});
+  }
+  put_setting_item(db,l,0,callback);
+}
+
+function put_setting_item(db,l,i,callback){
+  if (i>=l.length) callback();
+  else{
+    var setting=l[i].setting;
+    var value=l[i].value;
+    db.all("SELECT value from settings where setting=?",[setting],function(err,rows){
+      if (err)  callback(err);
+      else  if (rows==null||rows.length==0){
+        db.run("INSERT INTO settings(setting,value) values (?,?)",[setting,value],function(err){
+          if (err) callback(err);
+          else put_setting_item(db,l,i+1,callback);
+        });
+      }
+      else {
+        db.run("UPDATE settings set value=? where setting=?",[value,setting],function(err){
+          if (err) callback(err);
+          else put_setting_item(db,l,i+1,callback);
+        });
+      }
     });
   }
 }

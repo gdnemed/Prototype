@@ -82,10 +82,10 @@ exports.get_inputs=function(customer,callback){
 //this is so specific fot test
 exports.get_inputs_complete=function(customer,callback){
   var db=dbs[customer];
-  db.all("select b.*,c.card record from (SELECT i.id,tmp,result,a.card, 'lect1' reader from input_"+
+  db.all("select b.*,c.record from (SELECT i.id,tmp,result,a.card, 'lect1' reader from input_"+
 node_id+"_201705 i left join (select id,value card from input_data_str_"+
 node_id+"_201705 where property='card') a on a.id=i.id) b left join "+
-"(select id,value card from input_data_str_"+
+"(select id,value record from input_data_str_"+
 node_id+"_201705 where property='record') c on b.id=c.id", callback);
 }
 

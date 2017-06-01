@@ -42,9 +42,12 @@ function init_api_server(){
   api.post('/api/coms/records/:id/fingerprints',logic.post_fingerprints);
   api.get('/api/coms/clockings',logic.get_clockings);
   api.get('/api/coms/clockings_debug',logic.get_clockings_debug);
+  api.post('/api/objects/query',objects.get_query);
   api.get('/api/objects/entities',logic.get_entities);
   api.get('/api/objects/properties',logic.get_properties);
   api.get('/api/objects/relations',logic.get_relations);
+  api.post('/api/state/settings',state.post_settings);
+  api.get('/api/state/settings',state.get_settings);
   //Run http server
   http_server = api.listen(environment.api_listen.port, function () {
 		  var address = http_server.address();

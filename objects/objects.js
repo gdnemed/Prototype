@@ -2,9 +2,19 @@ const START_OF_TIME=19900101000000;
 const END_OF_TIME=99991231235959;
 
 var sqlite = require('sqlite3');
+var structured = require('./structured');
+
 var dbs={};
 var node_id;
 var state_service;
+
+var properties={
+  'language':{type:'str'}
+}
+
+var relations={
+  'identifies':{}
+}
 
 exports.init=function(node,customers,state){
   node_id=node;
@@ -352,4 +362,12 @@ function put_related_entity(customer,entity,relation,forward,field,rows_db,rows_
         relations_inserts(customer,entity,relation,forward,field,rows_db,rows_api,i+1,result,callback);
       });
 }
-////////////////////////////////////7
+////////////////////////////////////
+
+exports.get_query=function(req,res){
+  var db=dbs['SPEC'];
+  structured.structured_get(db,req.body,function(err,ret){
+    if(err)	res.status(500).end(err.message);
+		else res.status(200).jsonp(ret);
+  });
+}

@@ -58,6 +58,7 @@ function set_properties(customer,e,req,res,code_result){
     else {
       res.status(code_result).end(String(e.id));
       //send to terminals
+      console.log('send '+e.code);
       coms_service.global_send('record_insert',{records:[{id:e.code}]});
     }
   });
@@ -161,6 +162,27 @@ exports.post_fingerprints=function(req,res){
     }
   });
 }
+
+exports.post_enroll=function(req,res){
+  var customer='SPEC';
+  objects_service.get_entity(customer,'record','code',req.params.id,'id',function(err,rows){
+    if (err)res.status(500).end(err.message);
+    else if (rows==null||rows.length==0) res.status(404).end();
+    else {
+      var id=rows[0].id;
+      objects_service.get_simple_property(customer,'enroll',id,function(err,rows){
+        if(err) res.status(500).end(err.message);
+    		else {
+          var f=objects_service.process_properties(customer,id,'enroll',rows,[req.body.enroll],function(r){
+            if(r!=null)	res.status(500).end(r.message);
+        		else res.status(200).end();
+          });
+        }
+      });
+    }
+  });
+}
+
 
 exports.get_clockings=function(req,res){
   var customer='SPEC';
