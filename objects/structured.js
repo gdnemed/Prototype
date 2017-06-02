@@ -1,4 +1,4 @@
-const MODEL = require('./model')
+const MODEL = require('./model');
 var node_id=1;
 
 exports.structured_get=function(db,str,callback){
@@ -31,7 +31,7 @@ exports.structured_get=function(db,str,callback){
     case 'entity':
       var query="SELECT id _id_,"+select.complete+" FROM entity_"+node_id;
       if (str._entity_) where=" where type='"+type+"'";
-      if (str.filter){
+      if (filter){
         if (where) where+=" and ("+filter+")";
         else where=" where "+filter;
       }
@@ -75,7 +75,22 @@ function get_simple_fields(str,prefix){
             res.complete+=","+(prefix?prefix+".":"")+str[property]+" "+property;
             res.names+=","+property;
           }
-          else res={complete:str[property]+" "+property,names:property};
+          else res={complete:(prefix?prefix+".":"")+str[property]+" "+property,names:property};
+          switch(str[property]){
+            case 'id1':case 'id2':case 't1':case 't2':case 'order':case 'node':
+              if (res.complete_relation)
+                res.complete_relation+=","+(prefix?prefix+".":"")+str[property]+" "+property;
+              else res.complete_relation=(prefix?prefix+".":"")+str[property]+" "+property;
+              if (res.names_relation) res.names_relation+=","+property;
+              else res.names_relation=property;
+            break;
+            default:
+              if (res.complete_entity)
+                res.complete_entity+=","+(prefix?prefix+".":"")+str[property]+" "+property;
+              else res.complete_entity=(prefix?prefix+".":"")+str[property]+" "+property;
+              if (res.names_entity) res.names_entity+=","+property;
+              else  res.names_entity=property;
+          }
         }
       }
   	}
@@ -92,14 +107,39 @@ function get_subqueries(str){
         else if (typeof str[property] != 'string'){
           var d=str[property];
           d._entry_name_=property;
+          var w=d._what_;
           //relation
-          if (d._what_.indexOf('->')<0 && d._what_.indexOf('<-')<0){
+          if (w.indexOf('->')>=0 || w.indexOf('<-')>=0){
+            if (w.charAt(0)=='['){
+              w=w.substring(1,w.length-1);
+              d._is_array_=true;
+            }
+            if (w.charAt(0)=='*'){
+              w=w.substring(1,w.length);
+              d._recursive_=true;
+            }
+            else if (w.charAt(w.length-1)=='*'){
+              w=w.substring(0,w.length-1);
+              d._recursive_=true;
+            }
+            if (w.charAt(0)=='<'){
+              w=w.substring(2,w.length);
+              d._relation_='<-';
+            }
+            else if (w.charAt(w.length-1)=='>'){
+              w=w.substring(0,w.length-2);
+              d._relation_='->';
+            }
+            d._type_=w;
             if (res) res.push(d);
             else res=[d];
           }
-          else{
+          else if (d._what_.charAt(0)=='['){
             //array of properties
-
+            d._is_array_=true;
+            d._type_=w.substring(1,w.length-1);
+            if (res) res.push(d);
+            else res=[d];
           }
         }
       }
@@ -121,16 +161,14 @@ function get_property_fields(query,str){
           var d=str[property];
           //No relations, and only single properties
           if (d._what_.indexOf('->')<0 && d._what_.indexOf('<-')<0 && d._what_.charAt(0)!='['){
-            var select=get_simple_fields(d,"q"+i);
+            var select=get_simple_fields(d);
             //If no detailed fields, we assume it is the "value"
             if (select==null) select={names:property,complete:"value "+property}
-            if (res){
-              res="select sq"+i+".*"
-            }
-            else res="select q.*,"+select.names+" from ("+query+
-            ") q left join (select id _idp_,"+select.complete+
-            " from property_"+get_type_property(d._what_)+"_"+node_id+") q"+i+
-            " on q._id_=q"+i+"._idp_";
+            if (!res) res=query;
+            res="select sq"+i+".*,"+select.names+" from ("+res+
+              ") sq"+i+" left join (select entity _idp_,"+select.complete+
+              " from property_"+MODEL.get_type_property(d._what_)+"_"+node_id+
+              " where property='"+d._what_+"') q"+i+" on sq"+i+"._id_=q"+i+"._idp_";
             i++;
           }
         }
@@ -142,32 +180,71 @@ function get_property_fields(query,str){
 }
 
 function process_row(db,rows,i,subqueries,j,callback){
-  if (i>rows.length) callback(null,rows);
-  if (j>=subqueries.length){
+  console.log('process_row '+i+','+j);
+  if (i>=rows.length) callback(null,rows);
+  else if (j>=subqueries.length){
     delete rows[i]._id_;
     process_row(db,rows,i+1,subqueries,0,callback);
   }
-  else{
+  else if (rows[i]._id_){
     var s=subqueries[j];
-    var sql="select "+(s.forward?"id2,node":"id1")+" from relation_"+node_id+
-    " where relation=? and "+(s.forward?"id1":"id2")+"=?";
-    db.all(sql,[s.type,rows[i]._id_],function(err,rows_sq){
+    var select=get_simple_fields(s);
+    var sq=get_subqueries(s);
+    var sql;
+    switch(s._relation_){
+      case '->': sql="select id2 _id_,node _node_"+
+      (select&&select.complete_relation?","+select.complete_relation:"")+
+      " from relation_"+node_id+
+      " where relation=? and id1=?";
+      break;
+      case '<-': sql="select id1 _id_"+
+      (select&&select.complete_relation?","+select.complete_relation:"")+
+      " from relation_"+node_id+
+      " where relation=? and id2=?";
+      break;
+      default:  sql="select "+(select?select.complete:"value")+
+      " from property_"+MODEL.get_type_property(s._type_)+"_"+node_id+
+      " where property=? and entity=?";
+      break;
+    }
+    if (s._relation_ && select && select.complete_entity && !sq){
+      sql="select r.*,"+select.complete_entity+
+      " from ("+sql+") r left join entity_"+node_id+" on r._id_=entity_"+node_id+".id"
+    }
+    console.log(sql);
+    db.all(sql,[s._type_,rows[i]._id_],function(err,rows_sq){
       if (err) callback(err);
       else{
-        /*if (s.name)  rows[i][name]=rows_sq;
-        else{
-          for (var property in clients) {
-            if (clients.hasOwnProperty(property)) {
-
+        if (rows_sq.length>0){
+          if (s._relation_){
+            if (select) {
+              for (var k=0;k<rows_sq.length;k++)
+                delete rows_sq[k]._id_;
+              rows[i][s._entry_name_]=rows_sq;
             }
-        	}
-        }*/
+            else {
+              var l=[];
+              for (var k=0;k<rows_sq.length;k++)
+                l.push(rows_sq[k]._id_);
+              rows[i][s._entry_name_]=l;
+            }
+          }
+          else{//properties
+            if (s._is_array_){
+                if (select) rows[i][s._entry_name_]=rows_sq;
+                else{
+                  var l=[];
+                  for (var k=0;k<rows_sq.length;k++) l.push(rows_sq[k].value);
+                  rows[i][s._entry_name_]=l;
+                }
+            }
+            else rows[i][s._entry_name_]=rows_sq[0].value;
+          }
+        }
         process_row(db,rows,i,subqueries,j+1,callback);
       };
     });
   }
-}
-
-function get_type_property(p){
-  return MODEL.PROPERTIES[p].type;
+  //strange case, when join returns multiple rows
+  else process_row(db,rows,i+1,subqueries,0,callback);
 }

@@ -1,7 +1,6 @@
+const CT = require('../CT');
+const MODEL = require('./model');
 var utilsDb = require('../utils/db.js');
-
-const START_OF_TIME=19900101000000;
-const END_OF_TIME=99991231235959;
 
 var sqlite = require('sqlite3');
 var structured = require('./structured');
@@ -111,7 +110,7 @@ exports.delete_entity=function(customer,field,id,callback){
 exports.get_properties=function(customer,callback){
   var db=dbs[customer];
   db.all("SELECT * from property_str_"+node_id,
-    [property,entity],
+    [],
     function(err, rows){
 		if(err)	callback(err);
 		else callback(null,rows);
@@ -121,7 +120,7 @@ exports.get_properties=function(customer,callback){
 exports.get_property=function(customer,property,entity,callback){
   var db=dbs[customer];
   //TODO: detectar el tipus de taula a partir de la propietat
-  db.all("SELECT * from property_str_"+node_id+" where property=? and entity=?",
+  db.all("SELECT * from property_"+MODEL.get_type_property(property)+"_"+node_id+" where property=? and entity=?",
     [property,entity],
     function(err, rows){
 		if(err)	callback(err);
@@ -132,7 +131,7 @@ exports.get_property=function(customer,property,entity,callback){
 exports.get_simple_property=function(customer,property,entity,callback){
   var db=dbs[customer];
   //TODO: detectar el tipus de taula a partir de la propietat
-  db.all("SELECT value from property_str_"+node_id+" where property=? and entity=?",
+  db.all("SELECT value from property_"+MODEL.get_type_property(property)+"_"+node_id+" where property=? and entity=?",
     [property,entity],
     function(err, rows){
 		if(err)	callback(err);
@@ -146,10 +145,10 @@ exports.get_simple_property=function(customer,property,entity,callback){
 
 exports.insert_property=function(customer,entity,property,callback){
   var db=dbs[customer];
-  if (property.t1==null) property.t1=START_OF_TIME;
-  if (property.t2==null) property.t2=END_OF_TIME;
+  if (property.t1==null) property.t1=CT.START_OF_TIME;
+  if (property.t2==null) property.t2=CT.END_OF_TIME;
   //TODO: detectar el tipus de taula a partir de la propietat
-  db.run("INSERT INTO property_str_"+node_id+" (entity,property,t1,t2,value) VALUES (?,?,?,?,?)",
+  db.run("INSERT INTO property_"+MODEL.get_type_property(property.property)+"_"+node_id+" (entity,property,t1,t2,value) VALUES (?,?,?,?,?)",
     [entity,property.property,property.t1,property.t2,property.value],
     function(err){callback(err);}
   );
@@ -158,7 +157,7 @@ exports.insert_property=function(customer,entity,property,callback){
 exports.delete_property=function(customer,entity,property,value,callback){
   var db=dbs[customer];
   //TODO: detectar el tipus de taula a partir de la propietat
-  db.run("DELETE FROM property_str_"+node_id+" where entity=? and property=? and value=?",
+  db.run("DELETE FROM property_"+MODEL.get_type_property(property.property)+"_"+node_id+" where entity=? and property=? and value=?",
     [entity,property.property,property.value],
     function(err){callback(err);}
   );
@@ -365,4 +364,8 @@ exports.get_query=function(req,res){
     if(err)	res.status(500).end(err.message);
 		else res.status(200).jsonp(ret);
   });
+}
+
+function get_type_property(p){
+  return MODEL.PROPERTIES[p].type;
 }

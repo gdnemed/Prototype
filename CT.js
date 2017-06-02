@@ -4,6 +4,8 @@
 
 module.exports = {
 
-    DB_PATH: "./db/"
+    DB_PATH: "./db/",
+    START_OF_TIME: 19900101000000,
+    END_OF_TIME: 99991231235959
 
 };

@@ -40,6 +40,7 @@ function init_api_server(){
   api.post('/api/coms/records/:id/cards',logic.post_cards);
   api.get('/api/coms/records/:id/fingerprints',logic.get_fingerprints);
   api.post('/api/coms/records/:id/fingerprints',logic.post_fingerprints);
+  api.post('/api/coms/records/:id/enroll',logic.post_enroll);
   api.get('/api/coms/clockings',logic.get_clockings);
   api.get('/api/coms/clockings_debug',logic.get_clockings_debug);
   api.post('/api/objects/query',objects.get_query);
