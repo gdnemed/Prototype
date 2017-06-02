@@ -1,3 +1,4 @@
+const MODEL = require('./model')
 var node_id=1;
 
 exports.structured_get=function(db,str,callback){
@@ -168,5 +169,5 @@ function process_row(db,rows,i,subqueries,j,callback){
 }
 
 function get_type_property(p){
-  return properties[p].type;
+  return MODEL.PROPERTIES[p].type;
 }

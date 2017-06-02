@@ -10,14 +10,6 @@ var dbs={};
 var node_id;
 var state_service;
 
-var properties={
-  'language':{type:'str'}
-}
-
-var relations={
-  'identifies':{}
-}
-
 exports.init=function(node,customers,state){
   node_id=node;
   state_service=state;
