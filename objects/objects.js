@@ -4,49 +4,49 @@ const MODEL = require('./model')
 var structured = require('./structured')
 
 var dbs = {}
-var node_id
-var state_service
+var nodeId
+var stateService
 
 exports.init = function (node, customers, state) {
-  node_id = node
-  state_service = state
+  nodeId = node
+  stateService = state
   for (var i = 0; i < customers.length; i++) {
-    dbs[customers[i]] = init_db(customers[i])
+    dbs[customers[i]] = initDB(customers[i])
   }
 }
 
-function init_db (customer) {
-  var db = utilsDb.createDatabase(customer, 'objects', node_id)
+function initDB (customer) {
+  var db = utilsDb.createDatabase(customer, 'objects', nodeId)
 
-  db.run('CREATE TABLE if not exists entity_' + node_id +
+  db.run('CREATE TABLE if not exists entity_' + nodeId +
   ' (id integer, type text, name text, name2 text, intname text, document text, code text)', [], function () {
-    db.run('CREATE UNIQUE INDEX if not exists i_entity_' + node_id + '_id on entity_' + node_id + ' (id)')
-    db.run('CREATE INDEX if not exists i_entity_' + node_id + '_code on entity_' + node_id + ' (type,code)')
-    db.run('CREATE INDEX if not exists i_entity_' + node_id + '_name on entity_' + node_id + ' (type,name)')
-    db.run('CREATE INDEX if not exists i_entity_' + node_id + '_nc on entity_' + node_id + ' (type,name,name2)')
-    db.run('CREATE INDEX if not exists i_entity_' + node_id + '_document on entity_' + node_id + ' (type,document)')
+    db.run('CREATE UNIQUE INDEX if not exists i_entity_' + nodeId + '_id on entity_' + nodeId + ' (id)')
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_code on entity_' + nodeId + ' (type,code)')
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_name on entity_' + nodeId + ' (type,name)')
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_nc on entity_' + nodeId + ' (type,name,name2)')
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_document on entity_' + nodeId + ' (type,document)')
   })
-  db.run('CREATE TABLE if not exists property_num_' + node_id +
+  db.run('CREATE TABLE if not exists property_num_' + nodeId +
   ' (entity integer, property text, t1 integer, t2 integer, value integer)', [], function () {
-    db.run('CREATE INDEX if not exists i_property_num_' + node_id + '_pe on property_num_' + node_id + ' (property,entity)')
-    db.run('CREATE INDEX if not exists i_property_num_' + node_id + '_pv on property_num_' + node_id + ' (property,value)')
+    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pe on property_num_' + nodeId + ' (property,entity)')
+    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pv on property_num_' + nodeId + ' (property,value)')
   })
 
-  db.run('CREATE TABLE if not exists property_str_' + node_id +
+  db.run('CREATE TABLE if not exists property_str_' + nodeId +
   ' (entity integer, property text, t1 integer, t2 integer, value text)', [], function () {
-    db.run('CREATE INDEX if not exists i_property_str_' + node_id + '_pe on property_str_' + node_id + ' (property,entity)')
-    db.run('CREATE INDEX if not exists i_property_num_' + node_id + '_pv on property_num_' + node_id + ' (property,value)')
+    db.run('CREATE INDEX if not exists i_property_str_' + nodeId + '_pe on property_str_' + nodeId + ' (property,entity)')
+    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pv on property_num_' + nodeId + ' (property,value)')
   })
 
-  db.run('CREATE TABLE if not exists property_bin_' + node_id +
+  db.run('CREATE TABLE if not exists property_bin_' + nodeId +
   ' (entity integer, property text, t1 integer, t2 integer, value blob)', [], function () {
-    db.run('CREATE INDEX if not exists i_property_bin_' + node_id + '_pe on property_bin_' + node_id + ' (property,entity)')
+    db.run('CREATE INDEX if not exists i_property_bin_' + nodeId + '_pe on property_bin_' + nodeId + ' (property,entity)')
   })
 
-  db.run('CREATE TABLE if not exists relation_' + node_id +
+  db.run('CREATE TABLE if not exists relation_' + nodeId +
   ' (relation text, id1 integer, id2 integer, t1 integer, t2 integer, ord integer, node integer)', [], function () {
-    db.run('CREATE INDEX if not exists i_relation_' + node_id + '_r1 on relation_' + node_id + ' (relation,id1)')
-    db.run('CREATE INDEX if not exists i_relation_' + node_id + '_r2 on relation_' + node_id + ' (relation,id2)')
+    db.run('CREATE INDEX if not exists i_relation_' + nodeId + '_r1 on relation_' + nodeId + ' (relation,id1)')
+    db.run('CREATE INDEX if not exists i_relation_' + nodeId + '_r2 on relation_' + nodeId + ' (relation,id2)')
   })
   return db
 }
@@ -54,10 +54,10 @@ function init_db (customer) {
 exports.get_entities = function (customer, type, transform, callback) {
   var db = dbs[customer]
   db.all('SELECT ' + (transform || '*') +
-  ' from entity_' + node_id + (type ? ' where type=?' : ''),
+  ' from entity_' + nodeId + (type ? ' where type=?' : ''),
   type ? [type] : [],
   function (err, rows) {
-    if (err)	callback(err)
+    if (err) callback(err)
     else callback(null, rows)
   })
 }
@@ -65,24 +65,24 @@ exports.get_entities = function (customer, type, transform, callback) {
 exports.get_entity = function (customer, type, field, value, transform, callback) {
   var db = dbs[customer]
   db.all('SELECT ' + (transform || '*') +
-  ' from entity_' + node_id + ' where ' + field + '=?' + (type ? ' and type=?' : ''),
+  ' from entity_' + nodeId + ' where ' + field + '=?' + (type ? ' and type=?' : ''),
     type ? [value, type] : [value],
     function (err, rows) {
-  		if (err) callback(err)
-  		else callback(null, rows)
-  	})
+      if (err) callback(err)
+      else callback(null, rows)
+    })
 }
 
 exports.insert_entity = function (customer, e, callback) {
-  state_service.new_id(customer, function (err, newid) {
+  stateService.new_id(customer, function (err, newid) {
     if (err) callback(err)
     else {
       var db = dbs[customer]
       var params = [newid, e.type, e.name, e.name2, e.document, e.code, e.intname]
-      db.run('INSERT INTO entity_' + node_id + ' (id,type,name,name2,document,code,intname) VALUES (?,?,?,?,?,?,?)',
+      db.run('INSERT INTO entity_' + nodeId + ' (id,type,name,name2,document,code,intname) VALUES (?,?,?,?,?,?,?)',
         params,
         function (err) {
-          if (err)	callback(err)
+          if (err) callback(err)
       		else callback(null, newid)
         }
       )
@@ -92,7 +92,7 @@ exports.insert_entity = function (customer, e, callback) {
 
 exports.update_entity = function (customer, e, callback) {
   var db = dbs[customer]
-  db.run('UPDATE entity_' + node_id + ' set type=?,name=?,name2=?,document=?,code=?,intname=? where id=?',
+  db.run('UPDATE entity_' + nodeId + ' set type=?,name=?,name2=?,document=?,code=?,intname=? where id=?',
     [e.type, e.name, e.name2, e.document, e.code, e.intname, e.id],
     function (err) { callback(err) }
   )
@@ -100,7 +100,7 @@ exports.update_entity = function (customer, e, callback) {
 
 exports.delete_entity = function (customer, field, id, callback) {
   var db = dbs[customer]
-  db.run('delete from entity_' + node_id + ' where ' + field + '=?',
+  db.run('delete from entity_' + nodeId + ' where ' + field + '=?',
     [id],
     function (err) { callback(err) }
   )
@@ -108,10 +108,10 @@ exports.delete_entity = function (customer, field, id, callback) {
 
 exports.get_properties = function (customer, callback) {
   var db = dbs[customer]
-  db.all('SELECT * from property_str_' + node_id,
+  db.all('SELECT * from property_str_' + nodeId,
     [],
     function (err, rows) {
-      if (err)	callback(err)
+      if (err) callback(err)
       else callback(null, rows)
     })
 }
@@ -119,10 +119,10 @@ exports.get_properties = function (customer, callback) {
 exports.get_property = function (customer, property, entity, callback) {
   var db = dbs[customer]
   // TODO: detectar el tipus de taula a partir de la propietat
-  db.all('SELECT * from property_' + MODEL.get_type_property(property) + '_' + node_id + ' where property=? and entity=?',
+  db.all('SELECT * from property_' + MODEL.get_type_property(property) + '_' + nodeId + ' where property=? and entity=?',
     [property, entity],
     function (err, rows) {
-      if (err)	callback(err)
+      if (err) callback(err)
       else callback(null, rows)
     })
 }
@@ -130,10 +130,10 @@ exports.get_property = function (customer, property, entity, callback) {
 exports.get_simple_property = function (customer, property, entity, callback) {
   var db = dbs[customer]
   // TODO: detectar el tipus de taula a partir de la propietat
-  db.all('SELECT value from property_' + MODEL.get_type_property(property) + '_' + node_id + ' where property=? and entity=?',
+  db.all('SELECT value from property_' + MODEL.get_type_property(property) + '_' + nodeId + ' where property=? and entity=?',
     [property, entity],
     function (err, rows) {
-      if (err)	callback(err)
+      if (err) callback(err)
       else {
         var l = []
         for (var i = 0; i < rows.length; i++) l.push(rows[i].value)
@@ -147,7 +147,7 @@ exports.insert_property = function (customer, entity, property, callback) {
   if (property.t1 == null) property.t1 = CT.START_OF_TIME
   if (property.t2 == null) property.t2 = CT.END_OF_TIME
   // TODO: detectar el tipus de taula a partir de la propietat
-  db.run('INSERT INTO property_' + MODEL.get_type_property(property.property) + '_' + node_id + ' (entity,property,t1,t2,value) VALUES (?,?,?,?,?)',
+  db.run('INSERT INTO property_' + MODEL.get_type_property(property.property) + '_' + nodeId + ' (entity,property,t1,t2,value) VALUES (?,?,?,?,?)',
     [entity, property.property, property.t1, property.t2, property.value],
     function (err) { callback(err) }
   )
@@ -156,7 +156,7 @@ exports.insert_property = function (customer, entity, property, callback) {
 exports.delete_property = function (customer, entity, property, value, callback) {
   var db = dbs[customer]
   // TODO: detectar el tipus de taula a partir de la propietat
-  db.run('DELETE FROM property_' + MODEL.get_type_property(property.property) + '_' + node_id + ' where entity=? and property=? and value=?',
+  db.run('DELETE FROM property_' + MODEL.get_type_property(property.property) + '_' + nodeId + ' where entity=? and property=? and value=?',
     [entity, property.property, property.value],
     function (err) { callback(err) }
   )
@@ -164,37 +164,37 @@ exports.delete_property = function (customer, entity, property, value, callback)
 
 // ///////Complete update for a list of property values//////
 
-function properties_deletes (customer, entity, property, rows_db, rows_api, i, result, callback) {
+function propertiesDeletes (customer, entity, property, rows_db, rows_api, i, result, callback) {
   if (i >= rows_db.length) callback()
   else {
     if (!rows_api.find(function (a) { rows_db[i] == a })) {
       exports.delete_property(customer, entity, {property: property, value: rows_db[i]}, rows_db[i], function (err) {
         if (err != null) result.error = err
-        properties_deletes(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
+        propertiesDeletes(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
       })
-    } else properties_deletes(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
+    } else propertiesDeletes(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
   }
 }
 
-function properties_inserts (customer, entity, property, rows_db, rows_api, i, result, callback) {
+function propertiesInserts (customer, entity, property, rows_db, rows_api, i, result, callback) {
   if (i >= rows_api.length) callback()
   else {
     if (!rows_db.find(function (a) { rows_api[i] == a })) {
       exports.insert_property(customer, entity, {property: property, value: rows_api[i]}, function (err) {
         if (err != null) result.error = err
-        properties_inserts(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
+        propertiesInserts(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
       })
-    } else properties_inserts(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
+    } else propertiesInserts(customer, entity, property, rows_db, rows_api, i + 1, result, callback)
   }
 }
 
 exports.process_properties = function (customer, entity, property, rows_db, rows_api, callback) {
   var result = {}
-  properties_deletes(customer, entity, property, rows_db, rows_api, 0, result, function () {
+  propertiesDeletes(customer, entity, property, rows_db, rows_api, 0, result, function () {
     if (result.error) callback(error)
     else {
       result = {}
-      properties_inserts(customer, entity, property, rows_db, rows_api, 0, result, function () {
+      propertiesInserts(customer, entity, property, rows_db, rows_api, 0, result, function () {
         callback(result.error)
       })
     }
@@ -204,10 +204,10 @@ exports.process_properties = function (customer, entity, property, rows_db, rows
 
 exports.get_relations = function (customer, callback) {
   var db = dbs[customer]
-  db.all('SELECT * from relation_' + node_id,
+  db.all('SELECT * from relation_' + nodeId,
     [],
     function (err, rows) {
-      if (err)	callback(err)
+      if (err) callback(err)
       else callback(null, rows)
     })
 }
@@ -218,7 +218,7 @@ type_related can be specified if only elements of a concrete type should be take
 */
 exports.get_simple_relation = function (customer, entity, relation, forward, type_related, callback) {
   var db = dbs[customer]
-  db.all('SELECT id' + (forward ? '2,node' : '1') + ' from relation_' + node_id +
+  db.all('SELECT id' + (forward ? '2,node' : '1') + ' from relation_' + nodeId +
   ' where relation=?' + (entity ? ' and id' + (forward ? 1 : 2) + '=?' : ''),
     entity ? [relation, entity] : [relation],
     function (err, rows) {
@@ -266,7 +266,7 @@ function get_entities_related (customer, rows, i, l, type_related, forward, tran
 exports.get_both_relation = function (customer, relation, transform1, transform2, callback) {
   var db = dbs[customer]
   db.all('SELECT ' + (transform1 || '*') +
-  ',id2,node from relation_' + node_id + ',entity_' + node_id + ' where relation=? and id=id1',
+  ',id2,node from relation_' + nodeId + ',entity_' + nodeId + ' where relation=? and id=id1',
     [relation],
     function (err, rows) {
   		if (err)	callback(err)
@@ -276,14 +276,14 @@ exports.get_both_relation = function (customer, relation, transform1, transform2
 
 exports.delete_relation = function (customer, relation, id1, id2, callback) {
   var db = dbs[customer]
-  db.all('DELETE from relation_' + node_id + ' where relation=? and id1=? and id2=?',
+  db.all('DELETE from relation_' + nodeId + ' where relation=? and id1=? and id2=?',
     [relation, id1, id2],
     function (err) { callback(err) })
 }
 
 exports.insert_relation = function (customer, relation, id1, id2, e2node, callback) {
   var db = dbs[customer]
-  db.all('INSERT into relation_' + node_id + '(relation,id1,id2,node,t1,t2,ord) values (?,?,?,?,?,?,?)',
+  db.all('INSERT into relation_' + nodeId + '(relation,id1,id2,node,t1,t2,ord) values (?,?,?,?,?,?,?)',
     [relation, id1, id2, e2node, START_OF_TIME, END_OF_TIME, 0],
     function (err) { callback(err) })
 }
@@ -344,7 +344,7 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
   exports.insert_relation(customer, relation,
       forward ? entity.id : rows_api[i].id,
       forward ? rows_api[i].id : entity.id,
-      forward ? node_id : rows_api[i].node,
+      forward ? nodeId : rows_api[i].node,
       function (err) {
         if (err != null) result.errors.push(err)
         else {
@@ -358,8 +358,8 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
 
 exports.get_query = function (req, res) {
   var db = dbs['SPEC']
-  structured.structured_get(db, req.body, function (err, ret) {
-    if (err)	res.status(500).end(err.message)
+  structured.structuredGet(db, req.body, function (err, ret) {
+    if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
 }
