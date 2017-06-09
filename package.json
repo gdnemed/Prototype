@@ -10,7 +10,9 @@
     "request": "latest",
     "moment-timezone": "latest",
     "msgpack-lite": "latest",
-    "log4js": "latest"
+    "log4js": "latest",
+    "chokidar": "latest",
+    "csvtojson": "latest"
   },
   "scripts": {
     "test": "mocha"

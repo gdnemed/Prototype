@@ -25,6 +25,29 @@ const getRecords = (req, res) => {
 }
 
 const postRecord = (req, res) => {
+  var str = {
+    _op_: 'put',
+    _entity_: 'record',
+    _key_: 'id',
+    name: 'name',
+    id: 'code',
+    language: {_property_: 'language'},
+    timetype_grp: {_property_: 'ttgroup'},
+    validity: {_property_: 'validity', _op_: 'complete', start: 't1', end: 't2'}
+  }
+  objectsService.structuredPut('SPEC',
+    {
+      customer: 'SPEC',
+      str: str,
+      data: req.body,
+      callback: function (err, ret) {
+        if (err) res.status(500).end(err.message)
+        else res.status(200).jsonp(ret)
+      }
+    })
+}
+
+const postRecord_old = (req, res) => {
   var customer = 'SPEC'
   // Don't allow records wihout identifier or id
   if (req.body.id == null) {
@@ -66,7 +89,7 @@ const setProperties = (customer, e, req, res, codeResult) => {
     else {
       res.status(codeResult).end(String(e.id))
       // send to terminals
-      comsService.global_send('record_insert', {records: [{id: e.code}]})
+      comsService.globalSend('record_insert', {records: [{id: e.code}]})
     }
   })
 }
@@ -139,7 +162,7 @@ Informs communications about new cards inserts.
 const sendCards = (result) => {
   for (var i = 0; i < result.inserts.length; i++) {
     var ins = result.inserts[i]
-    comsService.global_send('card_insert', {cards: [{card: ins.field, id: ins.id2}]})
+    comsService.globalSend('card_insert', {cards: [{card: ins.field, id: ins.id2}]})
   }
 }
 
@@ -196,7 +219,7 @@ const postEnroll = (req, res) => {
 
 const getClockings = (req, res) => {
   var customer = 'SPEC'
-  inputsService.get_inputs_complete(customer, function (err, rows) {
+  inputsService.getInputsComplete(customer, function (err, rows) {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
@@ -214,11 +237,11 @@ const initTerminal = (serial) => {
   var customer = 'SPEC'
   objectsService.get_entities(customer, 'record', 'CAST(code as integer) id', function (err, rows) {
     if (err) logger.error(err.message)
-    else comsService.global_send('record_insert', {records: rows})
+    else comsService.globalSend('record_insert', {records: rows})
   })
   objectsService.get_both_relation(customer, 'identifies', 'code card', 'CAST(code as integer) id', function (err, rows) {
     if (err) logger.error(err.message)
-    else comsService.global_send('card_insert', {cards: rows})
+    else comsService.globalSend('card_insert', {cards: rows})
   })
 }
 
@@ -227,7 +250,7 @@ const createClocking = (clocking, customer, callback) => {
     if (err) callback(err)
     else {
       if (rows && rows.length > 0) clocking.owner = rows[0].id
-      inputsService.create_clocking(clocking, customer, callback)
+      inputsService.createClocking(clocking, customer, callback)
     }
   })
 }
@@ -246,7 +269,7 @@ const getPendingRegisters = (tab, tv, customer, node, serial) => {
     case 'record':objectsService.get_entities(customer, 'record', 'CAST(code as integer) id',
         function (err, rows) {
           if (err) logger.error(err.message)
-          else comsService.send_data(serial, 'record_insert', {records: rows})
+          else comsService.sendData(serial, 'record_insert', {records: rows})
         })
       break
   }

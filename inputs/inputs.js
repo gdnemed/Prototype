@@ -94,7 +94,7 @@ exports.get_inputs = function (customer, callback) {
 }
 
 // this is so specific fot test
-exports.get_inputs_complete = function (customer, callback) {
+exports.getInputsComplete = function (customer, callback) {
   var db = dbs[customer]
   db.all("select b.*,c.record from (SELECT i.id,tmp,result,a.card, 'lect1' reader from input_" +
 nodeId + '_201705 i left join (select id,value card from input_data_str_' +
@@ -103,7 +103,7 @@ nodeId + "_201705 where property='card') a on a.id=i.id) b left join " +
 nodeId + "_201705 where property='record') c on b.id=c.id", callback)
 }
 
-exports.create_clocking = function (clocking, customer, callback) {
+exports.createClocking = function (clocking, customer, callback) {
   if (currentId == null) {
     callback(new Error('Service unavailable'))
     return

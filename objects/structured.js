@@ -6,6 +6,7 @@ const MODEL = require('./model')
 const logger = require.main.require('./utils/log').getLogger('db')
 
 var nodeId = 1
+var stateService
 
 /*
 Main visible function for getting data.
@@ -58,57 +59,126 @@ const selectEntity = (db, str, definition, filter, select, subqueries, callback)
 
 /*
 Main visible function for putting data.
+Parameter params is an object which contains
+-customer: Name of customer
+-stateService: Service which gives new ids
 -db: Database
 -data: Data to put
 -str: Structure for query
 -callback: Callback function
+-parent: If this put depends on a parent objects, its id
+-entity: Type of entity
+-property: Type of property
+-relation: Type of relation
 */
-const structuredPut = (db, data, str, callback) => {
-  if (str._op_) {
-/*    state_service.new_id(customer,function(err,newid){
-      if (err) callback(err);
-      else{}
-    } */
-
-    var op = str._op_
-    if (op === 'put') {
-      var query = 'SELECT count(*) n FROM entity_' + nodeId + ' where ' + str[str._key_] + '=?'
-      db.all(query, [data[str._key_]], function (err, rows) {
-        if (err) callback(err)
-        else doPut(rows.n > 0 ? 'update' : 'insert', db, data, str, callback)
-      })
-    } else doPut(op, db, data, str, callback)
-  } else callback(new Error('No operation defined'))
+const structuredPut = (params) => {
+  if (params.str._property_) {
+    switch(params.str._op_) {
+      case 'complete': putCompleteProperty(params)
+      break
+      default: putSimpleProperty(params)
+    }
+  } else if (params.str._relation_) {
+  } else {
+    // First we search for the id of the entity to update, or to check if insert/put
+    var query = 'SELECT id FROM entity_' + nodeId + ' where ' +
+    (params.str._entity_ ? 'type=\'' + params.str._entity_ + ' and ' : '') +
+    params.str[params.str._key_] + '=?'
+    params.db.all(query, [params.data[params.str._key_]], function (err, rows) {
+      if (err) params.callback(err)
+      else {
+        var op = params.str._op_
+        // If no rows, it must be an insert, and we must search for a new id
+        if (rows.length === 0) {
+          if (op === 'update') params.callback(new Error('No object found'))
+          else {
+            params.stateService.new_id(params.customer, (err, newid) => {
+              if (err) params.callback(err)
+              else doPut('insert', newid, params)
+            })
+          }
+        } else doPut('update', rows[0].id, params)
+      }
+    })
+  }
 }
 
-const doPut = (op, db, data, str, callback) => {
+/*
+Builds the SQL sentence from data and str, and executes it
+*/
+const doPut = (op, id, params) => {
+  var substatements = getSubStatements(params.str)
+  var fields = getValues(params.str, params.data)
   var statement
-  var select = getSimpleFields(str)
-  var subqueries = getSubqueries(str)
+  let vals = ''
+  let list = ''
   switch (op) {
-    case 'insert':statement = 'INSERT INTO entity_' + nodeId + '() values ()'
+    case 'insert':
+      for (let i = 0; i < fields.fields.length; i++) {
+        list += fields.fields[i] + ','
+        vals += '?,'
+      }
+      statement = 'INSERT INTO entity_' + nodeId +
+     '(' + list + 'type,id) values (' + vals + '?,?)'
+      fields.values.push(params.str._entity_)
       break
     case 'update':
+      for (let i = 0; i < fields.fields.length; i++) vals += fields.fields[i] + '=?,'
+      statement = 'UPDATE entity_' + nodeId + ' set ' + vals + ' where id=?'
       break
   }
-  db.run(statement, [], function (err, result) {
-    if (err) callback(err)
-    else {
-      if (subqueries) runInternalPuts(subqueries, 0, db, data, str, callback)
-      else callback()
+  fields.values.push(id)
+  params.db.run(statement, fields.values, function (err, result) {
+    if (err) {
+      err.message = err.message + ' : ' + statement
+      params.callback(err)
+    } else {
+      logger.trace(statement)
+      if (substatements) runInternalPuts(substatements, 0, id, params)
+      else params.callback(null, result)
     }
   })
 }
 
 /*
-When a put statement contains a list, run the proper statements for
-every element.
+Recursively calls structuredPut over some entry, and then continues
+until substatements list is completely processed.
 */
-const runInternalPuts = (subqueries, i, db, data, str, callback) => {
-  if (i >= subqueries.length) callback()
-  structuredPut(db, data, str, function () {
-    runInternalPuts(subqueries, i + 1, db, data, str, callback)
+const runInternalPuts = (substatements, i, id, params) => {
+  if (i >= subqueries.length) params.callback()
+  var sq = substatements[i]
+  var newParams = {
+    parent: id,
+    customer: params.customer,
+    db: params.db,
+    stateService: params.stateService,
+    data: params.data[sq._entry_name_],
+    str: params.str[sq._entry_name_],
+    callback: function (err, result) {
+      if (err) params.callback(err)
+      else runInternalPuts(substatements, i + 1, id, params)
+    }
+  }
+  structuredPut(newParams)
+}
+
+const putSimpleProperty = (params) => {
+  var sql = 'SELECT value from property_' +
+  MODEL.getTypeProperty(params.str._property_) + '_' + nodeId +
+  ' where id=? and property=?'
+  params.db.all(sql, [params.parent, params.str._property_], (err, rows) => {
+    if (err) params.callback(err)
+    else {
+      if (rows.length === 0) {
+
+      } else {
+
+      }
+    }
   })
+}
+
+const putCompleteProperty = (params) => {
 }
 
 /*
@@ -116,7 +186,6 @@ Does a subquery for every element of rows,
 and puts the result as a property of the row.
 */
 const processRow = (db, rows, i, subqueries, j, callback) => {
-  logger.trace('process_row ' + i + ',' + j)
   if (i >= rows.length) callback(null, rows)
   else if (j >= subqueries.length) {
     delete rows[i]._id_
@@ -161,7 +230,7 @@ const getSubselect = (relation, type, select) => {
     (select && select.complete_relation ? ',' + select.complete_relation : '') +
     ' from relation_' + nodeId + ' where relation=? and id2=?'
     default: return 'select ' + (select ? select.complete : 'value') +
-    ' from property_' + MODEL.get_type_property(type) + '_' + nodeId +
+    ' from property_' + MODEL.getTypeProperty(type) + '_' + nodeId +
     ' where property=? and entity=?'
   }
 }
@@ -251,8 +320,6 @@ A simple fiels is something that should be included in SELECT clause.
 Return value (res) contains two strings:
 -complete: Complete query select. For instance: name n, code c
 -names: Final names to select: For instance: n,c
-
-When
 */
 const getSimpleFields = (str, prefix) => {
   if (str) {
@@ -279,6 +346,29 @@ const getSimpleFields = (str, prefix) => {
               if (res.names) res.names += ',' + property
               else res.names = property
           }
+        }
+      }
+    }
+    return res
+  }
+}
+
+/*
+Searches for values in a data object, matching with definition of str,
+and returns an array for input/update operations.
+*/
+const getValues = (str, data) => {
+  if (str) {
+    var res = {fields: [], values: []}
+    for (var property in str) {
+      if (str.hasOwnProperty(property)) {
+        if (property.charAt(0) === '_' && property !== '_field_') {
+        } else if (typeof str[property] === 'string') {
+          res.fields.push(str[property])
+          // Date fields could need some processing
+          if (str[property] === 't1' || str[property] === 't2') {
+            res.values.push(data[property])
+          } else res.values.push(data[property])
         }
       }
     }
@@ -331,6 +421,27 @@ const getSubqueries = (str) => {
             if (res) res.push(d)
             else res = [d]
           }
+        }
+      }
+    }
+    return res
+  }
+}
+
+/*
+Searches for data in str which leads to internal statements (relations and properties).
+If found any, creates the subquery and adds it to "res" array.
+Finally, returs res.
+*/
+const getSubStatements = (str) => {
+  if (str) {
+    var res
+    for (var property in str) {
+      if (str.hasOwnProperty(property)) {
+        if (property.charAt(0) === '_') {
+        } else if (typeof str[property] !== 'string') {
+          var d = str[property]
+          d._entry_name_ = property
         }
       }
     }

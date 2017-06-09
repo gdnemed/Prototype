@@ -356,13 +356,37 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
 }
 // //////////////////////////////////
 
-exports.get_query = function (req, res) {
+exports.query = function (req, res) {
   var db = dbs['SPEC']
   structured.structuredGet(db, req.body, function (err, ret) {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
 }
+
+exports.sentence = function (req, res) {
+  var db = dbs['SPEC']
+  structured.structuredPut(
+    {
+      customer: 'SPEC',
+      db: db,
+      stateService: stateService,
+      str: req.body.str,
+      data: req.body.data,
+      callback: function (err, ret) {
+        if (err) res.status(500).end(err.message)
+        else res.status(200).jsonp(ret)
+      }
+    })
+}
+
+const structuredPut = (customer, params) => {
+  params.db = dbs[customer]
+  params.stateService = stateService
+  structured.structuredPut(params)
+}
+
+exports.structuredPut = structuredPut
 
 function get_type_property (p) {
   return MODEL.PROPERTIES[p].type

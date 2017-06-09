@@ -13,6 +13,7 @@ const state = require('./state/state')
 const objects = require('./objects/objects')
 const inputs = require('./inputs/inputs')
 const coms = require('./coms/coms')
+const files = require('./exchange/files')
 const logic = require('./logic')
 const logger = require('./utils/log')
 
@@ -23,12 +24,13 @@ var httpServer
 main()
 
 function main () {
-  logger.configure()
+  let home = process.cwd()
+  logger.configure(home)
   // Install/uninstall service, or run it as a program
   if (process.argv.length > 2) serviceFunctions(process.argv)
   else {
     try {
-      environment = JSON.parse(fs.readFileSync('./config.json', 'utf8'))
+      environment = JSON.parse(fs.readFileSync(home + '/config.json', 'utf8'))
     } catch (err) {
       logger.getLogger('main').info('config.json not found, using default configuration.')
       environment = {
@@ -45,6 +47,7 @@ function main () {
     logic.init(objects, inputs, coms)
     coms.init(environment.coms_listen, logic)
     initApiServer()
+    files.init(environment.exchange.files)
   }
 }
 
@@ -62,7 +65,8 @@ function initApiServer () {
   api.post('/api/coms/records/:id/enroll', logic.postEnroll)
   api.get('/api/coms/clockings', logic.getClockings)
   api.get('/api/coms/clockings_debug', logic.getClockingsDebug)
-  api.post('/api/objects/query', objects.get_query)
+  api.post('/api/objects/query', objects.query)
+  api.post('/api/objects/sentence', objects.sentence)
   api.get('/api/objects/entities', objects.get_entities_debug)
   api.get('/api/objects/properties', objects.get_properties_debug)
   api.get('/api/objects/relations', objects.get_relations_debug)
