@@ -98,13 +98,48 @@ exports.update_entity = function (customer, e, callback) {
   )
 }
 
-exports.delete_entity = function (customer, field, id, callback) {
+const deleteFromField = (customer, type, field, value, callback) => {
   var db = dbs[customer]
-  db.run('delete from entity_' + nodeId + ' where ' + field + '=?',
-    [id],
-    function (err) { callback(err) }
-  )
+  db.all('SELECT id from entity_' + nodeId + ' where type=? and ' + field + '=?',
+  [type, value], (err, rows) => {
+    if (err) callback(err)
+    else if (rows.length > 0) deleteEntity(customer, rows[0].id, callback)
+    else callback(new Error('Not found'))
+  })
 }
+
+const deleteEntity = (customer, id, callback) => {
+  var db = dbs[customer]
+  db.run('delete from property_num_' + nodeId + ' where entity=?',
+  [id], (err) => {
+    if (err) callback(err)
+    else {
+      db.run('delete from property_str_' + nodeId + ' where entity=?',
+      [id], (err) => {
+        if (err) callback(err)
+        else {
+          db.run('delete from property_bin_' + nodeId + ' where entity=?',
+        [id], (err) => {
+          if (err) callback(err)
+          else {
+            db.run('delete from relation_' + nodeId + ' where id1=? or id2=?',
+            [id, id], (err) => {
+              if (err) callback(err)
+              else {
+                db.run('delete from entity_' + nodeId + ' where id=?',
+                [id], callback(err))
+              }
+            })
+          }
+        })
+        }
+      })
+    }
+  })
+}
+
+module.exports.deleteFromField = deleteFromField
+module.exports.deleteEntity = deleteEntity
 
 exports.get_properties = function (customer, callback) {
   var db = dbs[customer]
@@ -358,7 +393,7 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
 
 exports.query = function (req, res) {
   var db = dbs['SPEC']
-  structured.structuredGet(db, req.body, function (err, ret) {
+  structured.structuredGet(db, {}, req.body, function (err, ret) {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
@@ -380,13 +415,18 @@ exports.sentence = function (req, res) {
     })
 }
 
-const structuredPut = (customer, params) => {
-  params.db = dbs[customer]
+const structuredGet = (customer, variables, query, callback) => {
+  structured.structuredGet(dbs[customer], variables, query, callback)
+}
+
+const structuredPut = (params) => {
+  params.db = dbs[params.customer]
   params.stateService = stateService
   structured.structuredPut(params)
 }
 
 exports.structuredPut = structuredPut
+exports.structuredGet = structuredGet
 
 function get_type_property (p) {
   return MODEL.PROPERTIES[p].type
@@ -394,7 +434,7 @@ function get_type_property (p) {
 
 exports.get_entities_debug = function (req, res) {
   var customer = 'SPEC'
-  get_entities(customer, null, null, function (err, rows) {
+  exports.get_entities(customer, null, null, function (err, rows) {
     if (err)	res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
@@ -402,7 +442,7 @@ exports.get_entities_debug = function (req, res) {
 
 exports.get_properties_debug = function (req, res) {
   var customer = 'SPEC'
-  get_properties(customer, function (err, rows) {
+  exports.get_properties(customer, function (err, rows) {
     if (err)	res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })

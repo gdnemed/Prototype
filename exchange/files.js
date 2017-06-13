@@ -40,7 +40,8 @@ const moveRecordFile = (path) => {
       try {
         fs.writeFileSync(endPath, fs.readFileSync(newPath))
         fs.unlink(newPath, (err) => { if (err) logger.error(err) })
-        importRecords(endPath)
+        let output
+        importRecords(endPath, output)
       } catch (err) { logger.error(err) }
     }
   })
@@ -51,20 +52,21 @@ Converts CSV file to a map or objects,
 and calls sendRecordsOrders()
 to import it.
 */
-const importRecords = (path) => {
+const importRecords = (path, output) => {
   logger.info('Start of records import')
-  let today = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDD')
+  // TODO: Substract 1 day
+  let yesterday = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDD')
   let recordsToDelete = {}
+  let records = {}
   csvtojson().fromFile(path)
-  .on('json', (jsonObj) => processRecord(jsonObj, today, recordsToDelete))
+  .on('json', (jsonObj) => processRecord(jsonObj, yesterday, records))
   .on('done', (err) => {
     if (err) {
       logger.error(err)
       endRecordsImport(path, false)
     } else {
-      deleteRecords(recordsToDelete, (err) => {
-        if (err) logger.error(err)
-        endRecordsImport(path, true)
+      sendRecords(records, recordsToDelete, output, () => {
+        deleteRecords(recordsToDelete, output, () => endRecordsImport(path, output, true))
       })
     }
   })
@@ -73,7 +75,7 @@ const importRecords = (path) => {
 /*
 Moves records to "done" directories.
 */
-const endRecordsImport = (path, ok) => {
+const endRecordsImport = (path, output, ok) => {
   let now = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDDHHmmss')
   let newPath = workDir + '/' + (ok ? 'done' : 'error') + '/' +
     'RECORDS_' + now + '.DWN'
@@ -82,27 +84,91 @@ const endRecordsImport = (path, ok) => {
 }
 
 /*
-Puts record r information in maps, respecting
+Puts record r information in the map, respecting
 historic data.
 */
-const processRecord = (r, today, recordsToDelete) => {
+const processRecord = (r, yesterday, records) => {
   // Avoid past records
-  if (r.END !== '' && r.END < today) return
+  if (r.END !== '' && r.END < yesterday) return
   let record = {
-    code: r.ID,
+    id: r.ID,
+    code: r.CODE,
     name: r.NAME,
-    language: r.LANGUAGE,
-    ttgroup: r.TTGROUP,
     validity: [r.START, r.END]
   }
+  if (r.LANGUAGE) record.language = r.LANGUAGE
+  if (r.CARD) {
+    record.card = [{code: r.CARD}]
+    if (r.START) record.card[0].start = r.START
+    if (r.END) record.card[0].end = r.END
+  }
+  if (r.TTGROUP) {
+    record.ttgroup = [{code: r.TTGROUP}]
+    if (r.START) record.ttgroup[0].start = r.START
+    if (r.END) record.ttgroup[0].end = r.END
+  }
+  if (r.START || r.END) {
+    record.validity = {}
+    if (r.START) record.validity.start = r.START
+    if (r.END) record.validity.end = r.END
+  }
+
   let id = 'ID' + r.ID
-  if (recordsToDelete[id]) delete recordsToDelete[id]
-  // TODO: Call API
-  logger.debug(record)
-  // Now, cards ...
+  if (records[id]) {
+    let first = records[id]
+    if (record.card) {
+      if (first.card) first.card.push(record.card[0])
+      else first.card = record.card
+    }
+    if (record.ttgroup) {
+      if (first.ttgroup) first.ttgroup.push(record.ttgroup[0])
+      else first.ttgroup = record.ttgroup
+    }
+    if (record.validity) {
+      if (first.validity) first.validity.push(record.ttgroup[0])
+      else first.validity = record.validity
+    }
+  } else records[id] = record
 }
 
-const deleteRecords = (recordsToDelete, callback) => {
+/*
+Iterates over records to send them sequenced
+*/
+const sendRecords = (records, recordsToDelete, output, callback) => {
+  let l = []
+  for (let property in records) {
+    if (records.hasOwnProperty(property)) l.push(records[property])
+  }
+  sendRecord(l, 0, recordsToDelete, output, callback)
+}
+
+/*
+Inserts or updates a Record
+*/
+const sendRecord = (l, i, recordsToDelete, output, callback) => {
+  if (i >= l.length) callback()
+  let r = l[i]
+  if (recordsToDelete['ID' + l.id]) delete recordsToDelete['ID' + l.id]
+  // TODO:Call API
+  call('POST', '/api/coms/records', r, (err) => {
+    if (err) {
+      logger.debug(err)
+      if (output) output.print(err)
+    }
+    sendRecord(l, i + 1, recordsToDelete, output, callback)
+  })
+}
+
+/*
+Calls Lemuria API
+*/
+const call = (order, path, body, callback) => {
+}
+
+/*
+Iterates over recordsToDelete to send deletes
+*/
+const deleteRecords = (recordsToDelete, output, callback) => {
   let l = []
   for (let property in recordsToDelete) {
     if (recordsToDelete.hasOwnProperty(property)) {
@@ -110,13 +176,17 @@ const deleteRecords = (recordsToDelete, callback) => {
       l.push(property.substring(2))
     }
   }
-  deleteRecord(l, 0, callback)
+  deleteRecord(l, 0, output, callback)
 }
 
-const deleteRecord = (l, i, callback) => {
+/*
+Sends a delete order
+*/
+const deleteRecord = (l, i, output, callback) => {
   if (i >= l.length) callback()
   else {
     logger.debug('delete record ' + l[i])
+    // TODO: Call API
     deleteRecord(l, i + 1, callback)
   }
 }
