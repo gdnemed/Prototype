@@ -14,6 +14,7 @@ let remoteDir
 let workDir
 let timeZone
 let remoteService
+let createOutput
 
 /*
 Initialize variables and watching import files.
@@ -23,6 +24,7 @@ const init = (params) => {
   timeZone = 'Europe/Madrid'
   remoteDir = params.dir
   workDir = params.workdir
+  createOutput = params.output
   watch('RECORDS', processRecord, 'records', 'records')
   watch('TTYPES', processTtype, 'timetypes', 'timetypes')
   watch('INFO', processTtype, 'records/@/info', 'records/@/info')
@@ -51,12 +53,22 @@ const moveImportFile = (path, importType, fJson, pathPost, pathDelete) => {
         try {
           fs.writeFileSync(endPath, fs.readFileSync(newPath))
           fs.unlink(newPath, (err) => { if (err) logger.error(err) })
-          let output
-          importProcess(endPath, importType, fJson, pathPost, pathDelete, output)
+          let oneDay = 86400000
+          let now = moment.tz(new Date().getTime() - oneDay, timeZone).format('YYYYMMDDHHmmss')
+          if (createOutput) {
+            let logPath = workDir + '/' + 'pending' + '/' + importType + '_' + now + '.LOG'
+            let output = fs.createWriteStream(logPath)
+            output.once('open', () => importProcess(endPath, importType, fJson, pathPost, pathDelete, output, now))
+          } else importProcess(endPath, importType, fJson, pathPost, pathDelete, null, now)
         } catch (err) { logger.error(err) }
       }
     })
   }
+}
+
+const outPut = (stream, message) => {
+  let time = moment.tz(new Date().getTime(), timeZone).format('YYYY-MM-DD HH:mm:ss')
+  stream.write(time + ', ' + message + '\r\n')
 }
 
 /*
@@ -65,8 +77,9 @@ and calls fJson() for each json.
 Then calls
 to import it.
 */
-const importProcess = (path, importType, fJson, pathPost, pathDelete, output) => {
+const importProcess = (path, importType, fJson, pathPost, pathDelete, output, now) => {
   logger.info('Start of ' + importType + ' import')
+  if (output) outPut(output, 'Start')
   // TODO: Substract 1 day
   let yesterday = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDD')
   let elemsToDelete = {}
@@ -76,10 +89,12 @@ const importProcess = (path, importType, fJson, pathPost, pathDelete, output) =>
   .on('done', (err) => {
     if (err) {
       logger.error(err)
-      endImport(path, importType, output, false)
+      endImport(path, importType, output, now, false)
     } else {
-      sendOrders(pathPost, elems, elemsToDelete, output, () => {
-        deleteOrders(pathDelete, elemsToDelete, output, () => endImport(path, importType, output, true))
+      sendOrders(pathPost, elems, elemsToDelete, output, (nObjects, nErrors) => {
+        if (output) outPut(output, nObjects + ' lines processed. ' + nErrors + ' errors.')
+        deleteOrders(pathDelete, elemsToDelete, output,
+          () => endImport(path, importType, output, now, true))
       })
     }
   })
@@ -88,15 +103,25 @@ const importProcess = (path, importType, fJson, pathPost, pathDelete, output) =>
 /*
 Moves records to "done" directories.
 */
-const endImport = (path, importType, output, ok) => {
+const endImport = (path, importType, output, now, ok) => {
   if (fs.existsSync(path)) {
-    let oneDay = 86400000
-    let now = moment.tz(new Date().getTime() - oneDay, timeZone).format('YYYYMMDDHHmmss')
     let newPath = workDir + '/' + (ok ? 'done' : 'error') + '/' +
       importType + '_' + now + '.DWN'
     fs.rename(path, newPath, (err) => { if (err) logger.error(err) })
   }
+  if (output) {
+    output.on('finish', () => {
+      try {
+        let endPath = remoteDir + '/' + importType + '_' + now + '.LOG'
+        let local = workDir + '/' + 'pending' + '/' + importType + '_' + now + '.LOG'
+        fs.writeFileSync(endPath, fs.readFileSync(local))
+        fs.unlink(local, (err) => { if (err) logger.error(err) })
+      } catch (exc) { logger.error(exc) }
+    })
+    output.end()
+  }
   logger.info('End of ' + importType + ' import.')
+  // TODO: Aprofitar el moment per esborrar fitxers antics
 }
 
 /*
@@ -164,14 +189,14 @@ const sendOrders = (apiPath, elems, elemsToDelete, output, callback) => {
   for (let property in elems) {
     if (elems.hasOwnProperty(property)) l.push(elems[property])
   }
-  sendOrder(l, 0, apiPath, elemsToDelete, output, callback)
+  sendOrder(l, 0, apiPath, elemsToDelete, output, 0, 0, callback)
 }
 
 /*
 Inserts or updates a Record
 */
-const sendOrder = (l, i, apiPath, elemsToDelete, output, callback) => {
-  if (i >= l.length) callback()
+const sendOrder = (l, i, apiPath, elemsToDelete, output, nObjects, nErrors, callback) => {
+  if (i >= l.length) callback(nObjects, nErrors)
   else {
     let r = l[i]
     if (elemsToDelete['ID' + l[i].id]) delete elemsToDelete['ID' + l[i].id]
@@ -180,14 +205,19 @@ const sendOrder = (l, i, apiPath, elemsToDelete, output, callback) => {
     let url = pos < 0 ? apiPath + '/' + l[i].id
     : apiPath.substring(0, pos) + l[i].id + apiPath.substr(pos + 1)
     logger.debug('call ' + url)
+    nObjects++
     call('POST', url, r, (err, response, bodyResponse) => {
       if (err) {
+        nErrors++
         logger.debug(err)
-        if (output) output.print(err)
+        if (output) outPut(output, err.message)
       } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
-        logger.debug('Error ' + response.statusCode + ' : ' + bodyResponse)
+        let msg = 'Error ' + response.statusCode + ' : ' + bodyResponse
+        logger.debug(msg)
+        if (output) outPut(output, msg)
+        nErrors++
       }
-      sendOrder(l, i + 1, apiPath, elemsToDelete, output, callback)
+      sendOrder(l, i + 1, apiPath, elemsToDelete, output, nObjects, nErrors, callback)
     })
   }
 }
