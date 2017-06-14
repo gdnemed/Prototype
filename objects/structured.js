@@ -7,6 +7,7 @@ const CT = require.main.require('./CT')
 const logger = require.main.require('./utils/log').getLogger('db')
 
 var nodeId = 1
+var stateService
 
 /*
 Main visible function for getting data.

@@ -75,11 +75,15 @@ function initApiServer () {
   api.get('/api/coms/clockings_debug', logic.getClockingsDebug)
   api.post('/api/objects/query', objects.query)
   api.post('/api/objects/sentence', objects.sentence)
-  api.get('/api/objects/entities', objects.get_entities_debug)
-  api.get('/api/objects/properties', objects.get_properties_debug)
-  api.get('/api/objects/relations', objects.get_relations_debug)
+  api.get('/api/objects/entities', objects.getEntitiesDebug)
+  api.get('/api/objects/properties', objects.getPropertiesDebug)
+  api.get('/api/objects/relations', objects.getRelationsDebug)
   api.post('/api/state/settings', state.post_settings)
   api.get('/api/state/settings', state.get_settings)
+  api.get('/api/coms/timetypes', logic.getTimeTypes)
+  api.get('/api/coms/timetypes/:id', logic.getTimeType)
+  api.post('/api/coms/timetypes', logic.postTimeType)
+  api.delete('/api/coms/timetypes/:id', logic.deleteTimeType)
   // Run http server
   httpServer = api.listen(environment.api_listen.port, function () {
     var address = httpServer.address()

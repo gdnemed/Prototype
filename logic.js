@@ -71,6 +71,29 @@ const postRecord = (req, res) => {
     })
 }
 
+const setProperties = (customer, e, req, res, codeResult) => {
+  var l = []
+  if (req.body.language) l.push({property: 'language', value: req.body.language})
+  setProperty(customer, e.id, l, 0, function (err) {
+    if (err) res.status(500).end(err.message)
+    else {
+      res.status(codeResult).end(String(e.id))
+      // send to terminals
+      comsService.globalSend('record_insert', {records: [{id: e.code}]})
+    }
+  })
+}
+
+const setProperty = (customer, id, l, i, callback) => {
+  if (i >= l.length) callback()
+  else {
+    objectsService.insertProperty(customer, id, l[i], function (err) {
+      if (err) callback(err)
+      else setProperty(customer, id, l, i + 1, callback)
+    })
+  }
+}
+
 const deleteRecord = (req, res) => {
   var customer = 'SPEC'
   objectsService.deleteFromField(customer, 'record', 'document', req.params.id, function (err, rows) {
@@ -234,6 +257,113 @@ const getClockingsDebug = (req, res) => {
   })
 }
 
+const getTimeTypes = (req, res) => {
+  var customer = 'SPEC'
+  objectsService.get_entities(customer, 'timetype', 'code,name', function (err, rows) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(rows)
+  })
+}
+
+const getTimeType = (req, res) => {
+  var customer = 'SPEC'
+  objectsService.get_entity(customer, 'timetype', 'code', req.params.id, '', function (err, rows) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(rows)
+  })
+}
+
+const postTimeType = (req, res) => {
+  var customer = 'SPEC'
+  /* var str = {
+    _op_: 'put',
+    _entity_: 'timetype',
+    _key_: 'id',
+    name: 'name',
+    id: 'code',
+    language: {_property_: 'language'},
+    groups: {_property_: 'groups'}
+  }
+  objectsService.structuredPut(customer,
+    {
+      customer: 'SPEC',
+      str: str,
+      data: req.body,
+      callback: function (err, ret) {
+        if (err) res.status(500).end(err.message)
+        else res.status(200).jsonp(ret)
+      }
+    }) */
+  objectsService.getEntity(customer, 'timetype', 'code', req.body.id, '', (err, rows) => {
+    if (err) res.status(500).end(err.message)
+    else {
+      let row = rows[0]
+      if (row) {
+        // update
+        let e = {'id': row.id, 'name': req.body.name, 'code': req.body.id, 'type': 'timetype', 'properties': { 'group': req.body.groups, 'language': req.body.language }}
+        objectsService.updateEntity(customer, e, (err) => {
+          if (err) res.status(500).end(err.message)
+          else {
+            objectsService.deletePropertiesStr(customer, row.id, (err) => {
+              if (err) res.status(500).end(err.message)
+              else {
+                let property = [{property: 'language', value: req.body.language}]
+                for (let i = 0; i < req.body.groups.length; i++) {
+                  property.push({property: 'ttgroup', value: req.body.groups[i]})
+                }
+                objectsService.insertProperties(customer, row.id, property, 0, (err) => {
+                  if (err) res.status(500).end(err.message)
+                  else res.status(200).end()
+                })
+              }
+            })
+          }
+        })
+      } else {
+        let e = {'name': req.body.name, 'code': req.body.id, 'type': 'timetype', 'properties': { 'group': req.body.groups, 'language': req.body.language }}
+        objectsService.insertEntity(customer, e, (err, newid) => {
+          if (err) res.status(500).end(err.message)
+          else {
+            objectsService.deletePropertiesStr(customer, newid, (err) => {
+              if (err) res.status(500).end(err.message)
+              else {
+                let property = [{property: 'language', value: req.body.language}]
+                for (let i = 0; i < req.body.groups.length; i++) {
+                  property.push({property: 'ttgroup', value: req.body.groups[i]})
+                }
+                objectsService.insertProperties(customer, newid, property, 0, (err) => {
+                  if (err) res.status(500).end(err.message)
+                  else res.status(200).end()
+                })
+              }
+            })
+          }
+        })
+      }
+    }
+  })
+}
+
+const deleteTimeType = (req, res) => {
+  var customer = 'SPEC'
+  objectsService.deleteEntity(customer, 'timetype', 'code', req.params.id, function (err, rows) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).end()
+  })
+}
+
+const initTerminal = (serial) => {
+  var customer = 'SPEC'
+  objectsService.get_entities(customer, 'record', 'CAST(code as integer) id', function (err, rows) {
+    if (err) logger.error(err.message)
+    else comsService.globalSend('record_insert', {records: rows})
+  })
+  objectsService.get_both_relation(customer, 'identifies', 'code card', 'CAST(code as integer) id', function (err, rows) {
+    if (err) logger.error(err.message)
+    else comsService.globalSend('card_insert', {cards: rows})
+  })
+}
+
 const createClocking = (clocking, customer, callback) => {
   objectsService.structuredGet('SPEC', {},
     {
@@ -279,5 +409,9 @@ module.exports = {
   getFingerprints: getFingerprints,
   postFingerprints: postFingerprints,
   createClocking: createClocking,
-  getPendingRegisters: getPendingRegisters
+  getPendingRegisters: getPendingRegisters,
+  getTimeTypes: getTimeTypes,
+  getTimeType: getTimeType,
+  postTimeType: postTimeType,
+  deleteTimeType: deleteTimeType
 }
