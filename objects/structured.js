@@ -73,16 +73,16 @@ Parameter params is an object which contains
 */
 const structuredPut = (params) => {
   if (params.str._property_) {
-    switch(params.str._op_) {
+    switch (params.str._op_) {
       case 'complete': putCompleteProperty(params)
-      break
+        break
       default: putSimpleProperty(params)
     }
   } else if (params.str._relation_) {
   } else {
     // First we search for the id of the entity to update, or to check if insert/put
     var query = 'SELECT id FROM entity_' + nodeId + ' where ' +
-    (params.str._entity_ ? 'type=\'' + params.str._entity_ + ' and ' : '') +
+    (params.str._entity_ ? 'type=\'' + params.str._entity_ + '\' and ' : '') +
     params.str[params.str._key_] + '=?'
     params.db.all(query, [params.data[params.str._key_]], function (err, rows) {
       if (err) params.callback(err)
@@ -123,7 +123,12 @@ const doPut = (op, id, params) => {
       fields.values.push(params.str._entity_)
       break
     case 'update':
-      for (let i = 0; i < fields.fields.length; i++) vals += fields.fields[i] + '=?,'
+      for (let i = 0; i < fields.fields.length; i++) {
+        vals += fields.fields[i] + '=?'
+        if (i < fields.fields.length - 1) {
+          vals += ', '
+        }
+      }
       statement = 'UPDATE entity_' + nodeId + ' set ' + vals + ' where id=?'
       break
   }
@@ -145,7 +150,7 @@ Recursively calls structuredPut over some entry, and then continues
 until substatements list is completely processed.
 */
 const runInternalPuts = (substatements, i, id, params) => {
-  if (i >= subqueries.length) params.callback()
+  if (i >= substatements.length) params.callback()
   var sq = substatements[i]
   var newParams = {
     parent: id,

@@ -7,7 +7,7 @@ var dbs = {}
 var nodeId
 var stateService
 
-exports.init = function (node, customers, state) {
+const init = function (node, customers, state) {
   nodeId = node
   stateService = state
   for (var i = 0; i < customers.length; i++) {
@@ -51,7 +51,7 @@ function initDB (customer) {
   return db
 }
 
-exports.get_entities = function (customer, type, transform, callback) {
+const getEntities = function (customer, type, transform, callback) {
   var db = dbs[customer]
   db.all('SELECT ' + (transform || '*') +
   ' from entity_' + nodeId + (type ? ' where type=?' : ''),
@@ -62,7 +62,7 @@ exports.get_entities = function (customer, type, transform, callback) {
   })
 }
 
-exports.get_entity = function (customer, type, field, value, transform, callback) {
+const getEntity = function (customer, type, field, value, transform, callback) {
   var db = dbs[customer]
   db.all('SELECT ' + (transform || '*') +
   ' from entity_' + nodeId + ' where ' + field + '=?' + (type ? ' and type=?' : ''),
@@ -73,7 +73,7 @@ exports.get_entity = function (customer, type, field, value, transform, callback
     })
 }
 
-exports.insert_entity = function (customer, e, callback) {
+const insertEntity = function (customer, e, callback) {
   stateService.new_id(customer, function (err, newid) {
     if (err) callback(err)
     else {
@@ -83,30 +83,40 @@ exports.insert_entity = function (customer, e, callback) {
         params,
         function (err) {
           if (err) callback(err)
-      		else callback(null, newid)
+          else callback(null, newid)
         }
       )
     }
   })
 }
 
-exports.update_entity = function (customer, e, callback) {
+const updateEntity = function (customer, e, callback) {
   var db = dbs[customer]
   db.run('UPDATE entity_' + nodeId + ' set type=?,name=?,name2=?,document=?,code=?,intname=? where id=?',
     [e.type, e.name, e.name2, e.document, e.code, e.intname, e.id],
-    function (err) { callback(err) }
+    (err) => {
+      callback(err)
+    }
   )
 }
 
-exports.delete_entity = function (customer, field, id, callback) {
+const deleteEntity = function (customer, type, field, id, callback) {
   var db = dbs[customer]
-  db.run('delete from entity_' + nodeId + ' where ' + field + '=?',
-    [id],
-    function (err) { callback(err) }
-  )
+  getEntity(customer, type, field, id, '', (err, rows) => {
+    if (err) callback(err)
+    else if (rows.length > 0) {
+      db.run('delete from entity_' + nodeId + ' where id=? and type=?',
+        [rows[0].id, type],
+        (err) => {
+          if (err) callback(err)
+          else deleteProperties(customer, rows[0].id, callback)
+        }
+      )
+    }
+  })
 }
 
-exports.get_properties = function (customer, callback) {
+const getProperties = function (customer, callback) {
   var db = dbs[customer]
   db.all('SELECT * from property_str_' + nodeId,
     [],
@@ -116,7 +126,16 @@ exports.get_properties = function (customer, callback) {
     })
 }
 
-exports.get_property = function (customer, property, entity, callback) {
+const deleteProperties = function (customer, entity, callback) {
+  var db = dbs[customer]
+  db.all('DELETE from property_str_' + nodeId + ' where entity=?',
+    [entity],
+    (err) => {
+      callback(err)
+    })
+}
+
+const getProperty = function (customer, property, entity, callback) {
   var db = dbs[customer]
   // TODO: detectar el tipus de taula a partir de la propietat
   db.all('SELECT * from property_' + MODEL.get_type_property(property) + '_' + nodeId + ' where property=? and entity=?',
@@ -127,7 +146,7 @@ exports.get_property = function (customer, property, entity, callback) {
     })
 }
 
-exports.get_simple_property = function (customer, property, entity, callback) {
+const getSimpleProperty = function (customer, property, entity, callback) {
   var db = dbs[customer]
   // TODO: detectar el tipus de taula a partir de la propietat
   db.all('SELECT value from property_' + MODEL.get_type_property(property) + '_' + nodeId + ' where property=? and entity=?',
@@ -142,18 +161,36 @@ exports.get_simple_property = function (customer, property, entity, callback) {
     })
 }
 
-exports.insert_property = function (customer, entity, property, callback) {
+const insertProperties = function (customer, entity, properties, i, callback) {
+  if (i >= properties.length) callback()
+  else {
+    insertProperty(customer, entity, properties[i], (err) => {
+      if (err) callback(err)
+      else insertProperties(customer, entity, properties, i + 1, callback)
+    })
+  }
+}
+
+function insertProperty (customer, entity, property, callback) {
   var db = dbs[customer]
   if (property.t1 == null) property.t1 = CT.START_OF_TIME
   if (property.t2 == null) property.t2 = CT.END_OF_TIME
   // TODO: detectar el tipus de taula a partir de la propietat
-  db.run('INSERT INTO property_' + MODEL.get_type_property(property.property) + '_' + nodeId + ' (entity,property,t1,t2,value) VALUES (?,?,?,?,?)',
+  db.run('INSERT INTO property_' + MODEL.getTypeProperty(property.property) + '_' + nodeId + ' (entity,property,t1,t2,value) VALUES (?,?,?,?,?)',
     [entity, property.property, property.t1, property.t2, property.value],
     function (err) { callback(err) }
   )
 }
 
-exports.delete_property = function (customer, entity, property, value, callback) {
+const deletePropertiesStr = function (customer, entity, callback) {
+  var db = dbs[customer]
+  db.run('DELETE FROM property_str_' + nodeId + ' where entity=?',
+    [entity],
+    (err) => { callback(err) }
+  )
+}
+
+const deleteProperty = function (customer, entity, property, value, callback) {
   var db = dbs[customer]
   // TODO: detectar el tipus de taula a partir de la propietat
   db.run('DELETE FROM property_' + MODEL.get_type_property(property.property) + '_' + nodeId + ' where entity=? and property=? and value=?',
@@ -188,7 +225,7 @@ function propertiesInserts (customer, entity, property, rows_db, rows_api, i, re
   }
 }
 
-exports.process_properties = function (customer, entity, property, rows_db, rows_api, callback) {
+const processProperties = function (customer, entity, property, rows_db, rows_api, callback) {
   var result = {}
   propertiesDeletes(customer, entity, property, rows_db, rows_api, 0, result, function () {
     if (result.error) callback(error)
@@ -202,7 +239,7 @@ exports.process_properties = function (customer, entity, property, rows_db, rows
 }
 // ///////////////////////////////////////
 
-exports.get_relations = function (customer, callback) {
+const getRelations = function (customer, callback) {
   var db = dbs[customer]
   db.all('SELECT * from relation_' + nodeId,
     [],
@@ -216,7 +253,7 @@ exports.get_relations = function (customer, callback) {
 direction 1->2 if 'forward' or 2->1 otherwise.
 type_related can be specified if only elements of a concrete type should be taken.
 */
-exports.get_simple_relation = function (customer, entity, relation, forward, type_related, callback) {
+const getSimpleRelation = function (customer, entity, relation, forward, type_related, callback) {
   var db = dbs[customer]
   db.all('SELECT id' + (forward ? '2,node' : '1') + ' from relation_' + nodeId +
   ' where relation=?' + (entity ? ' and id' + (forward ? 1 : 2) + '=?' : ''),
@@ -263,7 +300,7 @@ function get_entities_related (customer, rows, i, l, type_related, forward, tran
 
 /** Gets both elements of a relation
 */
-exports.get_both_relation = function (customer, relation, transform1, transform2, callback) {
+const getBothRelation = function (customer, relation, transform1, transform2, callback) {
   var db = dbs[customer]
   db.all('SELECT ' + (transform1 || '*') +
   ',id2,node from relation_' + nodeId + ',entity_' + nodeId + ' where relation=? and id=id1',
@@ -274,14 +311,14 @@ exports.get_both_relation = function (customer, relation, transform1, transform2
   	})
 }
 
-exports.delete_relation = function (customer, relation, id1, id2, callback) {
+const deleteRelation = function (customer, relation, id1, id2, callback) {
   var db = dbs[customer]
   db.all('DELETE from relation_' + nodeId + ' where relation=? and id1=? and id2=?',
     [relation, id1, id2],
     function (err) { callback(err) })
 }
 
-exports.insert_relation = function (customer, relation, id1, id2, e2node, callback) {
+const insertRelation = function (customer, relation, id1, id2, e2node, callback) {
   var db = dbs[customer]
   db.all('INSERT into relation_' + nodeId + '(relation,id1,id2,node,t1,t2,ord) values (?,?,?,?,?,?,?)',
     [relation, id1, id2, e2node, START_OF_TIME, END_OF_TIME, 0],
@@ -289,7 +326,7 @@ exports.insert_relation = function (customer, relation, id1, id2, e2node, callba
 }
 
 // ///////Complete update for a list of related objects//////
-exports.process_relations = function (customer, entity, relation, forward, field, rows_db, rows_api, callback) {
+const processRelations = function (customer, entity, relation, forward, field, rows_db, rows_api, callback) {
   var result = {inserts: [], deletes: [], errors: []}
   relations_deletes(customer, entity, relation, forward, field, rows_db, rows_api, 0, result, function () {
     if (result.errors.length > 0) callback(result.errors[0], result)
@@ -356,7 +393,7 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
 }
 // //////////////////////////////////
 
-exports.query = function (req, res) {
+const query = function (req, res) {
   var db = dbs['SPEC']
   structured.structuredGet(db, req.body, function (err, ret) {
     if (err) res.status(500).end(err.message)
@@ -364,7 +401,7 @@ exports.query = function (req, res) {
   })
 }
 
-exports.sentence = function (req, res) {
+const sentence = function (req, res) {
   var db = dbs['SPEC']
   structured.structuredPut(
     {
@@ -386,32 +423,59 @@ const structuredPut = (customer, params) => {
   structured.structuredPut(params)
 }
 
-exports.structuredPut = structuredPut
+
 
 function get_type_property (p) {
   return MODEL.PROPERTIES[p].type
 }
 
-exports.get_entities_debug = function (req, res) {
+const getEntitiesDebug = function (req, res) {
   var customer = 'SPEC'
-  get_entities(customer, null, null, function (err, rows) {
+  getEntities(customer, null, null, function (err, rows) {
     if (err)	res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
 }
 
-exports.get_properties_debug = function (req, res) {
+const getPropertiesDebug = function (req, res) {
   var customer = 'SPEC'
-  get_properties(customer, function (err, rows) {
+  getProperties(customer, function (err, rows) {
     if (err)	res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
 }
 
-exports.get_relations_debug = function (req, res) {
+const getRelationsDebug = function (req, res) {
   var customer = 'SPEC'
-  get_relations(customer, function (err, rows) {
+  getRelations(customer, function (err, rows) {
     if (err)	res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
+}
+
+module.exports = {
+  insertProperties: insertProperties,
+  init: init,
+  get_entities: getEntities,
+  structuredPut: structuredPut,
+  getRelationsDebug: getRelationsDebug,
+  getPropertiesDebug: getPropertiesDebug,
+  insertRelation: insertRelation,
+  getEntitiesDebug: getEntitiesDebug,
+  deleteRelation: deleteRelation,
+  getEntity: getEntity,
+  insertEntity: insertEntity,
+  deletePropertiesStr: deletePropertiesStr,
+  updateEntity: updateEntity,
+  deleteEntity: deleteEntity,
+  deleteProperties: deleteProperties,
+  getProperty: getProperty,
+  getSimpleProperty: getSimpleProperty,
+  deleteProperty: deleteProperty,
+  processProperties: processProperties,
+  getSimpleRelation: getSimpleRelation,
+  processRelations: processRelations,
+  getBothRelation: getBothRelation,
+  query: query,
+  sentence: sentence
 }

@@ -13,7 +13,8 @@ module.exports = {
     'info': {type: 'str'},
     'enroll': {type: 'num'},
     'validity': {type: 'num'},
-    'ttgroup': {type: 'str'}
+    'ttgroup': {type: 'str'},
+    'groups': {type: 'str'}
   },
   RELATIONS: {
     'identifies': {}
