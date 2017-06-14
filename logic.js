@@ -352,18 +352,6 @@ const deleteTimeType = (req, res) => {
   })
 }
 
-const initTerminal = (serial) => {
-  var customer = 'SPEC'
-  objectsService.get_entities(customer, 'record', 'CAST(code as integer) id', function (err, rows) {
-    if (err) logger.error(err.message)
-    else comsService.globalSend('record_insert', {records: rows})
-  })
-  objectsService.get_both_relation(customer, 'identifies', 'code card', 'CAST(code as integer) id', function (err, rows) {
-    if (err) logger.error(err.message)
-    else comsService.globalSend('card_insert', {cards: rows})
-  })
-}
-
 const createClocking = (clocking, customer, callback) => {
   objectsService.structuredGet('SPEC', {},
     {
