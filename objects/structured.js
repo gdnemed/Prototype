@@ -3,6 +3,7 @@
 // -------------------------------------------------------------------------------------------
 
 const MODEL = require('./model')
+const CT = require.main.require('./CT')
 const logger = require.main.require('./utils/log').getLogger('db')
 
 var nodeId = 1
@@ -14,7 +15,7 @@ Main visible function for getting data.
 -str: Structure for query
 -callback: Callback function
 */
-const structuredGet = (db, str, callback) => {
+const structuredGet = (db, variables, str, callback) => {
   var definition = getDefinition(str)
   var select = getSimpleFields(str)
   var subqueries = getSubqueries(str)
@@ -32,7 +33,10 @@ const structuredGet = (db, str, callback) => {
 
 const selectEntity = (db, str, definition, filter, select, subqueries, callback) => {
   var where
-  var query = 'SELECT id _id_,' + (select ? select.complete : '*') + ' FROM entity_' + nodeId
+  let fields
+  if (str._subquery_) fields = ''
+  else fields = ',' + (select ? select.complete : '*')
+  var query = 'SELECT id _id_' + fields + ' FROM entity_' + nodeId
   if (str._entity_) where = " where type='" + definition.type + "'"
   if (filter) {
     if (where) where += ' and (' + filter + ')'
@@ -45,9 +49,26 @@ const selectEntity = (db, str, definition, filter, select, subqueries, callback)
   db.all(query, [], function (err, rows) {
     if (err) callback(err)
     else {
-      if (subqueries) processRow(db, rows, 0, subqueries, 0, callback)
-      else {
-        for (var i = 0; i < rows.length; i++) delete rows[i]._id_
+      if (subqueries) {
+        // If entity must be avoided, some additional treatment is needed
+        if (str._subquery_) {
+          processRow(db, rows, 0, subqueries, 0, (err) => {
+            if (err) callback(err)
+            else callback(null, rows[0]._subquery_)
+          })
+        } else {
+          processRow(db, rows, 0, subqueries, 0, (err) => {
+            if (err) callback(err)
+            else if (definition.isArray) callback(null, rows)
+            else callback(null, rows[0])
+          })
+        }
+      } else {
+        for (var i = 0; i < rows.length; i++) {
+          delete rows[i]._id_
+          cleanRow(rows[i])
+        }
+        logger.trace(definition.isArray)
         if (!definition.isArray) {
           if (rows.length > 0) callback(null, rows[0])
           else callback(null, null)
@@ -72,62 +93,100 @@ Parameter params is an object which contains
 -relation: Type of relation
 */
 const structuredPut = (params) => {
+  let definition = getDefinition(params.str)
+  let fields = getSimpleFields(params.str)
   if (params.str._property_) {
     switch (params.str._op_) {
-      case 'complete': putCompleteProperty(params)
+      case 'complete':putCompleteProperty(definition, fields, params)
         break
-      default: putSimpleProperty(params)
+      default: putSimpleProperty(definition, fields, params)
     }
   } else if (params.str._relation_) {
+    switch (params.str._op_) {
+      case 'complete':putCompleteRelation(definition, fields, params)
+        break
+      default: putSimpleRelation(definition, fields, params)
+    }
   } else {
+    // TODO: Block key before insert
     // First we search for the id of the entity to update, or to check if insert/put
-    var query = 'SELECT id FROM entity_' + nodeId + ' where ' +
-    (params.str._entity_ ? 'type=\'' + params.str._entity_ + '\' and ' : '') +
-    params.str[params.str._key_] + '=?'
-    params.db.all(query, [params.data[params.str._key_]], function (err, rows) {
+    let query = 'SELECT id FROM entity_' + nodeId + ' where ' +
+      (params.str._entity_ ? 'type=\'' + params.str._entity_ + '\' and ' : '')
+    let vals
+    if (params.str._key_) {
+      query += params.str[params.str._key_] + '=?'
+      vals = [params.data[params.str._key_]]
+    } else {
+      query += params.str._filter_
+      vals = []
+    }
+    logger.trace(query)
+    logger.trace(vals)
+    params.db.all(query, vals, function (err, rows) {
       if (err) params.callback(err)
       else {
-        var op = params.str._op_
-        // If no rows, it must be an insert, and we must search for a new id
+        let op = params.str._op_
         if (rows.length === 0) {
-          if (op === 'update') params.callback(new Error('No object found'))
+          if (op === 'search' || op === 'update') params.callback(new Error('No object found'))
           else {
+            // If no rows, it must be an insert, and we must search for a new id
             params.stateService.new_id(params.customer, (err, newid) => {
               if (err) params.callback(err)
-              else doPut('insert', newid, params)
+              else {
+                let f = params.callback
+                params.callback = (err) => {
+                  if (err) f(err)
+                  else f(null, newid)
+                }
+                doPut('insert', newid, params)
+              }
             })
           }
-        } else doPut('update', rows[0].id, params)
+        } else {
+          let f = params.callback
+          params.callback = (err) => {
+            if (err) f(err)
+            else f(null, rows[0].id)
+          }
+          if (op === 'search') {
+          // We are only searching for insertin related information
+            let substatements = getSubStatements(params.str)
+            if (substatements) runInternalPuts(substatements, 0, rows[0].id, params)
+            else params.callback(null, rows[0].id)
+          } else doPut('update', rows[0].id, params)
+        }
       }
     })
   }
 }
 
 /*
-Builds the SQL sentence from data and str, and executes it
+Builds the SQL sentence from data and str, and executes it.
+Returns the id of the entity which was created or updated.
 */
 const doPut = (op, id, params) => {
   var substatements = getSubStatements(params.str)
   var fields = getValues(params.str, params.data)
   var statement
-  let vals = ''
-  let list = ''
+  let vals
+  let list
   switch (op) {
     case 'insert':
       for (let i = 0; i < fields.fields.length; i++) {
-        list += fields.fields[i] + ','
-        vals += '?,'
+        if (list) list += ',' + fields.fields[i]
+        else list = fields.fields[i]
+        if (vals) vals += ',?'
+        else vals = '?'
       }
       statement = 'INSERT INTO entity_' + nodeId +
-     '(' + list + 'type,id) values (' + vals + '?,?)'
+     '(' + list + ',type,id) values (' + vals + ',?,?)'
       fields.values.push(params.str._entity_)
       break
     case 'update':
+    // TODO: Select before update, to ensure only modify when needed
       for (let i = 0; i < fields.fields.length; i++) {
-        vals += fields.fields[i] + '=?'
-        if (i < fields.fields.length - 1) {
-          vals += ', '
-        }
+        if (vals) vals += ',' + fields.fields[i] + '=?'
+        else vals = fields.fields[i] + '=?'
       }
       statement = 'UPDATE entity_' + nodeId + ' set ' + vals + ' where id=?'
       break
@@ -140,7 +199,7 @@ const doPut = (op, id, params) => {
     } else {
       logger.trace(statement)
       if (substatements) runInternalPuts(substatements, 0, id, params)
-      else params.callback(null, result)
+      else params.callback(null, id)
     }
   })
 }
@@ -151,39 +210,141 @@ until substatements list is completely processed.
 */
 const runInternalPuts = (substatements, i, id, params) => {
   if (i >= substatements.length) params.callback()
-  var sq = substatements[i]
-  var newParams = {
-    parent: id,
-    customer: params.customer,
-    db: params.db,
-    stateService: params.stateService,
-    data: params.data[sq._entry_name_],
-    str: params.str[sq._entry_name_],
-    callback: function (err, result) {
-      if (err) params.callback(err)
-      else runInternalPuts(substatements, i + 1, id, params)
-    }
+  else {
+    let sq = substatements[i]
+    let data = sq._entry_name_ === '_subquery_' ? params.data : params.data[sq._entry_name_]
+    logger.trace(data)
+    if (data) {
+      var newParams = {
+        parent: id,
+        entity: params.str._entity_,
+        customer: params.customer,
+        db: params.db,
+        stateService: params.stateService,
+        data: data,
+        str: params.str[sq._entry_name_],
+        callback: function (err, result) {
+          if (err) params.callback(err)
+          else runInternalPuts(substatements, i + 1, id, params)
+        }
+      }
+      structuredPut(newParams)
+    } else runInternalPuts(substatements, i + 1, id, params)
   }
-  structuredPut(newParams)
 }
 
-const putSimpleProperty = (params) => {
-  var sql = 'SELECT value from property_' +
-  MODEL.getTypeProperty(params.str._property_) + '_' + nodeId +
-  ' where id=? and property=?'
-  params.db.all(sql, [params.parent, params.str._property_], (err, rows) => {
+const putSimpleProperty = (definition, fields, params) => {
+  // TODO: If property is a key, block before insert
+  let table = 'property_' + MODEL.getTypeProperty(definition.type) + '_' + nodeId
+  let sql = 'SELECT value from ' + table + ' where entity=? and property=?'
+  let data = definition.isArray ? params.data[0] : params.data
+  let value
+  let t1
+  let t2
+  logger.trace('putSimpleProperty')
+  logger.trace(data)
+  if (fields) {
+    if (fields.map.value) value = data[fields.map.value]
+    else value = null
+    if (fields.map.t1) t1 = data[fields.map.t1]
+    else t1 = CT.START_OF_TIME
+    if (fields.map.t2) t2 = data[fields.map.t2]
+    else t2 = CT.END_OF_TIME
+  } else value = data
+  params.db.all(sql, [params.parent, definition.type], (err, rows) => {
     if (err) params.callback(err)
     else {
+      let values
       if (rows.length === 0) {
-
+        sql = 'INSERT into ' + table + '(entity,property,value,t1,t2) values (?,?,?,?,?)'
+        values = [params.parent, definition.type, value, t1, t2]
       } else {
-
+        sql = 'UPDATE ' + table + ' set value=?, t1=?, t2=? where entity=? and property=?'
+        values = [value, t1, t2, params.parent, definition.type]
       }
+      logger.trace(sql)
+      logger.trace(values)
+      params.db.run(sql, values, (err) => { params.callback(err) })
     }
   })
 }
 
-const putCompleteProperty = (params) => {
+const putSimpleRelation = (definition, fields, params) => {
+  let r = definition.type
+  let inverse = false
+  if (r.charAt(0) === '<') {
+    r = r.substring(2, r.length)
+    inverse = true
+  } else {
+    r = r.substring(0, r.length - 2)
+  }
+  // First, search the related entity and create it if needed
+  var str = {
+    _entity_: MODEL.getRelatedEntity(r, params.entity, inverse),
+    _key_: params.str._key_
+  }
+  if (params.str._field_) str[params.str._entry_name_] = params.str._field_
+  else {
+    for (var property in params.str) {
+      if (params.str.hasOwnProperty(property)) {
+        if (property.charAt(0) !== '_' && isEntityField(params.str[property])) {
+          str[property] = params.str[property]
+        }
+      }
+    }
+  }
+  var newParams = {
+    customer: params.customer,
+    db: params.db,
+    stateService: params.stateService,
+    data: definition.isArray ? params.data[0] : params.data,
+    str: str,
+    callback: function (err, result) {
+      if (err) params.callback(err)
+      else link(params, inverse, r, result)
+    }
+  }
+  logger.trace(newParams)
+  structuredPut(newParams)
+}
+
+const link = (params, inverse, r, relatedId) => {
+  let sql = 'SELECT ' + (inverse ? 'id1' : 'id2') +
+  ' id from relation_' + nodeId + ' where relation=? and ' +
+  (inverse ? 'id2' : 'id1') + '=?'
+  params.db.all(sql, [r, params.parent], (err, rows) => {
+    if (err) params.callback(err)
+    else {
+      let values
+      if (rows.length === 0) {
+        sql = 'INSERT into relation_' + nodeId +
+        '(relation,id1,id2,t1,t2,node) values (?,?,?,?,?,?)'
+        values = [r, inverse ? relatedId : params.parent,
+          inverse ? params.parent : relatedId,
+          CT.START_OF_TIME, CT.END_OF_TIME, nodeId]
+      } else {
+        if (rows[0].id !== relatedId) {
+          sql = 'UPDATE relation_' + nodeId + ' set ' +
+          (inverse ? 'id1' : 'id2') + '=? where relation=? and ' +
+          (inverse ? 'id2' : 'id1') + '=?'
+          values = [relatedId, r, params.parent]
+        }
+      }
+      if (values) {
+        logger.trace(sql)
+        logger.trace(values)
+        params.db.run(sql, values, (err) => {
+          params.callback(err)
+        })
+      } else params.callback() // No modification needed
+    }
+  })
+}
+
+const putCompleteProperty = (definition, fields, params) => {
+}
+
+const putCompleteRelation = (definition, fields, params) => {
 }
 
 /*
@@ -201,12 +362,15 @@ const processRow = (db, rows, i, subqueries, j, callback) => {
     var sq = getSubqueries(s)
     var sql = getSubselect(s._relation_, s._type_, select)
     if (s._relation_ && select && select.complete && !sq) {
+      logger.trace('change to:')
       sql = 'select r.*,' + select.complete +
       ' from (' + sql + ') r left join entity_' + nodeId + ' on r._id_=entity_' + nodeId + '.id' +
       (s._filter_ ? ' where ' + s._filter_ + '' : '')// TODO: more flexible filter: for relation, for entity...
     }
+    let values = [s._type_, rows[i]._id_]
     logger.trace(sql)
-    db.all(sql, [s._type_, rows[i]._id_], function (err, rowSubquery) {
+    logger.trace(values)
+    db.all(sql, values, function (err, rowSubquery) {
       if (err) callback(err)
       else {
         if (rowSubquery.length > 0) {
@@ -234,9 +398,15 @@ const getSubselect = (relation, type, select) => {
     case '<-': return 'select id1 _id_' +
     (select && select.complete_relation ? ',' + select.complete_relation : '') +
     ' from relation_' + nodeId + ' where relation=? and id2=?'
-    default: return 'select ' + (select ? select.complete : 'value') +
-    ' from property_' + MODEL.getTypeProperty(type) + '_' + nodeId +
-    ' where property=? and entity=?'
+    default: let sel
+      if (select) {
+        if (select.map.value) sel = (sel ? sel + ',' : '') + 'value ' + select.map.value
+        if (select.map.t1) sel = (sel ? sel + ',' : '') + 't1 ' + select.map.t1
+        if (select.map.t2) sel = (sel ? sel + ',' : '') + 't2 ' + select.map.t2
+      } else sel = 'value'
+      return 'select ' + sel + ' from property_' +
+      MODEL.getTypeProperty(type) + '_' + nodeId +
+      ' where property=? and entity=?'
   }
 }
 
@@ -245,13 +415,26 @@ Puts the result of a property subquery into the parent row.
 */
 const processProperty = (subquery, select, row, rowSubquery) => {
   if (subquery._isArray_) {
-    if (select) row[subquery._entry_name_] = rowSubquery
-    else {
+    if (select) {
+      for (let i = 0; i < rowSubquery.length; i++) cleanRow(rowSubquery[i])
+      row[subquery._entry_name_] = rowSubquery
+    } else {
       var l = []
       for (var k = 0; k < rowSubquery.length; k++) l.push(rowSubquery[k].value)
       row[subquery._entry_name_] = l
     }
-  } else row[subquery._entry_name_] = rowSubquery[0].value
+  } else if (rowSubquery[0].value) row[subquery._entry_name_] = rowSubquery[0].value
+}
+
+/*
+Deletes fields which should be hidden
+*/
+const cleanRow = (row) => {
+  for (var k in row) {
+    if (row.hasOwnProperty(k) &&
+    (row[k] == null || row[k] === CT.START_OF_TIME ||
+    row[k] === CT.END_OF_TIME)) delete row[k]
+  }
 }
 
 /*
@@ -266,7 +449,10 @@ const processRelation = (s, select, row, rowSubquery) => {
         for (let k = 0; k < rowSubquery.length; k++) l.push(rowSubquery[k]._field_)
         row[s._entry_name_] = l
       } else {
-        for (let k = 0; k < rowSubquery.length; k++) delete rowSubquery[k]._id_
+        for (let k = 0; k < rowSubquery.length; k++) {
+          delete rowSubquery[k]._id_
+          cleanRow(rowSubquery[k])
+        }
         row[s._entry_name_] = rowSubquery
       }
     } else {
@@ -334,7 +520,8 @@ const getSimpleFields = (str, prefix) => {
         if (property.charAt(0) === '_' && property !== '_field_') {
         } else if (typeof str[property] === 'string') {
           let p = (prefix ? prefix + '.' : '')
-          if (!res) res = {}
+          if (!res) res = {map: {}}
+          res.map[str[property]] = property
           switch (str[property]) {
             case 'id1':case 'id2':case 't1':case 't2':
             case 'order':case 'node':
@@ -392,12 +579,14 @@ const getSubqueries = (str) => {
     var res
     for (var property in str) {
       if (str.hasOwnProperty(property)) {
-        if (property.charAt(0) === '_') {} else if (typeof str[property] !== 'string') {
+        if (property.charAt(0) === '_' && property !== '_subquery_') {
+        } else if (typeof str[property] !== 'string') {
           var d = str[property]
           d._entry_name_ = property
-          var w = d._what_
+          var w = d._relation_
+          let p = d._property_
           // relation
-          if (w.indexOf('->') >= 0 || w.indexOf('<-') >= 0) {
+          if (w) {
             if (w.charAt(0) === '[') {
               w = w.substring(1, w.length - 1)
               d._isArray_ = true
@@ -419,10 +608,10 @@ const getSubqueries = (str) => {
             d._type_ = w
             if (res) res.push(d)
             else res = [d]
-          } else if (d._what_.charAt(0) === '[') {
+          } else if (p.charAt(0) === '[') {
             // array of properties
             d._isArray_ = true
-            d._type_ = w.substring(1, w.length - 1)
+            d._type_ = p.substring(1, p.length - 1)
             if (res) res.push(d)
             else res = [d]
           }
@@ -443,10 +632,12 @@ const getSubStatements = (str) => {
     var res
     for (var property in str) {
       if (str.hasOwnProperty(property)) {
-        if (property.charAt(0) === '_') {
+        if (property.charAt(0) === '_' && property !== '_subquery_') {
         } else if (typeof str[property] !== 'string') {
           var d = str[property]
           d._entry_name_ = property
+          if (res) res.push(d)
+          else res = [d]
         }
       }
     }
@@ -469,10 +660,9 @@ const getPropertyFields = (query, str) => {
         if (property.charAt(0) === '_') {
         } else if (typeof str[property] !== 'string') {
           var d = str[property]
+          let p = d._property_
           // No relations, and only single properties
-          if (d._what_.indexOf('->') < 0 &&
-              d._what_.indexOf('<-') < 0 &&
-              d._what_.charAt(0) !== '[') {
+          if (p && p.charAt(0) !== '[') {
             var select = getSimpleFields(d)
 
             // If no detailed fields, we assume it is the "value"
@@ -488,8 +678,8 @@ const getPropertyFields = (query, str) => {
             res = 'select sq' + i + '.*,' + names +
               ' from (' + res + ') sq' + i +
               ' left join (select entity _idp_,' + complete +
-              ' from property_' + MODEL.getTypeProperty(d._what_) + '_' + nodeId +
-              " where property='" + d._what_ + "'" +
+              ' from property_' + MODEL.getTypeProperty(p) + '_' + nodeId +
+              " where property='" + p + "'" +
               (d._filter_ ? ' and (' + d._filter_ + ')' : '') +
               ') q' + i + ' on sq' + i + '._id_=q' + i + '._idp_'
             i++
@@ -500,6 +690,11 @@ const getPropertyFields = (query, str) => {
     if (res) return res
     else return query
   }
+}
+
+const isEntityField = (name) => {
+  return name === 'id' || name === 'name' || name === 'name2' ||
+  name === 'code' || name === 'document' || name === 'intname'
 }
 
 module.exports = {

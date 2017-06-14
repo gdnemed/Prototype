@@ -12,7 +12,6 @@ const configure = (home) => {
   try {
     log4js.configure(JSON.parse(fs.readFileSync(home + '/logging.json', 'utf8')))
   } catch (err) {
-    console.log(err)
     console.log('logging.json not found, log messages sent to stdout.')
   }
 }
