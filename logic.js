@@ -24,6 +24,7 @@ const getRecords = (req, res) => {
       id: 'document',
       code: 'code',
       language: {_property_: 'language'},
+      validity: {_property_: '[validity]', start: 't1', end: 't2'},
       timetype_grp: {_property_: '[ttgroup]', code: 'value', start: 't1', end: 't2'},
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
     },
@@ -34,6 +35,8 @@ const getRecords = (req, res) => {
 }
 
 const postRecord = (req, res) => {
+  logger.trace('postRecord')
+  logger.trace(req.body)
   var str = {
     _op_: 'put',
     _entity_: 'record',
@@ -43,7 +46,7 @@ const postRecord = (req, res) => {
     code: 'code',
     language: {_property_: 'language'},
     timetype_grp: {_property_: '[ttgroup]', _op_: 'simple', code: 'value', start: 't1', end: 't2'},
-    validity: {_property_: '[validity]', _op_: 'simple', code: 'value', start: 't1', end: 't2'},
+    validity: {_property_: '[validity]', _op_: 'simple', start: 't1', end: 't2'},
     card: {
       _relation_: '[<-identifies]',
       _op_: 'simple',

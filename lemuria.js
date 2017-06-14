@@ -36,7 +36,14 @@ function main () {
       environment = {
         'api_listen': {'host': '', 'port': 8081},
         'coms_listen': {'host': '', 'port': 8092},
-        'node_id': 1
+        'node_id': 1,
+        'exchange': {
+          'files': {
+            'dir': '.',
+            'workdir': '.',
+            'server': {'host': '', 'port': 8081}
+          }
+        }
       }
     }
 
@@ -57,6 +64,7 @@ function initApiServer () {
   // API functions
   api.get('/api/coms/records', logic.getRecords)
   api.post('/api/coms/records', logic.postRecord)
+  api.post('/api/coms/records/:id', logic.postRecord)
   api.delete('/api/coms/records/:id', logic.deleteRecord)
   api.get('/api/coms/records/:id/cards', logic.getCards)
   api.post('/api/coms/records/:id/cards', logic.postCards)

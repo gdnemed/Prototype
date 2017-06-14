@@ -93,17 +93,18 @@ Parameter params is an object which contains
 */
 const structuredPut = (params) => {
   let definition = getDefinition(params.str)
+  let fields = getSimpleFields(params.str)
   if (params.str._property_) {
     switch (params.str._op_) {
-      case 'complete':putCompleteProperty(definition, params)
+      case 'complete':putCompleteProperty(definition, fields, params)
         break
-      default: putSimpleProperty(definition, params)
+      default: putSimpleProperty(definition, fields, params)
     }
   } else if (params.str._relation_) {
     switch (params.str._op_) {
-      case 'complete':putCompleteRelation(definition, params)
+      case 'complete':putCompleteRelation(definition, fields, params)
         break
-      default: putSimpleRelation(definition, params)
+      default: putSimpleRelation(definition, fields, params)
     }
   } else {
     // TODO: Block key before insert
@@ -231,20 +232,34 @@ const runInternalPuts = (substatements, i, id, params) => {
   }
 }
 
-const putSimpleProperty = (definition, params) => {
+const putSimpleProperty = (definition, fields, params) => {
   // TODO: If property is a key, block before insert
   let table = 'property_' + MODEL.getTypeProperty(definition.type) + '_' + nodeId
   let sql = 'SELECT value from ' + table + ' where entity=? and property=?'
+  let data = definition.isArray ? params.data[0] : params.data
+  let value
+  let t1
+  let t2
+  logger.trace('putSimpleProperty')
+  logger.trace(data)
+  if (fields) {
+    if (fields.map.value) value = data[fields.map.value]
+    else value = null
+    if (fields.map.t1) t1 = data[fields.map.t1]
+    else t1 = CT.START_OF_TIME
+    if (fields.map.t2) t2 = data[fields.map.t2]
+    else t2 = CT.END_OF_TIME
+  } else value = data
   params.db.all(sql, [params.parent, definition.type], (err, rows) => {
     if (err) params.callback(err)
     else {
       let values
       if (rows.length === 0) {
         sql = 'INSERT into ' + table + '(entity,property,value,t1,t2) values (?,?,?,?,?)'
-        values = [params.parent, definition.type, params.data, CT.START_OF_TIME, CT.END_OF_TIME]
+        values = [params.parent, definition.type, value, t1, t2]
       } else {
-        sql = 'UPDATE ' + table + ' set value=? where entity=? and property=?'
-        values = [params.data, params.parent, definition.type]
+        sql = 'UPDATE ' + table + ' set value=?, t1=?, t2=? where entity=? and property=?'
+        values = [value, t1, t2, params.parent, definition.type]
       }
       logger.trace(sql)
       logger.trace(values)
@@ -253,7 +268,7 @@ const putSimpleProperty = (definition, params) => {
   })
 }
 
-const putSimpleRelation = (definition, params) => {
+const putSimpleRelation = (definition, fields, params) => {
   let r = definition.type
   let inverse = false
   if (r.charAt(0) === '<') {
@@ -325,10 +340,10 @@ const link = (params, inverse, r, relatedId) => {
   })
 }
 
-const putCompleteProperty = (definition, params) => {
+const putCompleteProperty = (definition, fields, params) => {
 }
 
-const putCompleteRelation = (definition, params) => {
+const putCompleteRelation = (definition, fields, params) => {
 }
 
 /*
@@ -382,9 +397,15 @@ const getSubselect = (relation, type, select) => {
     case '<-': return 'select id1 _id_' +
     (select && select.complete_relation ? ',' + select.complete_relation : '') +
     ' from relation_' + nodeId + ' where relation=? and id2=?'
-    default: return 'select ' + (select ? select.complete : 'value') +
-    ' from property_' + MODEL.getTypeProperty(type) + '_' + nodeId +
-    ' where property=? and entity=?'
+    default: let sel
+      if (select) {
+        if (select.map.value) sel = (sel ? sel + ',' : '') + 'value ' + select.map.value
+        if (select.map.t1) sel = (sel ? sel + ',' : '') + 't1 ' + select.map.t1
+        if (select.map.t2) sel = (sel ? sel + ',' : '') + 't2 ' + select.map.t2
+      } else sel = 'value'
+      return 'select ' + sel + ' from property_' +
+      MODEL.getTypeProperty(type) + '_' + nodeId +
+      ' where property=? and entity=?'
   }
 }
 
@@ -498,7 +519,8 @@ const getSimpleFields = (str, prefix) => {
         if (property.charAt(0) === '_' && property !== '_field_') {
         } else if (typeof str[property] === 'string') {
           let p = (prefix ? prefix + '.' : '')
-          if (!res) res = {}
+          if (!res) res = {map: {}}
+          res.map[str[property]] = property
           switch (str[property]) {
             case 'id1':case 'id2':case 't1':case 't2':
             case 'order':case 'node':
