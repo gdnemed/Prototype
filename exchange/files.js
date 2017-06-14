@@ -10,6 +10,8 @@ const csvtojson = require('csvtojson')
 const request = require('request')
 const logger = require.main.require('./utils/log').getLogger('files')
 
+let ONE_DAY = 86400000
+
 let remoteDir
 let workDir
 let timeZone
@@ -53,13 +55,12 @@ const moveImportFile = (path, importType, fJson, pathPost, pathDelete) => {
         try {
           fs.writeFileSync(endPath, fs.readFileSync(newPath))
           fs.unlink(newPath, (err) => { if (err) logger.error(err) })
-          let oneDay = 86400000
-          let now = moment.tz(new Date().getTime() - oneDay, timeZone).format('YYYYMMDDHHmmss')
+          let now = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDDHHmmss')
           if (createOutput) {
             let logPath = workDir + '/' + 'pending' + '/' + importType + '_' + now + '.LOG'
             let output = fs.createWriteStream(logPath)
-            output.once('open', () => importProcess(endPath, importType, fJson, pathPost, pathDelete, output, now))
-          } else importProcess(endPath, importType, fJson, pathPost, pathDelete, null, now)
+            output.once('open', () => importPrepare(endPath, importType, fJson, pathPost, pathDelete, output, now))
+          } else importPrepare(endPath, importType, fJson, pathPost, pathDelete, null, now)
         } catch (err) { logger.error(err) }
       }
     })
@@ -72,18 +73,45 @@ const outPut = (stream, message) => {
 }
 
 /*
+Gets information from server, to manage total import.
+*/
+const importPrepare = (path, importType, fJson, pathPost, pathDelete, output, now) => {
+  logger.info('Start of ' + importType + ' import')
+  if (output) outPut(output, 'Start')
+  let errMsg
+  call('GET', pathPost, null, (err, response, bodyResponse) => {
+    if (err) {
+      logger.debug(err)
+      errMsg = err.message
+    } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
+      errMsg = 'Error ' + response.statusCode + ' : ' + bodyResponse
+      logger.debug(errMsg)
+    } else {
+      // Create Map from server response
+      let elemsToDelete = {}
+      let d = JSON.parse(bodyResponse)
+      for (let i = 0; i < d.length; i++) elemsToDelete['ID' + d[i].id] = d[i]
+      logger.trace('elemsToDelete')
+      logger.trace(elemsToDelete)
+      importProcess(elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now)
+    }
+
+    if (errMsg) {
+      if (output) outPut(output, errMsg)
+      endImport(path, importType, output, now, false)
+    }
+  })
+}
+
+/*
 Converts CSV file to a map or objects,
 and calls fJson() for each json.
 Then calls
 to import it.
 */
-const importProcess = (path, importType, fJson, pathPost, pathDelete, output, now) => {
-  logger.info('Start of ' + importType + ' import')
-  if (output) outPut(output, 'Start')
-  // TODO: Substract 1 day
-  let yesterday = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDD')
-  let elemsToDelete = {}
+const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now) => {
   let elems = {}
+  let yesterday = moment.tz(new Date().getTime() - ONE_DAY, timeZone).format('YYYYMMDD')
   csvtojson().fromFile(path)
   .on('json', (jsonObj) => fJson(jsonObj, yesterday, elems))
   .on('done', (err) => {
@@ -131,25 +159,23 @@ historic data.
 const processRecord = (r, yesterday, records) => {
   // Avoid past records
   if (r.END !== '' && r.END < yesterday) return
-  let record = {
-    id: r.ID,
-    code: r.CODE,
-    name: r.NAME
-  }
-  if (r.LANGUAGE) record.language = r.LANGUAGE
-  if (r.START !== '' || r.END !== '') {
+  let record = {id: r.ID}
+  if (r.CODE && r.CODE !== '') record.code = r.CODE
+  if (r.NAME && r.NAME !== '') record.name = r.NAME
+  if (r.LANGUAGE && r.LANGUAGE !== '') record.language = r.LANGUAGE
+  if ((r.START && r.START !== '') || (r.END && r.END !== '')) {
     record.validity = [{}]
-    if (r.START !== '') record.validity[0].start = r.START + '000000'
-    if (r.END !== '') record.validity[0].end = r.END + '235959'
+    if (r.START && r.START !== '') record.validity[0].start = r.START + '000000'
+    if (r.END && r.END !== '') record.validity[0].end = r.END + '235959'
   }
   if (r.CARD) {
     record.card = [{code: r.CARD}]
     if (record.validity && record.validity.start) record.card[0].start = record.validity[0].start
-    if (record.validity && record.validity.end) record.card[0].end = record.validityv.end
+    if (record.validity && record.validity.end) record.card[0].end = record.validity[0].end
   }
   if (r.TTGROUP) {
     record.timetype_grp = [{code: r.TTGROUP}]
-    if (record.validity && record.validity.start) record.ttgroup[0].start = record.validityv.start
+    if (record.validity && record.validity.start) record.ttgroup[0].start = record.validity[0].start
     if (record.validity && record.validity.end) record.ttgroup[0].end = record.validity[0].end
   }
 
