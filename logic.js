@@ -97,7 +97,7 @@ const setProperties = (customer, e, req, res, codeResult) => {
 const setProperty = (customer, id, l, i, callback) => {
   if (i >= l.length) callback()
   else {
-    objectsService.insert_property(customer, id, l[i], function (err) {
+    objectsService.insertProperty(customer, id, l[i], function (err) {
       if (err) callback(err)
       else setProperty(customer, id, l, i + 1, callback)
     })
@@ -106,7 +106,7 @@ const setProperty = (customer, id, l, i, callback) => {
 
 const deleteRecord = (req, res) => {
   var customer = 'SPEC'
-  objectsService.delete_entity(customer, 'code', req.params.id, function (err, rows) {
+  objectsService.deleteEntity(customer, 'record', 'code', req.params.id, function (err, rows) {
     if (err) res.status(500).end(err.message)
     else res.status(200).end()
   })
@@ -114,11 +114,11 @@ const deleteRecord = (req, res) => {
 
 const getCards = (req, res) => {
   var customer = 'SPEC'
-  objectsService.get_entity(customer, 'record', 'code', req.params.id, 'id', function (err, rows) {
+  objectsService.getEntity(customer, 'record', 'code', req.params.id, 'id', function (err, rows) {
     if (err)res.status(500).end(err.message)
     else if (rows === null || rows.length === 0) res.status(404).end()
     else {
-      objectsService.get_simple_relation(customer, rows[0].id, 'identifies', false, 'card', function (err, rows) {
+      objectsService.getSimpleRelation(customer, rows[0].id, 'identifies', false, 'card', function (err, rows) {
         if (err) res.status(500).end(err.message)
         else {
           var l = []
@@ -132,17 +132,17 @@ const getCards = (req, res) => {
 
 const postCards = (req, res) => {
   var customer = 'SPEC'
-  objectsService.get_entity(customer, 'record', 'code', req.params.id, 'id', function (err, rows) {
+  objectsService.getEntity(customer, 'record', 'code', req.params.id, 'id', function (err, rows) {
     if (err)res.status(500).end(err.message)
     else if (rows == null || rows.length === 0) res.status(404).end()
     else {
       var id = rows[0].id
-      objectsService.get_simple_relation(customer, id, 'identifies', false, 'card', function (err, rows) {
+      objectsService.getSimpleRelation(customer, id, 'identifies', false, 'card', function (err, rows) {
         if (err) res.status(500).end(err.message)
         else {
           var l = []
           for (var i = 0; i < req.body.length; i++) l.push({type: 'card', code: req.body[i], node: 1})
-          objectsService.process_relations(customer, {id: id, type: 'record'},
+          objectsService.processRelations(customer, {id: id, type: 'record'},
           'identifies', false, 'code', rows, l, function (r, result) {
             if (r != null) res.status(500).end(r.message)
             else {
@@ -170,7 +170,7 @@ const getFingerprints = (req, res) => {
   var customer = 'SPEC'
 
   // TODO: search by code
-  objectsService.get_property(customer, 'fingerprint', parseInt(req.params.id), function (err, rows) {
+  objectsService.getProperty(customer, 'fingerprint', parseInt(req.params.id), function (err, rows) {
     if (err) res.status(500).end(err.message)
     else {
       var l = []
@@ -185,10 +185,10 @@ const postFingerprints = (req, res) => {
 
   // TODO: search by code
   var id = parseInt(req.params.id)
-  objectsService.get_simple_property(customer, 'fingerprint', id, function (err, rows) {
+  objectsService.getSimpleProperty(customer, 'fingerprint', id, function (err, rows) {
     if (err) res.status(500).end(err.message)
     else {
-      objectsService.process_properties(customer, id, 'fingerprint', rows, req.body, function (r) {
+      objectsService.processProperties(customer, id, 'fingerprint', rows, req.body, function (r) {
         if (r != null) res.status(500).end(r.message)
         else res.status(200).end()
       })
@@ -198,15 +198,15 @@ const postFingerprints = (req, res) => {
 
 const postEnroll = (req, res) => {
   var customer = 'SPEC'
-  objectsService.get_entity(customer, 'record', 'code', req.params.id, 'id', function (err, rows) {
+  objectsService.getEntity(customer, 'record', 'code', req.params.id, 'id', function (err, rows) {
     if (err)res.status(500).end(err.message)
     else if (rows == null || rows.length === 0) res.status(404).end()
     else {
       var id = rows[0].id
-      objectsService.get_simple_property(customer, 'enroll', id, function (err, rows) {
+      objectsService.getSimpleProperty(customer, 'enroll', id, function (err, rows) {
         if (err) res.status(500).end(err.message)
         else {
-          objectsService.process_properties(customer,
+          objectsService.processProperties(customer,
             id, 'enroll', rows, [req.body.enroll], function (r) {
               if (r != null) res.status(500).end(r.message)
               else res.status(200).end()
@@ -230,6 +230,101 @@ const getClockingsDebug = (req, res) => {
   inputsService.get_inputs(customer, function (err, r) {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp({input: r[0], input_data_str: r[1]})
+  })
+}
+
+const getTimeTypes = (req, res) => {
+  var customer = 'SPEC'
+  objectsService.get_entities(customer, 'timetype', 'code,name', function (err, rows) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(rows)
+  })
+}
+
+const getTimeType = (req, res) => {
+  var customer = 'SPEC'
+  objectsService.get_entity(customer, 'timetype', 'code', req.params.id, '', function (err, rows) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(rows)
+  })
+}
+
+const postTimeType = (req, res) => {
+  var customer = 'SPEC'
+  /* var str = {
+    _op_: 'put',
+    _entity_: 'timetype',
+    _key_: 'id',
+    name: 'name',
+    id: 'code',
+    language: {_property_: 'language'},
+    groups: {_property_: 'groups'}
+  }
+  objectsService.structuredPut(customer,
+    {
+      customer: 'SPEC',
+      str: str,
+      data: req.body,
+      callback: function (err, ret) {
+        if (err) res.status(500).end(err.message)
+        else res.status(200).jsonp(ret)
+      }
+    }) */
+  objectsService.getEntity(customer, 'timetype', 'code', req.body.id, '', (err, rows) => {
+    if (err) res.status(500).end(err.message)
+    else {
+      let row = rows[0]
+      if (row) {
+        // update
+        let e = {'id': row.id, 'name': req.body.name, 'code': req.body.id, 'type': 'timetype', 'properties': { 'group': req.body.groups, 'language': req.body.language }}
+        objectsService.updateEntity(customer, e, (err) => {
+          if (err) res.status(500).end(err.message)
+          else {
+            objectsService.deletePropertiesStr(customer, row.id, (err) => {
+              if (err) res.status(500).end(err.message)
+              else {
+                let property = [{property: 'language', value: req.body.language}]
+                for (let i = 0; i < req.body.groups.length; i++) {
+                  property.push({property: 'ttgroup', value: req.body.groups[i]})
+                }
+                objectsService.insertProperties(customer, row.id, property, 0, (err) => {
+                  if (err) res.status(500).end(err.message)
+                  else res.status(200).end()
+                })
+              }
+            })
+          }
+        })
+      } else {
+        let e = {'name': req.body.name, 'code': req.body.id, 'type': 'timetype', 'properties': { 'group': req.body.groups, 'language': req.body.language }}
+        objectsService.insertEntity(customer, e, (err, newid) => {
+          if (err) res.status(500).end(err.message)
+          else {
+            objectsService.deletePropertiesStr(customer, newid, (err) => {
+              if (err) res.status(500).end(err.message)
+              else {
+                let property = [{property: 'language', value: req.body.language}]
+                for (let i = 0; i < req.body.groups.length; i++) {
+                  property.push({property: 'ttgroup', value: req.body.groups[i]})
+                }
+                objectsService.insertProperties(customer, newid, property, 0, (err) => {
+                  if (err) res.status(500).end(err.message)
+                  else res.status(200).end()
+                })
+              }
+            })
+          }
+        })
+      }
+    }
+  })
+}
+
+const deleteTimeType = (req, res) => {
+  var customer = 'SPEC'
+  objectsService.deleteEntity(customer, 'timetype', 'code', req.params.id, function (err, rows) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).end()
   })
 }
 
@@ -289,5 +384,9 @@ module.exports = {
   getFingerprints: getFingerprints,
   postFingerprints: postFingerprints,
   createClocking: createClocking,
-  getPendingRegisters: getPendingRegisters
+  getPendingRegisters: getPendingRegisters,
+  getTimeTypes: getTimeTypes,
+  getTimeType: getTimeType,
+  postTimeType: postTimeType,
+  deleteTimeType: deleteTimeType
 }
