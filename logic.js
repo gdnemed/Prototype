@@ -294,7 +294,7 @@ const postTimeType = (req, res) => {
         else res.status(200).jsonp(ret)
       }
     }) */
-  objectsService.getEntity(customer, 'timetype', 'code', req.body.id, '', (err, rows) => {
+  objectsService.get_entity(customer, 'timetype', 'code', req.body.id, '', (err, rows) => {
     if (err) res.status(500).end(err.message)
     else {
       let row = rows[0]
