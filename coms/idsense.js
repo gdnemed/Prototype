@@ -7,6 +7,8 @@ const msgpack = require('msgpack-lite')
 
 const logger = require.main.require('./utils/log').getLogger('coms')
 
+var withHeader = false
+
 const send = (socket, command, data) => {
   logger.trace(command)
   logger.trace(data)
@@ -14,20 +16,35 @@ const send = (socket, command, data) => {
     case 'card_insert':data.cmd = 2; break
     case 'record_insert':data.cmd = 3; break
   }
-  data.seq = socket.specInfo.seq
-// var str=JSON.stringify(data);
-  var str = msgpack.encode(data)
-  socket.write(str)
+  if (withHeader) {
+    sendFrame(data, socket.specInfo.seq, socket)
+  } else {
+    data.seq = socket.specInfo.seq
+    var str = msgpack.encode(data)
+    socket.write(str)
+  }
   socket.specInfo.seq++
 }
 
 const ack = (frame, socket) => { nack(frame, socket, 1) }
 
 const nack = (frame, socket, code) => {
-  var j = {seq: frame.seq, ack: code, cmd: frame.cmd}
-// var str=JSON.stringify(j);
-  var str = msgpack.encode(j)
-  socket.write(str)
+  if (withHeader) {
+    sendFrame({ack: code, cmd: frame.cmd}, frame.seq, socket)
+  } else {
+    let j = {seq: frame.seq, ack: code, cmd: frame.cmd}
+    let str = msgpack.encode(j)
+    socket.write(str)
+  }
+}
+
+const sendFrame = (j, seq, socket) => {
+  let str = msgpack.encode(j)
+  let b = Buffer.allocUnsafe(str.length + 4)
+  str.copy(b, 4)
+  b.writeUInt16BE(seq, 0)
+  b.writeUInt16BE(str.length, 2)
+  socket.write(b)
 }
 
 const receive = (data, socket, logicService) => {

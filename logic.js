@@ -71,29 +71,6 @@ const postRecord = (req, res) => {
     })
 }
 
-const setProperties = (customer, e, req, res, codeResult) => {
-  var l = []
-  if (req.body.language) l.push({property: 'language', value: req.body.language})
-  setProperty(customer, e.id, l, 0, function (err) {
-    if (err) res.status(500).end(err.message)
-    else {
-      res.status(codeResult).end(String(e.id))
-      // send to terminals
-      comsService.globalSend('record_insert', {records: [{id: e.code}]})
-    }
-  })
-}
-
-const setProperty = (customer, id, l, i, callback) => {
-  if (i >= l.length) callback()
-  else {
-    objectsService.insertProperty(customer, id, l[i], function (err) {
-      if (err) callback(err)
-      else setProperty(customer, id, l, i + 1, callback)
-    })
-  }
-}
-
 const deleteRecord = (req, res) => {
   var customer = 'SPEC'
   objectsService.deleteFromField(customer, 'record', 'document', req.params.id, function (err, rows) {
@@ -178,6 +155,71 @@ const nextVersion = (obj) => {
             comsService.globalSend('record_insert', {records: r})
             comsService.globalSend('card_insert', {cards: c})
           }
+        }
+      }
+    })
+}
+
+const getInfo = (req, res) => {
+  objectsService.structuredGet('SPEC', {},
+    {
+      _entity_: 'record',
+      _filter_: 'document=\'' + req.params.id + '\'',
+      id: 'document',
+      info: {
+        _property_: 'info',
+        value: 'value',
+        date: 't1'
+      }
+    },
+    (err, ret) => {
+      if (err) res.status(500).end(err.message)
+      else res.status(200).jsonp(ret)
+    })
+}
+
+const getInfos = (req, res) => {
+  objectsService.structuredGet('SPEC', {},
+    {
+      _entity_: '[record]',
+      id: 'document',
+      info: {
+        _property_: 'info',
+        value: 'value',
+        date: 't1'
+      }
+    },
+    (err, ret) => {
+      if (err) res.status(500).end(err.message)
+      else res.status(200).jsonp(ret)
+    })
+}
+
+const postInfo = (req, res) => {
+  logger.trace('postRecord')
+  logger.trace(req.body)
+  var str = {
+    _op_: 'search',
+    _entity_: 'record',
+    _filter_: 'document=\'' + req.params.id + '\'',
+    _subquery_: {
+      _property_: 'info',
+      _op_: 'simple',
+      _key_: 'value',
+      value: 'value',
+      date: 't1'
+    }
+  }
+  objectsService.structuredPut(
+    {
+      customer: 'SPEC',
+      str: str,
+      data: req.body,
+      callback: (err, ret) => {
+        if (err) res.status(500).end(err.message)
+        else {
+          res.status(200).jsonp(ret)
+          nextVersion(ret)// Notify communications
         }
       }
     })
@@ -352,18 +394,6 @@ const deleteTimeType = (req, res) => {
   })
 }
 
-const initTerminal = (serial) => {
-  var customer = 'SPEC'
-  objectsService.get_entities(customer, 'record', 'CAST(code as integer) id', function (err, rows) {
-    if (err) logger.error(err.message)
-    else comsService.globalSend('record_insert', {records: rows})
-  })
-  objectsService.get_both_relation(customer, 'identifies', 'code card', 'CAST(code as integer) id', function (err, rows) {
-    if (err) logger.error(err.message)
-    else comsService.globalSend('card_insert', {cards: rows})
-  })
-}
-
 const createClocking = (clocking, customer, callback) => {
   objectsService.structuredGet('SPEC', {},
     {
@@ -402,6 +432,9 @@ module.exports = {
   deleteRecord: deleteRecord,
   getCards: getCards,
   postCards: postCards,
+  getInfo: getInfo,
+  getInfos: getInfos,
+  postInfo: postInfo,
   postEnroll: postEnroll,
   getClockings: getClockings,
   getClockingsDebug: getClockingsDebug,

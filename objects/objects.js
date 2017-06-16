@@ -432,26 +432,26 @@ function get_type_property (p) {
   return MODEL.PROPERTIES[p].type
 }
 
-exports.get_entities_debug = function (req, res) {
+exports.getEntitiesDebug = function (req, res) {
   var customer = 'SPEC'
   exports.get_entities(customer, null, null, function (err, rows) {
-    if (err)	res.status(500).end(err.message)
+    if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
 }
 
-exports.get_properties_debug = function (req, res) {
+exports.getPropertiesDebug = function (req, res) {
   var customer = 'SPEC'
   exports.get_properties(customer, function (err, rows) {
-    if (err)	res.status(500).end(err.message)
+    if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
 }
 
-exports.get_relations_debug = function (req, res) {
+exports.getRelationsDebug = function (req, res) {
   var customer = 'SPEC'
-  get_relations(customer, function (err, rows) {
-    if (err)	res.status(500).end(err.message)
+  exports.get_relations(customer, function (err, rows) {
+    if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
   })
 }

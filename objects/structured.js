@@ -246,6 +246,7 @@ const putSimpleProperty = (definition, fields, params) => {
   if (fields) {
     if (fields.map.value) value = data[fields.map.value]
     else value = null
+    logger.trace(fields.map.t1)
     if (fields.map.t1) t1 = data[fields.map.t1]
     else t1 = CT.START_OF_TIME
     if (fields.map.t2) t2 = data[fields.map.t2]
