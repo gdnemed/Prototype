@@ -316,79 +316,35 @@ const getTimeType = (req, res) => {
 }
 
 const postTimeType = (req, res) => {
-  var customer = 'SPEC'
-  /* var str = {
+  logger.trace('postRecord')
+  logger.trace(req.body)
+  var str = {
     _op_: 'put',
     _entity_: 'timetype',
-    _key_: 'id',
+    _key_: 'code',
     name: 'name',
-    id: 'code',
+    code: 'code',
     language: {_property_: 'language'},
-    groups: {_property_: 'groups'}
+    ttgroup: {_property_: '[ttgroup]'}
   }
-  objectsService.structuredPut(customer,
+  objectsService.structuredPut(
     {
       customer: 'SPEC',
       str: str,
       data: req.body,
-      callback: function (err, ret) {
+      callback: (err, ret) => {
         if (err) res.status(500).end(err.message)
-        else res.status(200).jsonp(ret)
+        else {
+          res.status(200).jsonp(ret)
+          nextVersion(ret)// Notify communications
+        }
       }
-    }) */
-  objectsService.get_entity(customer, 'timetype', 'code', req.body.id, '', (err, rows) => {
-    if (err) res.status(500).end(err.message)
-    else {
-      let row = rows[0]
-      if (row) {
-        // update
-        let e = {'id': row.id, 'name': req.body.name, 'code': req.body.id, 'type': 'timetype', 'properties': { 'group': req.body.groups, 'language': req.body.language }}
-        objectsService.updateEntity(customer, e, (err) => {
-          if (err) res.status(500).end(err.message)
-          else {
-            objectsService.deletePropertiesStr(customer, row.id, (err) => {
-              if (err) res.status(500).end(err.message)
-              else {
-                let property = [{property: 'language', value: req.body.language}]
-                for (let i = 0; i < req.body.groups.length; i++) {
-                  property.push({property: 'ttgroup', value: req.body.groups[i]})
-                }
-                objectsService.insertProperties(customer, row.id, property, 0, (err) => {
-                  if (err) res.status(500).end(err.message)
-                  else res.status(200).end()
-                })
-              }
-            })
-          }
-        })
-      } else {
-        let e = {'name': req.body.name, 'code': req.body.id, 'type': 'timetype', 'properties': { 'group': req.body.groups, 'language': req.body.language }}
-        objectsService.insertEntity(customer, e, (err, newid) => {
-          if (err) res.status(500).end(err.message)
-          else {
-            objectsService.deletePropertiesStr(customer, newid, (err) => {
-              if (err) res.status(500).end(err.message)
-              else {
-                let property = [{property: 'language', value: req.body.language}]
-                for (let i = 0; i < req.body.groups.length; i++) {
-                  property.push({property: 'ttgroup', value: req.body.groups[i]})
-                }
-                objectsService.insertProperties(customer, newid, property, 0, (err) => {
-                  if (err) res.status(500).end(err.message)
-                  else res.status(200).end()
-                })
-              }
-            })
-          }
-        })
-      }
-    }
-  })
+    })
 }
 
 const deleteTimeType = (req, res) => {
   var customer = 'SPEC'
-  objectsService.deleteEntity(customer, 'timetype', 'code', req.params.id, function (err, rows) {
+  objectsService.deleteFromField(customer, 'timetype', 'code', req.params.id, function (err, rows) {
     if (err) res.status(500).end(err.message)
     else res.status(200).end()
   })
