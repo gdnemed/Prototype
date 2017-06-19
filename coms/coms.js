@@ -27,6 +27,7 @@ const init = (listen, logic) => {
   logicService = logic
   net.createServer(listenFunction).listen(listen.port, listen.host)
   logger.info('coms listening at ' + listen.host + ':' + listen.port)
+  setInterval(refreshClocks, 60000)
 }
 
 const listenFunction = (socket) => {
@@ -59,9 +60,36 @@ const onClose = (err, socket) => {
 }
 
 const receive = (dataBuffer, socket) => {
-  // var data=JSON.parse(data_buffer.toString('utf-8'));
-  var data = msgpack.decode(dataBuffer)
   var info = socket.specInfo
+  // If there was a piece of information, concatenate with this
+  if (info.buffer) {
+    let newb = Buffer.allocUnsafe(info.buffer.length + dataBuffer.length)
+    info.buffer.copy(newb, 0)
+    dataBuffer.copy(newb, info.buffer.length)
+    dataBuffer = newb
+  }
+  // At least we need length
+  if (dataBuffer.length < 2) {
+    info.buffer = dataBuffer
+    return
+  }
+  let l = dataBuffer.readUInt16LE(0)
+  // We still don't have the frame
+  if (l > dataBuffer.length) {
+    info.buffer = dataBuffer
+    return
+  }
+  let s = dataBuffer.readUInt16LE(2)
+  let b = Buffer.allocUnsafe(l - 4)
+  dataBuffer.copy(b, 0, 4, l)
+  // Remaining information must be kept for new receive
+  if (l < dataBuffer.length) {
+    info.buffer = Buffer.allocUnsafe(dataBuffer.length - l)
+    dataBuffer.copy(info.buffer, 0, l)
+  } else delete info.buffer
+
+  var data = msgpack.decode(b)
+  data.seq = s
   logger.trace('socket ' + info.name)
   logger.trace(data)
   // each type of terminal, needs its own processing
@@ -143,6 +171,19 @@ const checkVersions = (specInfo) => {
       if (tv < sv) {
         // We put node_id=1 at the moment, should be revised
         logicService.get_pending_registers(tab, tv, specInfo.customer, 1, specInfo.serial)
+      }
+    }
+  }
+}
+
+const refreshClocks = () => {
+  console.log('refreshClocks')
+  for (var k in clients) {
+    if (clients.hasOwnProperty(k)) {
+      switch (clients[k].specInfo.type) {
+        case 'idSense': idsense.send(clients[k], 'clock', {time: Math.floor(new Date().getTime() / 1000)})
+          break
+        default:
       }
     }
   }

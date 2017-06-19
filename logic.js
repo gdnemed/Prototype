@@ -35,40 +35,40 @@ const getRecords = (req, res) => {
 }
 
 const postRecord = (req, res) => {
-  logger.trace('postRecord')
-  logger.trace(req.body)
-  var str = {
-    _op_: 'put',
-    _entity_: 'record',
-    _key_: 'id',
-    name: 'name',
-    id: 'document',
-    code: 'code',
-    language: {_property_: 'language'},
-    timetype_grp: {_property_: '[ttgroup]', _op_: 'simple', code: 'value', start: 't1', end: 't2'},
-    validity: {_property_: '[validity]', _op_: 'simple', start: 't1', end: 't2'},
-    card: {
-      _relation_: '[<-identifies]',
-      _op_: 'simple',
-      _key_: 'code',
+  if (req.body.id) {
+    var str = {
+      _op_: 'put',
+      _entity_: 'record',
+      _key_: 'id',
+      name: 'name',
+      id: 'document',
       code: 'code',
-      start: 't1',
-      end: 't2'
-    }
-  }
-  objectsService.structuredPut(
-    {
-      customer: 'SPEC',
-      str: str,
-      data: req.body,
-      callback: (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else {
-          res.status(200).jsonp(ret)
-          nextVersion(ret)// Notify communications
-        }
+      language: {_property_: 'language'},
+      timetype_grp: {_property_: '[ttgroup]', _op_: 'simple', code: 'value', start: 't1', end: 't2'},
+      validity: {_property_: '[validity]', _op_: 'simple', start: 't1', end: 't2'},
+      card: {
+        _relation_: '[<-identifies]',
+        _op_: 'simple',
+        _key_: 'code',
+        code: 'code',
+        start: 't1',
+        end: 't2'
       }
-    })
+    }
+    objectsService.structuredPut(
+      {
+        customer: 'SPEC',
+        str: str,
+        data: req.body,
+        callback: (err, ret) => {
+          if (err) res.status(500).end(err.message)
+          else {
+            res.status(200).jsonp(ret)
+            nextVersion(ret)// Notify communications
+          }
+        }
+      })
+  } else res.status(400).end()
 }
 
 const deleteRecord = (req, res) => {
@@ -149,8 +149,10 @@ const nextVersion = (obj) => {
             let c = []
             let r = []
             for (let i = 0; i < card.length; i++) {
-              r.push({id: ret.code})
-              c.push({card: card[i].code, id: ret.code})
+              if (ret.code) {
+                r.push({id: parseInt(ret.code)})
+                c.push({card: card[i].code, id: parseInt(ret.code)})
+              }
             }
             comsService.globalSend('record_insert', {records: r})
             comsService.globalSend('card_insert', {cards: c})
@@ -238,11 +240,14 @@ const initTerminal = (serial) => {
         let c = []
         let r = []
         for (let i = 0; i < ret.length; i++) {
-          r.push({id: ret[i].code})
-          let card = ret[i].card
-          if (card) {
-            for (let i = 0; i < card.length; i++) {
-              c.push({card: card[i].code, id: ret[i].code})
+          if (ret[i].code && ret[i].code !== null) {
+            r.push({id: parseInt(ret[i].code)})
+            let card = ret[i].card
+            if (card) {
+              for (let j = 0; j < card.length; j++) {
+                let e = {card: card[j].code, id: parseInt(ret[i].code)}
+                c.push(e)
+              }
             }
           }
         }

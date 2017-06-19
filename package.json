@@ -12,7 +12,8 @@
     "msgpack-lite": "latest",
     "log4js": "latest",
     "chokidar": "latest",
-    "csvtojson": "latest"
+    "csvtojson": "latest",
+    "knex": "latest"
   },
   "scripts": {
     "test": "mocha"
