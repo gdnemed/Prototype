@@ -152,13 +152,6 @@ select(knex,{},{},(err) => {
   process.exit(0)
 })*/
 
-/*
-let s1 = (sq => sq.from('entity').column('id as _id_').as('e'))
-let s2 = (sq => sq.from('property').column('entity').column('value as language').as('p1'))
-let s = knex.from(s1).leftJoin(s2,'e._id_','p1.entity')
-console.log(s.toSQL())
-*/
-
 
  get(knex, null, {_entity_: 'record',
   nombre: 'name',
