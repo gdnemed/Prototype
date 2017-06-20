@@ -305,11 +305,24 @@ const getClockingsDebug = (req, res) => {
 }
 
 const getTimeTypes = (req, res) => {
-  var customer = 'SPEC'
-  objectsService.get_entities(customer, 'timetype', 'code,name', function (err, rows) {
+  objectsService.structuredGet('SPEC', {},
+    {
+      _entity_: '[timetype]',
+      name: 'name',
+      id: 'id',
+      code: 'code',
+      intnames: 'intname',
+      timetype_grp: {_property_: '[ttgroup]', code: 'value'}
+    },
+    (err, ret) => {
+      if (err) res.status(500).end(err.message)
+      else res.status(200).jsonp(ret)
+    })
+  /* var customer = 'SPEC'
+  objectsService.get_entities(customer, 'timetype', 'id,code,name', function (err, rows) {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(rows)
-  })
+  }) */
 }
 
 const getTimeType = (req, res) => {
@@ -329,8 +342,8 @@ const postTimeType = (req, res) => {
     _key_: 'code',
     name: 'name',
     code: 'code',
-    language: {_property_: 'language'},
-    ttgroup: {_property_: '[ttgroup]'}
+    language: 'intname',
+    ttgroup: {_property_: '[ttgroup]', _op_: 'multiple'}
   }
   objectsService.structuredPut(
     {
