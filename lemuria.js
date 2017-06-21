@@ -86,6 +86,7 @@ function initApiServer () {
   api.get('/api/coms/timetypes', logic.getTimeTypes)
   api.get('/api/coms/timetypes/:id', logic.getTimeType)
   api.post('/api/coms/timetypes', logic.postTimeType)
+  api.post('/api/coms/timetypes/:id', logic.postTimeType)
   api.delete('/api/coms/timetypes/:id', logic.deleteTimeType)
   // Run http server
   httpServer = api.listen(environment.api_listen.port, function () {

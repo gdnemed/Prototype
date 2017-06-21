@@ -97,7 +97,9 @@ const structuredPut = (params) => {
   let fields = getSimpleFields(params.str)
   if (params.str._property_) {
     switch (params.str._op_) {
-      case 'complete':putCompleteProperty(definition, fields, params)
+      case 'complete':putCompleteProperty(definition, fields, params, 0)
+        break
+      case 'multiple':putMultipleProperty(definition, fields, params, 0)
         break
       default: putSimpleProperty(definition, fields, params)
     }
@@ -110,7 +112,7 @@ const structuredPut = (params) => {
   } else {
     // TODO: Block key before insert
     // First we search for the id of the entity to update, or to check if insert/put
-    let query = 'SELECT id FROM entity_' + nodeId + ' where ' +
+    let query = 'SELECT * FROM entity_' + nodeId + ' where ' +
       (params.str._entity_ ? 'type=\'' + params.str._entity_ + '\' and ' : '')
     let vals
     if (params.str._key_) {
@@ -153,7 +155,9 @@ const structuredPut = (params) => {
             let substatements = getSubStatements(params.str)
             if (substatements) runInternalPuts(substatements, 0, rows[0].id, params)
             else params.callback(null, rows[0].id)
-          } else doPut('update', rows[0].id, params)
+          } else {
+            doPut('update', rows[0].id, params, rows[0])
+          }
         }
       }
     })
@@ -164,9 +168,9 @@ const structuredPut = (params) => {
 Builds the SQL sentence from data and str, and executes it.
 Returns the id of the entity which was created or updated.
 */
-const doPut = (op, id, params) => {
+const doPut = (op, id, params, entity) => {
   var substatements = getSubStatements(params.str)
-  var fields = getValues(params.str, params.data)
+  var fields = getValues(params.str, params.data, entity)
   var statement
   let vals
   let list
@@ -342,7 +346,44 @@ const link = (params, inverse, r, relatedId) => {
   })
 }
 
-const putCompleteProperty = (definition, fields, params) => {
+const putCompleteProperty = (definition, fields, params, i) => {
+  let table = 'property_' + MODEL.getTypeProperty(definition.type) + '_' + nodeId
+  // It's complete property, so we can erase previous registers
+  if (i === 0) {
+    let sql = 'delete from ' + table + ' where entity=? and property=?'
+    params.db.run(sql, [params.parent, definition.type], (err) => {
+      if (err) params.callback(err)
+      else {
+        // now we must insert the new registers
+        sql = 'insert into ' + table + ' (entity,property,value) values (?,?,?)'
+        params.db.run(sql, [params.parent, definition.type, params.data[i]], putCompleteProperty(definition, fields, params, i + 1))
+      }
+    })
+  } else if (i < params.data.length) {
+    let sql = 'insert into ' + table + ' (entity,property,value) values (?,?,?)'
+    params.db.run(sql, [params.parent, definition.type, params.data[i]], putCompleteProperty(definition, fields, params, i + 1))
+  } else {
+    params.callback(null)
+  }
+}
+
+const putMultipleProperty = (definition, fields, params, i) => {
+  if (i < params.data.length) {
+    let table = 'property_' + MODEL.getTypeProperty(definition.type) + '_' + nodeId
+    let sql = 'select value from ' + table + ' where entity=? and property=? and value=?'
+    params.db.all(sql, [params.parent, definition.type, params.data[i]], (err, rows) => {
+      if (err) params.callback(err)
+      else if (rows.length === 0) {
+        // now we must insert the new registers
+        sql = 'insert into ' + table + ' (entity,property,value) values (?,?,?)'
+        params.db.run(sql, [params.parent, definition.type, params.data[i]], putMultipleProperty(definition, fields, params, i + 1))
+      } else {
+        putMultipleProperty(definition, fields, params, i + 1)
+      }
+    })
+  } else {
+    params.callback(null)
+  }
 }
 
 const putCompleteRelation = (definition, fields, params) => {
@@ -550,7 +591,7 @@ const getSimpleFields = (str, prefix) => {
 Searches for values in a data object, matching with definition of str,
 and returns an array for input/update operations.
 */
-const getValues = (str, data) => {
+const getValues = (str, data, entity) => {
   if (str) {
     var res = {fields: [], values: []}
     for (var property in str) {
@@ -561,6 +602,12 @@ const getValues = (str, data) => {
           // Date fields could need some processing
           if (str[property] === 't1' || str[property] === 't2') {
             res.values.push(data[property])
+          } else if (str[property] === 'intname') {
+            let jsonIntNames = {}
+            if (entity) jsonIntNames = JSON.parse(entity.intname)
+            jsonIntNames[data[property]] = data['name']
+            // let intname = '{"' + data[property] + '": "' + data['name'] + '"}'
+            res.values.push(JSON.stringify(jsonIntNames))
           } else res.values.push(data[property])
         }
       }

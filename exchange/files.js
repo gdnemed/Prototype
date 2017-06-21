@@ -90,7 +90,10 @@ const importPrepare = (path, importType, fJson, pathPost, pathDelete, output, no
       // Create Map from server response
       let elemsToDelete = {}
       let d = JSON.parse(bodyResponse)
-      for (let i = 0; i < d.length; i++) elemsToDelete['ID' + d[i].id] = d[i]
+      for (let i = 0; i < d.length; i++) {
+        if (importType === 'TTYPES') elemsToDelete['ID' + d[i].code] = d[i]
+        else elemsToDelete['ID' + d[i].id] = d[i]
+      }
       logger.trace('elemsToDelete')
       logger.trace(elemsToDelete)
       importProcess(elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now)
@@ -202,6 +205,11 @@ const processRecord = (r, yesterday, records) => {
 }
 
 const processTtype = (r, yesterday, ttypes) => {
+  let ttype = {code: r.CODE}
+  if (r.NAME && r.NAME !== '') ttype.name = r.NAME
+  if (r.LANGUAGE && r.LANGUAGE !== '') ttype.language = r.LANGUAGE
+  if (r.TTGROUP && r.TTGROUP !== '') ttype.ttgroup = [ r.TTGROUP ]
+  ttypes[ttype.code + ttype.language + ttype.ttgroup] = ttype
 }
 
 const processInfo = (r, yesterday, infos) => {
@@ -225,10 +233,13 @@ const sendOrder = (l, i, apiPath, elemsToDelete, output, nObjects, nErrors, call
   if (i >= l.length) callback(nObjects, nErrors)
   else {
     let r = l[i]
-    if (elemsToDelete['ID' + l[i].id]) delete elemsToDelete['ID' + l[i].id]
+    let id
+    if (apiPath === 'timetypes') id = l[i].code
+    else id = l[i].id
+    if (elemsToDelete['ID' + id]) delete elemsToDelete['ID' + id]
     // Add item id
     let pos = apiPath.indexOf('@')
-    let url = pos < 0 ? apiPath + '/' + l[i].id
+    let url = pos < 0 ? apiPath + '/' + id
     : apiPath.substring(0, pos) + l[i].id + apiPath.substr(pos + 1)
     logger.debug('call ' + url)
     nObjects++
