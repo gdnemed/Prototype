@@ -2,6 +2,7 @@ const CT = require.main.require('./CT')
 const utilsDb = require.main.require('./utils/db.js')
 const MODEL = require('./model')
 var structured = require('./structured')
+var squeries = require('./squeries')
 
 var dbs = {}
 var nodeId
@@ -143,7 +144,7 @@ module.exports.deleteEntity = deleteEntity
 
 exports.get_properties = function (customer, callback) {
   var db = dbs[customer]
-  db.all('SELECT * from property_str_' + nodeId,
+  db.all('SELECT * from property_num_' + nodeId,
     [],
     function (err, rows) {
       if (err) callback(err)
@@ -393,7 +394,7 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
 
 exports.query = function (req, res) {
   var db = dbs['SPEC']
-  structured.structuredGet(db, {}, req.body, function (err, ret) {
+  squeries.get(db, {}, req.body, function (err, ret) {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })

@@ -13,7 +13,9 @@ const PROPERTIES = {
   'info': {type: 'str'},
   'enroll': {type: 'num'},
   'validity': {type: 'num'},
-  'ttgroup': {type: 'str'}
+  'ttgroup': {type: 'str'},
+  'card': {type: 'str'},
+  'record': {type: 'str'}
 }
 
 const RELATIONS = {
