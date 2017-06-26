@@ -4,7 +4,6 @@
 // -Initialize Lemuria services
 // -Starts http server for API calls
 // -------------------------------------------------------------------------------------------
-
 const fs = require('fs')
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -16,6 +15,7 @@ const coms = require('./coms/coms')
 const files = require('./exchange/files')
 const logic = require('./logic')
 const logger = require('./utils/log')
+const migrations = require('./migrations')
 
 var environment
 var api
@@ -26,6 +26,13 @@ main()
 function main () {
   let home = process.cwd()
   logger.configure(home)
+
+  // -------------------------------------------------------------------------------------------
+  // start of migrations
+  // -------------------------------------------------------------------------------------------
+  migrations.init()
+  // -------------------------------------------------------------------------------------------
+
   // Install/uninstall service, or run it as a program
   if (process.argv.length > 2) serviceFunctions(process.argv)
   else {
