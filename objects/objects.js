@@ -1,5 +1,8 @@
+const moment = require('moment-timezone')
+
 const CT = require.main.require('./CT')
 const utilsDb = require.main.require('./utils/db.js')
+const logger = require.main.require('./utils/log').getLogger('db')
 const MODEL = require('./model')
 var structured = require('./structured')
 var squeries = require('./squeries')
@@ -16,32 +19,34 @@ exports.init = function (node, customers, state) {
   }
 }
 
+const resSQL = (err) => { if (err) logger.error(err) }
+
 function initDB (customer) {
   var db = utilsDb.createDatabase(customer, 'objects', nodeId)
 
   db.run('CREATE TABLE if not exists entity_' + nodeId +
   ' (id integer, type text, name text, name2 text, intname text, document text, code text)', [], function () {
     db.run('CREATE UNIQUE INDEX if not exists i_entity_' + nodeId + '_id on entity_' + nodeId + ' (id)')
-    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_code on entity_' + nodeId + ' (type,code)')
-    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_name on entity_' + nodeId + ' (type,name)')
-    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_nc on entity_' + nodeId + ' (type,name,name2)')
-    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_document on entity_' + nodeId + ' (type,document)')
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_code on entity_' + nodeId + ' (type,code)', resSQL)
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_name on entity_' + nodeId + ' (type,name)', resSQL)
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_nc on entity_' + nodeId + ' (type,name,name2)', resSQL)
+    db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_document on entity_' + nodeId + ' (type,document)', resSQL)
   })
   db.run('CREATE TABLE if not exists property_num_' + nodeId +
   ' (entity integer, property text, t1 integer, t2 integer, value integer)', [], function () {
-    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pe on property_num_' + nodeId + ' (property,entity)')
-    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pv on property_num_' + nodeId + ' (property,value)')
+    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pe on property_num_' + nodeId + ' (entity,property,t1,t2)', resSQL)
+    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pv on property_num_' + nodeId + ' (value,property,t1,t2)', resSQL)
   })
 
   db.run('CREATE TABLE if not exists property_str_' + nodeId +
   ' (entity integer, property text, t1 integer, t2 integer, value text)', [], function () {
-    db.run('CREATE INDEX if not exists i_property_str_' + nodeId + '_pe on property_str_' + nodeId + ' (property,entity)')
-    db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pv on property_num_' + nodeId + ' (property,value)')
+    db.run('CREATE INDEX if not exists i_property_str_' + nodeId + '_pe on property_str_' + nodeId + ' (entity,property,t1,t2)', resSQL)
+    db.run('CREATE INDEX if not exists i_property_str_' + nodeId + '_pv on property_str_' + nodeId + ' (value,property,t1,t2)', resSQL)
   })
 
   db.run('CREATE TABLE if not exists property_bin_' + nodeId +
   ' (entity integer, property text, t1 integer, t2 integer, value blob)', [], function () {
-    db.run('CREATE INDEX if not exists i_property_bin_' + nodeId + '_pe on property_bin_' + nodeId + ' (property,entity)')
+    db.run('CREATE INDEX if not exists i_property_bin_' + nodeId + '_pe on property_bin_' + nodeId + ' (entity,property,t1,t2)', resSQL)
   })
 
   db.run('CREATE TABLE if not exists relation_' + nodeId +
@@ -50,6 +55,14 @@ function initDB (customer) {
     db.run('CREATE INDEX if not exists i_relation_' + nodeId + '_r2 on relation_' + nodeId + ' (relation,id2)')
   })
   return db
+}
+
+exports.prepare = (str) => {
+  return squeries.prepareGet(null, str)
+}
+
+exports.get = (db, variables, str, callback) => {
+  squeries.get(db, variables, str, callback)
 }
 
 exports.get_entities = function (customer, type, transform, callback) {
@@ -394,15 +407,25 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
 
 exports.query = function (req, res) {
   var db = dbs['SPEC']
-  squeries.get(db, {}, req.body, function (err, ret) {
+  let ts1 = new Date().getTime()
+  let now = moment.tz(ts1, 'GMT').format('YYYYMMDDHHmmss')
+  squeries.get(db, {now: parseInt(now), today: parseInt(now.substring(0, 8))}, req.body, function (err, ret) {
     if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(ret)
+    else {
+      let ts2 = new Date().getTime()
+      logger.debug(ts2 - ts1)
+      res.status(200).jsonp(ret)
+    }
   })
 }
 
 exports.sentence = function (req, res) {
   var db = dbs['SPEC']
-  structured.structuredPut(
+  squeries.put(db, null, req.body.str, req.body.data, function (err, ret) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(ret)
+  })
+  /* structured.structuredPut(
     {
       customer: 'SPEC',
       db: db,
@@ -413,7 +436,7 @@ exports.sentence = function (req, res) {
         if (err) res.status(500).end(err.message)
         else res.status(200).jsonp(ret)
       }
-    })
+    }) */
 }
 
 const structuredGet = (customer, variables, query, callback) => {

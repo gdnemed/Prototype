@@ -3,8 +3,8 @@
 // -------------------------------------------------------------------------------------------
 
 const MODEL = require('./model')
-// const CT = require.main.require('./CT')
-const CT = require('../CT')
+const CT = require.main.require('./CT')
+const logger = require.main.require('./utils/log').getLogger('db')
 
 const knexObjects = require('knex')({
   client: 'sqlite3',
@@ -33,10 +33,45 @@ Main visible function for getting data.
 */
 const get = (db, variables, str, callback) => {
   if (!str._guide_) {
-    if (!prepare(db, str, variables)) callback(new Error('Syntax error'))
+    if (!prepareGet(db, str)) {
+      callback(new Error('Syntax error'))
+      return
+    }
   }
-  execute(str, callback)
+  executeSelect(str, variables, callback)
 }
+
+/*
+ Main visible function for putting data.
+ -db: Database
+ -variables: Variables used by the query
+ -str: Structure for put process
+ -data: Data to insert
+ -callback: Callback function
+ */
+const put = (db, variables, str, data, callback) => {
+  if (!str._guide_) {
+    if (!preparePut(db, str)) {
+      callback(new Error('Syntax error'))
+      return
+    }
+  }
+  executeUpdate(str, data, variables, callback)
+}
+
+const preparePut = (db, str) => {
+  db = str._inputs_ ? knexInputs : knexObjects
+  str._guide_ = {entity_fields: {},
+    property_fields: [],
+    property_subqueries: {},
+    op: str._op_,
+    key: str._key_
+  }
+ /* let type = getType(str)
+  getFields(str, db, str._inputs_)
+*/
+}
+
 /*
 Prepare str structure for future execution, adding _guide_ field, which will contain:
 - entity_fields: Field of the entity/inputs table.
@@ -51,6 +86,8 @@ Prepare str structure for future execution, adding _guide_ field, which will con
                                     isArray:true, typeProperty: 'str'},
                             _statement_: <Object>}
   The map contains also an _statement_, which is the query to be executed.
+- direct_relations: list of relations which don't load the complete history,
+  but just the current object related. These can be resolved in a join.
 - relations_forward, relations_backward: Maps for relations (for inputs, only forward).
   Each map has relation type as key, and as value, an object like:
   {entry: <entry name>, type: <relation name>, isArray:{false}}
@@ -58,33 +95,33 @@ Prepare str structure for future execution, adding _guide_ field, which will con
   statement to be executed.
 - relation_owner: Only for inputs which must be linked with owner entity
 */
-const prepare = (db, str, variables) => {
+const prepareGet = (db, str) => {
   db = str._inputs_ ? knexInputs : knexObjects
   str._guide_ = {entity_fields: {},
     property_fields: [],
-    property_subqueries: {}}
-
-  let type = str._entity_ ? str._entity_
-  : (str._property_ ? str._property_
-    : (str._relation_ ? str._relation_ : str._inputs_))
-
-  if (type) {
-    if (type.charAt(0) === '[') {
-      str._guide_.isArray = true
-      type = type.substring(1, type.length - 1)
-    } else str._guide_.isArray = false
+    property_subqueries: {},
+    direct_relations: [],
+    variablesMapping: []}
+  let type = getType(str)
+  // Get information if this is a subquery from a relation
+  if (str._prefix_) {
+    str._guide_.prefix = str._prefix_
+    str._guide_.subquery = str._subquery_
+    str._guide_.link_field_1 = str._link_field_1_
+    str._guide_.link_field_2 = str._link_field_2_
   }
   // Always a hidden id of the entity
-  str._guide_.fields_to_remove = ['_id_']
+  str._guide_.fields_to_remove = [(str._prefix_ ? str._prefix_ : '') + '_id_']
   getFields(str, db, str._inputs_)
   if (str._entity_ || str._linked_) {
     let f = str._guide_.entity_fields
 
     // Select over ENTITY
+    filterEntity(str._guide_)
     let e = sq => {
-      selectEntity(sq, f, type)
+      selectEntity(sq, f, type, str._filter_, str._guide_)
     }
-    joinProperties(db, str, e, f, type)
+    joins(db, str, e, f, type)
     preparePropertySubquery(db, str._guide_.property_subqueries, 'str')
     preparePropertySubquery(db, str._guide_.property_subqueries, 'num')
     preparePropertySubquery(db, str._guide_.property_subqueries, 'bin')
@@ -94,9 +131,9 @@ const prepare = (db, str, variables) => {
     let f = str._guide_.entity_fields
     // Select over INPUTS
     let e = sq => {
-      selectInput(sq, f, type)
+      selectInput(sq, f, type, str._filter_, str._guide_)
     }
-    joinProperties(db, str, e, f, type)
+    joins(db, str, e, f, type)
     preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'str', type)
     preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'num', type)
     preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'bin', type)
@@ -106,31 +143,73 @@ const prepare = (db, str, variables) => {
 }
 
 /*
-Basic select over entity table
+Checks which type of relation/entity/property/input is, and if it must be an array.
 */
-const selectEntity = (sq, f, type) => {
-  let s = sq.from('entity_' + nodeId)
-  s.column('id as _id_')
-  for (var c in f) {
-    if (f.hasOwnProperty(c)) s.column(c + ' as ' + f[c])
+const getType = (str) => {
+  let type = str._entity_ ? str._entity_
+    : (str._property_ ? str._property_
+    : (str._relation_ ? str._relation_ : str._inputs_))
+
+  if (type) {
+    if (type.charAt(0) === '[') {
+      str._guide_.isArray = true
+      type = type.substring(1, type.length - 1)
+    } else str._guide_.isArray = false
   }
-  if (type) s.where('type', type).as('e')
-  else s.where('id', 0).as('e')
-  return s
+  return type
 }
 
 /*
-Basic select over inputs table
+Basic select over entity table
 */
-const selectInput = (sq, f, period) => {
+const selectEntity = (sq, f, type, filter, helper) => {
+  let s = sq.from('entity_' + nodeId)
+  s.column('id as ' + (helper.prefix ? helper.prefix : '') + '_id_')
+  for (var c in f) {
+    if (f.hasOwnProperty(c)) s.column(c + ' as ' + (helper.prefix ? helper.prefix : '') + f[c])
+  }
+  if (filter) addFilter(s, filter, helper)
+  if (type) s.where('type', type)
+  else if (!helper.subquery) s.where('id', 0)
+  s.as(helper.subquery ? helper.prefix + 'r' : 'e')
+  return s
+}
+
+const filterEntity = (helper) => {
+  helper.variablesMapping.push(null) // 1 position in bindings is fixed
+}
+
+/*
+ Basic select over inputs table
+ */
+const selectInput = (sq, f, period, filter, helper) => {
   let s = sq.from('input_' + nodeId + '_' + period)
   s.column('id as _id_')
   for (var c in f) {
     if (f.hasOwnProperty(c)) s.column(c + ' as ' + f[c])
   }
+  if (filter) addFilter(s, filter, helper)
+  helper.variablesMapping.push(null) // 1 position in bindings is fixed
   return s.as('e')
 }
 
+/*
+Adds a filter into an statement and update the variablesMapping of
+the helper structure.
+*/
+const addFilter = (statement, filter, helper) => {
+  let v = filter.variable ? 0 : filter.value
+  if (filter.condition === '=' || !filter.condition) {
+    statement.where(filter.field, v)
+  } else statement.where(filter.field, filter.condition, v)
+  if (filter.variable) {
+    helper.variablesMapping.push(filter.variable)
+  }
+}
+
+/*
+Prepares statement for relation query, and puts it into rels structure.
+*/
 const prepareRelation = (db, rels, forward) => {
   if (rels) {
     let l = []
@@ -188,50 +267,188 @@ and put the result in str._guide_.statement
 - f: Entity/input fields
 - type: type of entity, or period of inputs
 */
-const joinProperties = (db, str, e, f, type) => {
+const joins = (db, str, e, f, type) => {
   let ps = str._guide_.property_fields
-  let linkField = str._inputs_ ? '.id' : '.entity'
-  if (ps && ps.length > 0) {
+  let dr = str._guide_.direct_relations
+  if ((ps && ps.length > 0) || (dr && dr.length > 0)) {
+    let last
+    // To avoid nulls
+    if (!ps) ps = []
+    if (!dr) dr = []
+
+    let linkField = str._inputs_ ? '.id' : '.entity'
+    // First, properties
     for (let i = 0; i < ps.length; i++) {
       // First a simple query over property table
       let propertyTable = str._inputs_
         ? 'input_data_' + ps[i].typeProperty + '_' + nodeId + '_' + type
         : 'property_' + ps[i].typeProperty + '_' + nodeId
-      ps[i].stProperty = sq => {
-        sq.from(propertyTable)
-          .as('pr' + i)
-          .where('property', ps[i].type).as('pr' + i)
-      }
-      // Now, join with previous level
-      ps[i].join = sq => {
-        let table = i === 0 ? 'e' : 'jpr' + (i - 1)
-        sq.from(i === 0 ? e : ps[i - 1].join)
-          .leftJoin(ps[i].stProperty, 'pr' + i + linkField, table + '._id_')
-          .column(table + '.*')
-        // Now, property columns. It could be just 'value' (the default)
-        // or a list of fields.
-        if (ps[i].fields) {
-          // Not just value, but we seek also t1 and t2
-          if (ps[i].fields.value) sq.column('pr' + i + '.value as ' + ps[i].fields.value)
-          if (ps[i].fields.t1) {
-            sq.column('pr' + i + '.t1 as ' + ps[i].fields.t1)
-            str._guide_.fields_to_remove.push(ps[i].fields.t1)
-          }
-          if (ps[i].fields.t2) {
-            sq.column('pr' + i + '.t2 as ' + ps[i].fields.t2)
-            str._guide_.fields_to_remove.push(ps[i].fields.t2)
-          }
-        } else sq.column('pr' + i + '.value as ' + ps[i].entry)
-        sq.as('jpr' + i) // New alias for every join
-      }
+      joinProperty(str, ps, i, propertyTable, e, linkField)
+      last = ps[i].join
     }
-    str._guide_.statement = db.from(ps[ps.length - 1].join)
-  } else if (str._inputs_) str._guide_.statement = selectInput(db, f, type)
-  else str._guide_.statement = selectEntity(db, f, type)
+    // Now, relations
+    for (let i = 0; i < dr.length; i++) {
+      joinRelation(db, str, dr, i, ps, e)
+      last = dr[i].join
+    }
+    if (str._guide_.subquery) {
+      str._guide_.subquery.leftJoin(last, str._guide_.link_field_1, str._guide_.link_field_2)
+    } else str._guide_.statement = db.from(last)
+  } else if (str._inputs_) str._guide_.statement = selectInput(db, f, type, str._filter_, str._guide_)
+  else {
+    if (str._guide_.subquery) str._guide_.subquery.leftJoin(e, str._guide_.link_field_1, str._guide_.link_field_2)
+    else str._guide_.statement = selectEntity(db, f, type, str._filter_, str._guide_)
+  }
+  if (!str._guide_.subquery) {
+    // Transform to raw for better use
+    let sql = str._guide_.statement.toSQL()
+    str._guide_.statement = db.raw(sql.sql, sql.bindings)
+    logger.debug(str._guide_.statement.toSQL())
+  }
+}
+
+const filterTime = (join, withtime, elem, variablesMapping) => {
+  if (!elem.isArray) {
+    join.onBetween('t1', [withtime ? CT.START_OF_TIME : CT.START_OF_DAYS, 0])
+      .onBetween('t2', [0, withtime ? CT.END_OF_TIME : CT.END_OF_DAYS])
+    if (withtime) {
+      variablesMapping.push(null)
+      variablesMapping.push('now')
+      variablesMapping.push('now')
+      variablesMapping.push(null)
+    } else {
+      variablesMapping.push(null)
+      variablesMapping.push('today')
+      variablesMapping.push('today')
+      variablesMapping.push(null)
+    }
+  }
+}
+
+const joinProperty = (str, a, i, propertyTable, e, linkField) => {
+  // Now, join with previous level
+  a[i].join = sq => {
+    let table = i === 0 ? 'e' : 'jps' + (i - 1)
+    sq.from(i === 0 ? e : a[i - 1].join)
+    let on = (j) => {
+      // Now, the 'on' links, using index (id,relation,t1,t2)
+      // First id
+      j.on('ps' + i + linkField, table + '._id_')
+      // Now, relation
+      let pType = a[i].type
+      j.onIn('ps' + i + '.property', [pType])
+      str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+      logger.debug('push null property')
+      // Now date
+      let withtime = MODEL.PROPERTIES[pType].time
+      filterTime(j, withtime, a[i], str._guide_.variablesMapping)
+    }
+    // If filter over property join, otherwise, left join
+    if (a[i].filter) sq.join(propertyTable + ' as ps' + i, on)
+    else sq.leftJoin(propertyTable + ' as ps' + i, on)
+
+    // If additional filters, put them in 'where'
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    // Select every column from previous joins
+    sq.column(table + '.*')
+    // Now, current relation columns. It could be just 'value' (the default)
+    // or a list of fields.
+    if (a[i].fields) {
+      // Not just value, but we seek also t1 and t2
+      if (a[i].fields.t1) {
+        sq.column('ps' + i + '.t1 as ' + a[i].fields.t1)
+        str._guide_.fields_to_remove.push(a[i].fields.t1)
+      }
+      if (a[i].fields.t2) {
+        sq.column('ps' + i + '.t2 as ' + a[i].fields.t2)
+        str._guide_.fields_to_remove.push(a[i].fields.t2)
+      }
+    } else sq.column('ps' + i + '.value as ' + a[i].entry)
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    sq.as('jps' + i) // New alias for every join
+  }
+}
+
+const joinRelation = (db, str, a, i, ps, e) => {
+  // Now, join with previous level
+  a[i].join = sq => {
+    let table = i === 0 ? (ps.length > 0 ? ('jps' + (ps.length - 1)) : 'e') : 'jdr' + (i - 1)
+    sq.from(i === 0 ? (ps.length > 0 ? ps[ps.length - 1].join : e) : a[i - 1].join)
+    let on = (j) => {
+      // Now, the 'on' links, using index (id,relation,t1,t2)
+      // First id
+      let linkField = a[i].forward ? '.id1' : '.id2'
+      j.on('dr' + i + linkField, table + '._id_')
+      // Now, relation
+      let rType = a[i].type
+      j.onIn('dr' + i + '.relation', [rType])
+      str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+      // Now date
+      let withtime = MODEL.RELATIONS[rType].time
+      filterTime(j, withtime, a[i], str._guide_.variablesMapping)
+    }
+    // If filter over property join, otherwise, left join
+    if (a[i].filter) sq.join('relation_' + nodeId + ' as dr' + i, on)
+    else sq.leftJoin('relation_' + nodeId + ' as dr' + i, on)
+
+    // If additional filters, put them in 'where'
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    // Select every column from previous joins
+    sq.column(table + '.*')
+    // Now, current relation columns. It could be just 'value' (the default)
+    // or a list of fields.
+    if (a[i].fields) putRelationInfo(db, str, a[i], i, sq)
+    else sq.column('dr' + i + (a[i].forward ? '.id2 as ' : '.id1 as ') + a[i].entry)
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    sq.as('jdr' + i) // New alias for every join
+  }
 }
 
 /*
-Analyze this level of str, and creates structures which
+Puts columns in subquery, about relation table.
+- str: General query structure.
+- info: Information about relation join.
+- i: Index in joins array.
+- subquery: Query for this join.
+*/
+const putRelationInfo = (db, str, info, i, subquery) => {
+  if (info.nextEntity) {
+    info.nextEntity._subquery_ = subquery
+    let prefix = 'r' + i + '_'
+    // Objects: we put the id for next get
+    // subquery.column('dr' + i + (info.forward ? '.id2 as ' : '.id1 as ') + prefix + 'id')
+    info.nextEntity._prefix_ = prefix
+    if (info.fields.t1) {
+      subquery.column('dr' + i + '.t1 as ' + prefix + info.fields.t1)
+      str._guide_.fields_to_remove.push(info.fields.t1)
+    }
+    if (info.fields.t2) {
+      subquery.column('dr' + i + '.t2 as ' + prefix + info.fields.t2)
+      str._guide_.fields_to_remove.push(info.fields.t2)
+    }
+    info.nextEntity._link_field_1_ = prefix + 'r.' + prefix + '_id_'
+    info.nextEntity._link_field_2_ = 'dr' + i + (info.forward ? '.id2' : '.id1')
+    prepareGet(db, info.nextEntity)
+    subquery = info.nextEntity._guide_.subquery
+    subquery.column(prefix + 'r' + '.*')
+  } else {
+    // One field, from the relation table
+    if (info.fields.t1) {
+      subquery.column('dr' + i + '.t1 as ' + info.fields.t1)
+      str._guide_.fields_to_remove.push(info.fields.t1)
+    }
+    if (info.fields.t2) {
+      subquery.column('dr' + i + '.t2 as ' + info.fields.t2)
+      str._guide_.fields_to_remove.push(info.fields.t2)
+    }
+    if (info.fields.id) {
+      subquery.column('dr' + i + (info.forward ? '.id2 as ' : '.id1 as ') + info.fields.id)
+    }
+  }
+}
+
+/*
+Analyze this level of str structure, and creates objects which
 guide the program to do queries.
 */
 const getFields = (str, db, forInputs) => {
@@ -256,14 +473,24 @@ const getFields = (str, db, forInputs) => {
           str._guide_.fields_to_remove.push('_owner_')
           prepareRelatedObject(f, str[property], null, db)
         } else if (f.type.indexOf('->') >= 0) {
-          if (!str._guide_.relations_forward) str._guide_.relations_forward = {}
           f.type = f.type.substring(0, f.type.length - 2)
-          str._guide_.relations_forward[f.type] = f
+          f.forward = true
+          if (f.isArray) {
+            if (!str._guide_.relations_forward) str._guide_.relations_forward = {}
+            str._guide_.relations_forward[f.type] = f
+          } else {
+            str._guide_.direct_relations.push(f)
+          }
           prepareRelatedObject(f, str[property], true, db)
         } else if (f.type.indexOf('<-') >= 0) {
-          if (!str._guide_.relations_backward) str._guide_.relations_backward = {}
           f.type = f.type.substring(2, f.type.length)
-          str._guide_.relations_backward[f.type] = f
+          f.forward = false
+          if (f.isArray) {
+            if (!str._guide_.relations_backward) str._guide_.relations_backward = {}
+            str._guide_.relations_backward[f.type] = f
+          } else {
+            str._guide_.direct_relations.push(f)
+          }
           prepareRelatedObject(f, str[property], false, db)
         } else { // It's a property
           f.typeProperty = MODEL.getTypeProperty(f.type)
@@ -274,6 +501,7 @@ const getFields = (str, db, forInputs) => {
               f.fields[str[property][pf]] = pf
             }
           }
+          if (str[property]._filter_) f.filter = str[property]._filter_
           if (f.isArray) {
             if (!str._guide_.property_subqueries[f.typeProperty]) {
               str._guide_.property_subqueries[f.typeProperty] = {}
@@ -286,32 +514,74 @@ const getFields = (str, db, forInputs) => {
   }
 }
 
+/*
+Puts every relation field in the descriptor (f).
+- forward: indicates the direction of the relation.
+- entry: is the name of the relation in the main structure.
+*/
 const prepareRelatedObject = (f, entry, forward, db) => {
+  let nfields = 0
   for (let rf in entry) {
     if (!f.fields) f.fields = {}
     if (entry.hasOwnProperty(rf)) {
-      if (rf === 't1') f.fields.t1 = rf
-      else if (rf === 't2') f.fields.t2 = rf
-      else if (rf === 'id') {
-        if (forward === null) f.fields.id = rf
+      if (entry[rf] === 't1') {
+        f.fields.t1 = rf
+        nfields++
+      }
+      else if (entry[rf] === 't2') {
+        f.fields.t2 = rf
+        nfields++
+      }
+      else if (entry[rf] === 'id') {
+        if (forward === null) f.fields.id1 = rf
         else if (forward) f.fields.id2 = rf
         else f.fields.id1 = rf
+        nfields++
       } else if (rf === '_relation_') {
       } else {
         // Related entity
-        if (!f.nextEntity) f.nextEntity = {_linked_: true}
+        if (!f.nextEntity) f.nextEntity = {_linked_: true, _n_fields: 0}
         f.nextEntity[rf] = entry[rf]
+        nfields++
       }
     }
   }
-  if (f.nextEntity) prepare(db, f.nextEntity, null)
+  if (f.nextEntity) f.nextEntity._n_fields = nfields
+  if (f.isArray) prepareGet(db, f.nextEntity)
 }
 
-const execute = (str, callback) => {
-  str._guide_.statement.then((rows) => {
-    processRow(str, rows, 0, callback)
-  })
-  .catch((err) => callback(err))
+/*
+Select execution
+*/
+const executeSelect = (str, variables, callback) => {
+  // Variables substitution
+  let v = str._guide_.variablesMapping
+  let l = str._guide_.statement.bindings
+  // logger.debug(v)
+  // logger.debug(l)
+  if (v) {
+    for (let i = 0; i < l.length; i++) {
+      if (v[i] !== null) l[i] = variables[v[i]]
+    }
+  }
+  // logger.debug(str._guide_.statement.toSQL())
+  str._guide_.statement
+    .then((rows) => processRow(str, rows, 0, callback))
+    .catch((err) => callback(err))
+}
+
+/*
+Update/Insert execution
+*/
+const executeUpdate = (str, data, variables, callback) => {
+  if (str._property_) {
+  } else {
+    // TODO: Block key before insert
+    // First, we
+    str._guide_.search_statement
+      .then((count) => callback(null, count))
+      .catch((err) => callback(err))
+  }
 }
 
 /*
@@ -319,71 +589,107 @@ For every row of the main query, does a select,
 because there are related entities or historic properties.
 */
 const processRow = (str, rows, i, callback) => {
+  let execution = {change: false}
   if (i >= rows.length) callback(null, rows)
   else {
-    // Subqueries for properties
-    executePropertySq(str, 'num', rows, i, (err) => {
-      if (err) callback(err)
-      else {
-        executePropertySq(str, 'str', rows, i, (err) => {
-          if (err) callback(err)
-          else {
-            executePropertySq(str, 'bin', rows, i, (err) => {
-              if (err) callback(err)
-              else {
-                executeInputOwner(str, rows, i, (err) => {
-                  if (err) callback(err)
-                  else {
-                    executeRelation(str, true, rows, i, (err) => {
-                      if (err) callback(err)
-                      else {
-                        executeRelation(str, false, rows, i, (err) => {
-                          if (err) callback(err)
-                          else {
-                            let r = str._guide_.fields_to_remove
-                            // We remove the hidden field _id_ and every extreme date
-                            for (let j = 0; j < r.length; j++) {
-                              if (r[j] === '_id_') delete rows[i]._id_
-                              else if (rows[i][r[j]] === CT.END_OF_TIME ||
-                                rows[i][r[j]] === CT.START_OF_TIME) delete rows[i][r[j]]
+    while (!execution.change && i < rows.length) {
+      // Subqueries for properties
+      executePropertySq(str, 'num', rows, i, execution, (err) => {
+        if (err) callback(err)
+        else {
+          executePropertySq(str, 'str', rows, i, execution, (err) => {
+            if (err) callback(err)
+            else {
+              executePropertySq(str, 'bin', rows, i, execution, (err) => {
+                if (err) callback(err)
+                else {
+                  executeInputOwner(str, rows, i, execution, (err) => {
+                    if (err) callback(err)
+                    else {
+                      executeRelation(str, true, rows, i, execution, (err) => {
+                        if (err) callback(err)
+                        else {
+                          executeRelation(str, false, rows, i, execution, (err) => {
+                            if (err) callback(err)
+                            else {
+                              // Every related data which must be in an object, shoud be moved
+                              let dr = str._guide_.direct_relations
+                              if (dr) treatRelatedObject(dr, rows[i])
+                              let r = str._guide_.fields_to_remove
+                              for (let j = 0; j < r.length; j++) {
+                                // We remove the hidden field _id_ and every extreme date
+                                if (r[j] === '_id_') delete rows[i]._id_
+                                else if (rows[i][r[j]] === CT.END_OF_TIME ||
+                                  rows[i][r[j]] === CT.START_OF_TIME ||
+                                  rows[i][r[j]] === CT.END_OF_DAYS ||
+                                  rows[i][r[j]] === CT.END_OF_DAYS) delete rows[i][r[j]]
+                              }
+                              // Next row
+                              if (execution.change) processRow(str, rows, i + 1, callback)
                             }
-                            // Next row
-                            processRow(str, rows, i + 1, callback)
-                          }
-                        })
-                      }
-                    })
-                  }
-                })
-              }
-            })
+                          })
+                        }
+                      })
+                    }
+                  })
+                }
+              })
+            }
+          })
+        }
+      })
+      // No callback change, so iterate
+      if (!execution.change) i++
+    }
+    if (!execution.change) callback(null, rows)
+  }
+}
+
+/*
+Puts information in a related object
+ */
+const treatRelatedObject = (dr, row) => {
+  for (let i = 0; i < dr.length; i++) {
+    // For every direct relation with more than 1 field
+    if (dr[i].nextEntity) {
+      let prefix = dr[i].nextEntity._prefix_
+      let o = {}
+      if (dr[i].nextEntity._n_fields > 1) row[dr[i].entry] = o
+      for (let p in row) {
+        // Nested relation have fields changed to r<i>_<field>
+        if (row.hasOwnProperty(p)) {
+          if (p.startsWith(prefix)) {
+            if (p !== prefix + '_id_') {
+              if (dr[i].nextEntity._n_fields > 1) o[p.substring(prefix.length)] = row[p]
+              else row[dr[i].entry] = row[p]
+            }
+            delete row[p]
           }
-        })
+        }
       }
-    })
+    }
   }
 }
 
 /*
 Links input with owner entity
 */
-const executeInputOwner = (str, rows, i, callback) => {
+const executeInputOwner = (str, rows, i, execution, callback) => {
   let ow = str._guide_.relation_owner
   if (ow) {
-    getNextEntity(ow, true, rows[i], null, callback)
+    getNextEntity(ow, true, rows[i], null, execution, callback)
   } else callback()
 }
 
 /*
 Calls get() for related entity
 */
-const getNextEntity = (info, forward, parentRow, thisRow, callback) => {
+const getNextEntity = (info, forward, parentRow, thisRow, execution, callback) => {
   // Already prepared, just substitute id (it's always the last condition)
   let s = info.nextEntity._guide_.statement
-  console.log(parentRow)
   let id = thisRow ? (forward ? thisRow.id2 : thisRow.id1) : parentRow._owner_
   if (id) {
-    s._statements[s._statements.length - 1].value = id
+    s.bindings[s.bindings.length - 1] = id
     // Recursively call get
     get(null, null, info.nextEntity, (err, r) => {
       if (err) callback(err)
@@ -392,13 +698,14 @@ const getNextEntity = (info, forward, parentRow, thisRow, callback) => {
         callback()
       }
     })
+    execution.change = true
   } else callback()
 }
 
 /*
 For every row of the entity query, searches for related objects.
 */
-const executeRelation = (str, forward, rows, i, callback) => {
+const executeRelation = (str, forward, rows, i, execution, callback) => {
   let sq = forward ? str._guide_.relations_forward : str._guide_.relations_backward
   if (sq) {
     // Modify query 'where' with current id
@@ -407,10 +714,17 @@ const executeRelation = (str, forward, rows, i, callback) => {
     sq._statement_
       .then((h) => processRelationRow(rows, i, forward, sq, h, 0, callback))
       .catch((err) => callback(err))
+    execution.change = true
   } else callback()
 }
 
+/*
+Process every row (h[k]) of the relation table, over an entity row (rows[i]).
+- sq is the relations descriptor, which maps relation type to information about it.
+- forward indicates the direction of the relation.
+*/
 const processRelationRow = (rows, i, forward, sq, h, k, callback) => {
+  let execution = {change: false}
   if (k >= h.length) callback()
   else {
     let info = sq[h[k].relation]
@@ -421,7 +735,7 @@ const processRelationRow = (rows, i, forward, sq, h, k, callback) => {
       }
       if (info.fields) {
         if (info.nextEntity) {
-          getNextEntity(info, forward, rows[i], h[k], (err) => {
+          getNextEntity(info, forward, rows[i], h[k], execution, (err) => {
             if (err) callback(err)
             else processRelationRow(rows, i, forward, sq, h, k + 1, callback)
           })
@@ -441,17 +755,30 @@ const processRelationRow = (rows, i, forward, sq, h, k, callback) => {
   }
 }
 
+/*
+Puts relation fields into the object to return (o),
+which is part of the parent object (parentRow).
+*/
 const completeRelation = (o, parentRow, info, data, forward) => {
   if (forward) {
     if (info.fields.id2) o[info.fields.id2] = data.id2
   } else if (info.fields.id1) o[info.fields.id1] = data.id1
-  if (info.fields.t1) o[info.fields.t1] = data.t1
-  if (info.fields.t2) o[info.fields.t2] = data.t2
+  if (info.fields.t1) {
+    if (data.t1 !== CT.START_OF_DAYS && data.t1 !== CT.START_OF_TIME) o[info.fields.t1] = data.t1
+  }
+  if (info.fields.t2) {
+    if (data.t2 !== CT.END_OF_DAYS && data.t2 !== CT.END_OF_TIME) o[info.fields.t2] = data.t2
+  }
   if (info.isArray) parentRow[info.entry].push(o)
   else parentRow[info.entry] = o
 }
 
-const executePropertySq = (str, type, rows, i, callback) => {
+/*
+Executes a query for an historical property (which should generate an array)
+over the entity row rows[i].
+Returns true if execution changes to callback
+*/
+const executePropertySq = (str, type, rows, i, execution, callback) => {
   let sq = str._guide_.property_subqueries
   if (sq[type]) {
     let s = sq[type]._statement_
@@ -475,26 +802,42 @@ const executePropertySq = (str, type, rows, i, callback) => {
       callback()
     })
     .catch((err) => callback(err))
+    execution.change = true
   } else callback()
 }
 
 module.exports = {
 
-  get: get
+  get: get,
+  put: put,
+  prepareGet: prepareGet,
+  preparePut: preparePut
 
 }
-
 /*
- get(knex, null, {_entity_: 'record',
-  nombre: 'name',
-  codigo: 'code',
-  idioma: {_property_: 'language'},
-  incidencias: {_property_: 'ttgroup'},
-  validez: {_property_: '[validity]', start: 't1', end: 't2'},
-  tarjeta: {_relation_: '[<-identifies]', code: 'code'}
-},
-(err, rows) => {
-  if (err) console.log(err)
-  else console.log(rows)
-  process.exit(0)
-}) */
+const insert = (i) => {
+  if (i >= 10000) return
+  let a = {id: i, name: 'persona' + i, document: 'doc' + i, code: 'code' + i}
+  knexObjects.insert(a).into('entity_1').then((id) => {
+    logger.debug('insert ' + i)
+    let b = {entity: i, property: 'language', t1: CT.START_OF_DAYS, t2: CT.END_OF_DAYS, value: 'es'}
+    knexObjects.insert(b).into('property_str_1').then((id) => {
+      let j = 10000 + i
+      let c = {id: j, code: '' + j}
+      knexObjects.insert(c).into('entity_1').then((id) => {
+        let r = {id1: j, id2: i, relation: 'identifies', t1: CT.START_OF_DAYS, t2: CT.END_OF_DAYS, node: 1}
+        knexObjects.insert(r).into('relation_1').then((id) => {
+          let d = {entity: i, property: 'ttgroup', t1: CT.START_OF_DAYS, t2: CT.END_OF_DAYS, value: 'A01'}
+          knexObjects.insert(d).into('property_str_1').then((id) => {
+            let e = {entity: i, property: 'validity', t1: 20170401, t2: 20170805}
+            knexObjects.insert(e).into('property_num_1').then((id) => {
+              insert(i + 1)
+            })
+          })
+        })
+      })
+    })
+  })
+}
+
+insert(1) */

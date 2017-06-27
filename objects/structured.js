@@ -37,7 +37,7 @@ const selectEntity = (db, str, definition, filter, select, subqueries, callback)
   if (str._subquery_) fields = ''
   else fields = ',' + (select ? select.complete : '*')
   var query = 'SELECT id _id_' + fields + ' FROM entity_' + nodeId
-  if (str._entity_) where = " where type='" + definition.type + "'"
+  if (str._entity_) where = " where id<10 and type='" + definition.type + "'"
   if (filter) {
     if (where) where += ' and (' + filter + ')'
     else where = ' where ' + filter
@@ -404,14 +404,11 @@ const processRow = (db, rows, i, subqueries, j, callback) => {
     var sq = getSubqueries(s)
     var sql = getSubselect(s._relation_, s._type_, select)
     if (s._relation_ && select && select.complete && !sq) {
-      logger.trace('change to:')
       sql = 'select r.*,' + select.complete +
       ' from (' + sql + ') r left join entity_' + nodeId + ' on r._id_=entity_' + nodeId + '.id' +
       (s._filter_ ? ' where ' + s._filter_ + '' : '')// TODO: more flexible filter: for relation, for entity...
     }
     let values = [s._type_, rows[i]._id_]
-    logger.trace(sql)
-    logger.trace(values)
     db.all(sql, values, function (err, rowSubquery) {
       if (err) callback(err)
       else {

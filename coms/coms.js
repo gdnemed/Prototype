@@ -60,43 +60,53 @@ const onClose = (err, socket) => {
 }
 
 const receive = (dataBuffer, socket) => {
-  var info = socket.specInfo
-  // If there was a piece of information, concatenate with this
-  if (info.buffer) {
-    let newb = Buffer.allocUnsafe(info.buffer.length + dataBuffer.length)
-    info.buffer.copy(newb, 0)
-    dataBuffer.copy(newb, info.buffer.length)
-    dataBuffer = newb
-  }
-  // At least we need length
-  if (dataBuffer.length < 2) {
-    info.buffer = dataBuffer
-    return
-  }
-  let l = dataBuffer.readUInt16LE(0)
-  // We still don't have the frame
-  if (l > dataBuffer.length) {
-    info.buffer = dataBuffer
-    return
-  }
-  let s = dataBuffer.readUInt16LE(2)
-  let b = Buffer.allocUnsafe(l - 4)
-  dataBuffer.copy(b, 0, 4, l)
-  // Remaining information must be kept for new receive
-  if (l < dataBuffer.length) {
-    info.buffer = Buffer.allocUnsafe(dataBuffer.length - l)
-    dataBuffer.copy(info.buffer, 0, l)
-  } else delete info.buffer
+  let info = socket.specInfo
+  while (dataBuffer != null || info.buffer) {
+    // If there was a piece of information, concatenate with this
+    if (info.buffer) {
+      if (dataBuffer != null) {
+        let newb = Buffer.allocUnsafe(info.buffer.length + dataBuffer.length)
+        info.buffer.copy(newb, 0)
+        dataBuffer.copy(newb, info.buffer.length)
+        dataBuffer = newb
+      } else {
+        dataBuffer = info.buffer
+        delete info.buffer
+      }
+    }
+    // At least we need length
+    if (dataBuffer.length < 2) {
+      info.buffer = dataBuffer
+      return
+    }
+    let l = dataBuffer.readUInt16LE(0)
+    // We still don't have the frame
+    if (l > dataBuffer.length) {
+      info.buffer = dataBuffer
+      return
+    }
+    let s = dataBuffer.readUInt16LE(2)
+    let b = Buffer.allocUnsafe(l - 4)
+    dataBuffer.copy(b, 0, 4, l)
+    // Remaining information must be kept for new receive
+    if (l < dataBuffer.length) {
+      info.buffer = Buffer.allocUnsafe(dataBuffer.length - l)
+      dataBuffer.copy(info.buffer, 0, l)
+    } else delete info.buffer
+    dataBuffer = null
 
-  var data = msgpack.decode(b)
-  data.seq = s
-  logger.trace('socket ' + info.name)
-  logger.trace(data)
-  // each type of terminal, needs its own processing
-  switch (info.type) {
-    case 'idSense':idsense.receive(data, socket, logicService)
-      break
-    default:genericReceive(data, socket)
+    var data = msgpack.decode(b)
+    data.seq = s
+    logger.trace('socket ' + info.name)
+    logger.trace(data)
+    // each type of terminal, needs its own processing
+    switch (info.type) {
+      case 'idSense':
+        idsense.receive(data, socket, logicService)
+        break
+      default:
+        genericReceive(data, socket)
+    }
   }
 }
 

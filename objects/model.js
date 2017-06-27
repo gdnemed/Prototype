@@ -3,23 +3,24 @@
 // -------------------------------------------------------------------------------------------
 
 const ENTITIES = {
-  'card': {keys: ['code']},
+  'card': {keys: ['code'], required: ['code']},
   'record': {keys: ['code', 'document'],
+    required: ['code', 'document', 'name'],
     related_from: {identifies: 'card'}}
 }
 
 const PROPERTIES = {
   'language': {type: 'str'},
-  'info': {type: 'str'},
-  'enroll': {type: 'num'},
-  'validity': {type: 'num'},
-  'ttgroup': {type: 'str'},
+  'info': {type: 'str', time: true},
+  'enroll': {type: 'num', time: true},
+  'validity': {type: 'num', time: false},
+  'ttgroup': {type: 'str', time: false},
   'card': {type: 'str'},
   'record': {type: 'str'}
 }
 
 const RELATIONS = {
-  'identifies': {}
+  'identifies': {time: false}
 }
 
 const getTypeProperty = (p) => {

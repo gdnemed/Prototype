@@ -4,20 +4,33 @@
 // -Manages upload to terminals.
 // -------------------------------------------------------------------------------------------
 
+const moment = require('moment-timezone')
 const logger = require.main.require('./utils/log').getLogger('coms')
 
 var objectsService
 var inputsService
 var comsService
 
+let prepGetRecords = {
+  _entity_: '[record]',
+  name: 'name',
+  id: 'document',
+  code: 'code',
+  language: {_property_: 'language'},
+  validity: {_property_: '[validity]', start: 't1', end: 't2'},
+  timetype_grp: {_property_: '[ttgroup]', code: 'value', start: 't1', end: 't2'},
+  card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
+}
+
 const init = (objects, inputs, coms) => {
   objectsService = objects
   inputsService = inputs
   comsService = coms
+  if (!objectsService.prepare(prepGetRecords)) logger.error('prepGetRecords not prepared.')
 }
 
 const getRecords = (req, res) => {
-  objectsService.structuredGet('SPEC', {},
+  /* objectsService.structuredGet('SPEC', {},
     {
       _entity_: '[record]',
       name: 'name',
@@ -31,7 +44,17 @@ const getRecords = (req, res) => {
     (err, ret) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(ret)
-    })
+    }) */
+  let ts1 = new Date().getTime()
+  let now = moment.tz(ts1, 'GMT').format('YYYYMMDDHHmmss')
+  objectsService.get(null, {now: parseInt(now), today: parseInt(now.substring(0, 8))}, prepGetRecords, (err, ret) => {
+    if (err) res.status(500).end(err.message)
+    else {
+      let ts2 = new Date().getTime()
+      logger.debug(ts2 - ts1)
+      res.status(200).jsonp(ret)
+    }
+  })
 }
 
 const postRecord = (req, res) => {
@@ -146,16 +169,12 @@ const nextVersion = (obj) => {
         if (ret) {
           let card = ret.card
           if (card) {
-            let c = []
-            let r = []
             for (let i = 0; i < card.length; i++) {
               if (ret.code) {
-                r.push({id: parseInt(ret.code)})
-                c.push({card: card[i].code, id: parseInt(ret.code)})
+                comsService.globalSend('record_insert', {records: {id: parseInt(ret.code)}})
+                comsService.globalSend('card_insert', {cards: {card: card[i].code, id: parseInt(ret.code)}})
               }
             }
-            comsService.globalSend('record_insert', {records: r})
-            comsService.globalSend('card_insert', {cards: c})
           }
         }
       }
@@ -237,22 +256,21 @@ const initTerminal = (serial) => {
     (err, ret) => {
       if (err) logger.error(err)
       else {
-        let c = []
-        let r = []
         for (let i = 0; i < ret.length; i++) {
           if (ret[i].code && ret[i].code !== null) {
-            r.push({id: parseInt(ret[i].code)})
+            let r = {id: parseInt(ret[i].code)}
+            comsService.globalSend('record_insert', {records: [r]})
             let card = ret[i].card
             if (card) {
               for (let j = 0; j < card.length; j++) {
                 let e = {card: card[j].code, id: parseInt(ret[i].code)}
-                c.push(e)
+                comsService.globalSend('card_insert', {cards: [e]})
               }
             }
           }
         }
-        comsService.globalSend('record_insert', {records: r})
-        comsService.globalSend('card_insert', {cards: c})
+
+
       }
     })
 }

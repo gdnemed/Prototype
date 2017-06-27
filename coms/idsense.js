@@ -8,6 +8,7 @@ const msgpack = require('msgpack-lite')
 const logger = require.main.require('./utils/log').getLogger('coms')
 
 const send = (socket, command, data) => {
+  // TODO: synchronous send or just put in a send queue
   logger.trace(command)
   logger.trace(data)
   switch (command) {
@@ -37,7 +38,7 @@ const sendFrame = (j, seq, socket) => {
 
 const receive = (data, socket, logicService) => {
   if (data.ack) {
-// Something to do?
+// TODO: Check send queue
   } else {
     switch (data.cmd) {
       case 4:newClocking(data, socket, logicService)
@@ -51,7 +52,7 @@ const newClocking = (data, socket, logicService) => {
   clocking.reception = moment.tz(new Date().getTime(), 'GMT').format('YYYYMMDDHHmmss')
   clocking.gmt = moment.tz(data.tmp * 1000, 'GMT').format('YYYYMMDDHHmmss')
   clocking.tmp = moment.tz(data.tmp * 1000, info.timezone).format('YYYYMMDDHHmmss')
-
+  logger.trace(clocking)
   logicService.createClocking(clocking, info.customer, function (err) {
     if (err) {
       logger.error(err.message)

@@ -17,7 +17,7 @@ var buffer
 init()
 
 function init () {
-  client.connect(8082, '172.18.4.203', function () {
+  client.connect(8092, '172.18.4.203', function () {
   	console.log('Connected')
     var bin = Buffer.from('c8f6', 'hex')
     var init_str = {serial: 'c32a034', cmd: 1, protocol: '0.1', bin: bin}
@@ -83,17 +83,19 @@ function send (data, seq) {
   b.writeUInt16LE(b.length, 0)
   b.writeUInt16LE(seq, 2)
   m.copy(b, 4)
-
+  client.write(b)
+  console.log(b)
+  /*
   let b1 = Buffer.allocUnsafe(b.length - 5)
   let b2 = Buffer.allocUnsafe(5)
-  b.copy(b1, 0, 0, b.length - 5)
+ /* b.copy(b1, 0, 0, b.length - 5)
   client.write(b1)
   b.copy(b2, 0, b.length - 5, b.length)
-  client.write(b2)
+  client.write(b2) */
 }
 
 function clocking (card, id) {
-  var tmp = new Date().getTime()
+  var tmp = Math.floor(new Date().getTime() / 1000)
   send({cmd: 4,
     id: id,
     card: card,
