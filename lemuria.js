@@ -8,7 +8,6 @@
 const fs = require('fs')
 const express = require('express')
 const bodyParser = require('body-parser')
-// const Promise = require('promise')
 
 const state = require('./state/state')
 const objects = require('./objects/objects')
