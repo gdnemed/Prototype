@@ -21,16 +21,24 @@ var environment
 var api
 var httpServer
 
-main()
+// Entry point: starts Lemuria app after executing migrations
+migrations.init()
+  .then((knex) => main(knex))
 
-function main () {
+const main = (knex) => {
   let home = process.cwd()
   logger.configure(home)
 
   // -------------------------------------------------------------------------------------------
-  // start of migrations
+  // PROVA
   // -------------------------------------------------------------------------------------------
-  migrations.init()
+  /*knex.select().table('settings')
+    .then((collection) => {
+      console.log('>settings len  = ' + collection.length)
+    })
+    .catch(function (err) {
+      console.log('>>ERROR: in GET settings : ' + err)
+    })*/
   // -------------------------------------------------------------------------------------------
 
   // Install/uninstall service, or run it as a program

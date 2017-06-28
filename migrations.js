@@ -6,79 +6,47 @@ const loggerMachine = require('./utils/log')
 const logger = loggerMachine.getLogger('migrations')
 
 const Knex = require('knex')
-// const knexConfig = require('./knexfile')
 
-const init = () => {
-  logger.info('info: migrations.init()')
-  logger.trace('trace: migrations.init()')
-  logger.debug('trace: migrations.init()')
+const SECTIONS = {
+  STATE: 'state',
+  OBJECTS: 'objects',
+  INPUTS: 'inputs'
+}
 
-  // OK (via configuration)
-  /*
+
+const getDirForMigration = () => {
   let environment = process.env.NODE_ENV || 'development'
-  logger.info('Initializing knex for environment = ' + environment)
+  switch (environment) {
+    case 'test': return './db/test/'
+    default: return './db/'
+  }
+}
 
-   const knex = Knex(knexConfig[environment])
-  knex.migrate.latest().then((result) => {
-    logger.trace("EUREKA! migration done!" + result)
-  }) */
-
-  let baseMigration = {
+// Executes the migration for the section, returning the implicit Promise of knex.migrate()
+const migrateSection = (section) => {
+  // Base object for composing other specific objects via "object.assing"
+  const baseMigration = {
     client: 'sqlite3',
     useNullAsDefault: true
   }
-
-  /* let migrStateCfg = Object.assign({}, baseMigration)
-  Object.assign(migrStateCfg, {
-    connection: {filename: './db/lemuria_state.db'},
-    migrations: {directory: './db/migrations/state'}
+  let cfg = Object.assign({}, baseMigration)
+  Object.assign(cfg, {
+    connection: {filename: getDirForMigration() + `M_${section}.db`},
+    migrations: {directory: `./db/migrations/${section}`}
   })
-  let knex = Knex(migrStateCfg)
-  knex.migrate.latest().then((result) => {
-    logger.trace('EUREKA! state_migration done! ' + result)
+  let knex = Knex(cfg)
+  logger.debug(`Invoking knex.migrate.latest() for ${section}`)
+  return knex.migrate.latest().then((result) => {
+    logger.trace(`${section} migration done: ${result}`)
   })
-*/
+}
 
-  const getDirForMigration = () => {
-    let environment = process.env.NODE_ENV || 'development'
-    logger.debug('getDirForMigration ENV = ' + environment)
-    switch (environment) {
-      case 'test': return './db/test/'
-      default: return './db/'
-    }
-  }
+const init = () => {
+  logger.info('info: migrations.init()')
 
-  // Does "state" migration and returns a Promise
-  const migrateState = () => {
-    let migrStateCfg = Object.assign({}, baseMigration)
-    Object.assign(migrStateCfg, {
-      connection: {filename: getDirForMigration() + 'M_state.db'},
-      migrations: {directory: './db/migrations/state'}
-    })
-    let knex = Knex(migrStateCfg)
-    logger.debug('Invoking knex.migrate.latest() for state')
-    return knex.migrate.latest().then((result) => {
-      logger.trace('state_migration done! ' + result)
-    })
-  }
-
-  // Does "objects" migration and returns a Promise
-  const migrateObjects = () => {
-    let migrObjectsCfg = Object.assign({}, baseMigration)
-    Object.assign(migrObjectsCfg, {
-      connection: {filename: getDirForMigration() + 'M_objects.db'},
-      migrations: {directory: './db/migrations/objects'}
-    })
-    let knex = Knex(migrObjectsCfg)
-    logger.debug('Invoking knex.migrate.latest() for objects')
-    return knex.migrate.latest().then((result) => {
-      logger.trace('objects_migration done! ' + result)
-    })
-  }
-
-  // Migretes sequentially state, objects, entities (one after the other)
-  return migrateState()
-    .then(() => migrateObjects())
+  return migrateSection(SECTIONS.STATE)
+    .then(() => migrateSection(SECTIONS.OBJECTS))
+    .then(() => migrateSection(SECTIONS.INPUTS))
 }
 
 module.exports = {
