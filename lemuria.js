@@ -24,7 +24,7 @@ let logM = logger.getLogger('migration')
 // Entry point: starts Lemuria app after executing migrations
 migrations.init()
   .then((knex) => main(knex))
-  .catch((err) => logM.error('ERROR: cannot start Lemuria (migration has not been properly executed)'))
+  .catch((err) => logM.error(`ERROR: cannot start Lemuria (migration has not been properly executed) ${err}`))
 
 // debug: verifies that each knex object for each db exists
 const debugTestKnexRefs = (knexRefs) => {

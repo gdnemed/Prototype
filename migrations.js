@@ -16,10 +16,10 @@ const SECTIONS = {
 // Object that holds a reference to every section knex object
 let knexRefs = {}
 
-const getDirForMigration = () => {
+const getDirForSqliteDB = () => {
   let environment = process.env.NODE_ENV || 'development'
   switch (environment) {
-    case 'test': return './db/test/'
+    case 'test': return './db/test/'  // TODO: connect to config.json path or specifiy some fixed path ex 'c:/temp/db/test/'
     default: return './db/'
   }
 }
@@ -33,7 +33,7 @@ const migrateSection = (section) => {
   }
   let cfg = Object.assign({}, baseMigration)
   Object.assign(cfg, {
-    connection: {filename: getDirForMigration() + `M_${section}.db`},
+    connection: {filename: getDirForSqliteDB() + `M_${section}.db`},
     migrations: {directory: `./db/migrations/${section}`}
   })
   // let knex = Knex(cfg)
@@ -55,6 +55,7 @@ const init = () => {
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
     migrateSection(SECTIONS.STATE)
+      .then(() => knexRefs['state']('global_id').insert({id: 1}))
       .then(() => migrateSection(SECTIONS.OBJECTS))
       .then(() => migrateSection(SECTIONS.INPUTS))
       .then(() => resolve(knexRefs))
