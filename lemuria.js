@@ -8,6 +8,7 @@
 const fs = require('fs')
 const express = require('express')
 const bodyParser = require('body-parser')
+// const Promise = require('promise')
 
 const state = require('./state/state')
 const objects = require('./objects/objects')
@@ -18,108 +19,144 @@ const logic = require('./logic')
 const logger = require('./utils/log')
 const migrations = require('./migrations')
 
-let environment, api, httpServer
+let home, environment, customers, api, httpServer, logM, log
 
-let logM = logger.getLogger('migration')
-// Entry point: starts Lemuria app after executing migrations
-migrations.init()
-  .then((knex) => main(knex))
-  .catch((err) => logM.error(`ERROR: cannot start Lemuria (migration has not been properly executed) ${err}`))
-
-// debug: verifies that each knex object for each db exists
-const debugTestKnexRefs = (knexRefs) => {
-  let kState = knexRefs['state']
-  let kObjects = knexRefs['objects']
-  let kInputs = knexRefs['inputs']
-
-  // testing knex ojbect that holds 'state' db
-  kState.select().table('settings')
-    .then((collection) => logM.debug('settings len  = ' + collection.length))
-    .catch((err) => logM.error('ERROR: in GET settings : ' + err))
-
-  // testing knex ojbect that holds 'objects' db
-  kObjects.select().table('entity_')
-    .then((collection) => logM.debug('entity_ len  = ' + collection.length))
-    .catch((err) => logM.error('ERROR: in GET entity_ : ' + err))
-
-  // testing knex ojbect that holds 'inputs' db
-  kInputs.select().table('local_id')
-    .then((collection) => logM.debug('local_id len  = ' + collection.length))
-    .catch((err) => logM.error('ERROR: in GET local_id : ' + err))
-}
-
-const main = (knexRefs) => {
-  let home = process.cwd()
-  logger.configure(home)
-
-  debugTestKnexRefs(knexRefs)
-
-  // Install/uninstall service, or run it as a program
+const init = () => {
+  // Install/uninstall as a service
   if (process.argv.length > 2) serviceFunctions(process.argv)
   else {
-    try {
-      environment = JSON.parse(fs.readFileSync(home + '/config.json', 'utf8'))
-    } catch (err) {
-      logger.getLogger('main').info('config.json not found, using default configuration.')
-      environment = {
-        'api_listen': {'host': '', 'port': 8081},
-        'coms_listen': {'host': '', 'port': 8092},
-        'node_id': 1,
-        'exchange': {
-          'files': {
-            'dir': '.',
-            'workdir': '.',
-            'server': {'host': '', 'port': 8081}
-          }
+    // Run it as a program
+    initConfiguration()
+    migrations.init().then((knexRefs) => {
+      debugTestKnexRefs(knexRefs)
+        .then(initApiServer())
+        .then(initServices())
+        .then(initProcess())
+        .catch((err) => log.error(`ERROR: cannot start Lemuria: ${err}`))
+    }).catch((err) => logM.error(`ERROR: Migration failed: ${err}`))
+  }
+}
+
+const initConfiguration = () => {
+  home = process.cwd()
+  logger.configure(home)
+  logM = logger.getLogger('migration')
+  log = logger.getLogger('Main')
+  try {
+    environment = JSON.parse(fs.readFileSync(home + '/config.json', 'utf8'))
+  } catch (err) {
+    log.info('config.json not found, using default configuration.')
+    environment = {
+      'api_listen': {'host': '', 'port': 8081},
+      'coms_listen': {'host': '', 'port': 8092},
+      'node_id': 1,
+      'exchange': {
+        'files': {
+          'dir': '.',
+          'workdir': '.',
+          'server': {'host': '', 'port': 8081}
         }
       }
     }
+  }
+  // it will be: customers = {SPEC: {}}
+  customers = ['SPEC']
+}
 
-    let customers = ['SPEC']
+// debug: verifies that each knex object for each db exists
+const debugTestKnexRefs = (knexRefs) => {
+  return new Promise((resolve, reject) => {
+    log.info('Verifying migration')
+    let kState = knexRefs['state']
+    let kObjects = knexRefs['objects']
+    let kInputs = knexRefs['inputs']
+
+    // TODO: uncomment this when DB work is done
+    // customers['SPEC'].dbs = knexRefs
+
+    // testing knex ojbect that holds 'state' db
+    kState.select().table('settings')
+      .then((collection) => logM.debug('settings len  = ' + collection.length))
+      .catch((err) => logM.error('ERROR: in GET settings : ' + err))
+
+    // testing knex ojbect that holds 'objects' db
+    kObjects.select().table('entity_')
+      .then((collection) => logM.debug('entity_ len  = ' + collection.length))
+      .catch((err) => logM.error('ERROR: in GET entity_ : ' + err))
+
+    // testing knex ojbect that holds 'inputs' db
+    kInputs.select().table('local_id')
+      .then((collection) => logM.debug('local_id len  = ' + collection.length))
+      .catch((err) => logM.error('ERROR: in GET local_id : ' + err))
+
+    resolve()
+  })
+}
+
+function initApiServer () {
+  return new Promise((resolve, reject) => {
+    log.info('initApiServer')
+    api = express()
+    api.use(bodyParser.json())
+    // API functions
+    api.get('/api/coms/records', logic.getRecords)
+    api.post('/api/coms/records', logic.postRecord)
+    api.post('/api/coms/records/:id', logic.postRecord)
+    api.delete('/api/coms/records/:id', logic.deleteRecord)
+    api.get('/api/coms/records/:id/cards', logic.getCards)
+    api.post('/api/coms/records/:id/cards', logic.postCards)
+    api.get('/api/coms/records/:id/fingerprints', logic.getFingerprints)
+    api.post('/api/coms/records/:id/fingerprints', logic.postFingerprints)
+    api.post('/api/coms/records/:id/enroll', logic.postEnroll)
+    api.get('/api/coms/records/:id/info', logic.getInfo)
+    api.get('/api/coms/infos', logic.getInfos)
+    api.post('/api/coms/records/:id/info', logic.postInfo)
+    api.get('/api/coms/clockings', logic.getClockings)
+    api.get('/api/coms/clockings_debug', logic.getClockingsDebug)
+    api.post('/api/objects/query', objects.query)
+    api.post('/api/objects/sentence', objects.sentence)
+    api.get('/api/objects/entities', objects.getEntitiesDebug)
+    api.get('/api/objects/properties', objects.getPropertiesDebug)
+    api.get('/api/objects/relations', objects.getRelationsDebug)
+    api.post('/api/state/settings', state.post_settings)
+    api.get('/api/state/settings', state.get_settings)
+    api.get('/api/coms/timetypes', logic.getTimeTypes)
+    api.get('/api/coms/timetypes/:id', logic.getTimeType)
+    api.post('/api/coms/timetypes', logic.postTimeType)
+    api.post('/api/coms/timetypes/:id', logic.postTimeType)
+    api.delete('/api/coms/timetypes/:id', logic.deleteTimeType)
+    // Run http server
+    httpServer = api.listen(environment.api_listen.port, (err) => {
+      if (err) reject(err)
+      else {
+        let address = httpServer.address()
+        log.info('API listening at port ' + address.port)
+        resolve()
+      }
+    })
+  })
+}
+
+const initServices = () => {
+  return new Promise((resolve, reject) => {
+    log.info('initServices')
     state.init(customers)
     objects.init(environment.node_id, customers, state)
     inputs.init(environment.node_id, customers)
     logic.init(objects, inputs, coms)
     coms.init(environment.coms_listen, logic)
-    initApiServer()
-    files.init(environment.exchange.files)
-  }
+    resolve()
+  })
 }
 
-function initApiServer () {
-  api = express()
-  api.use(bodyParser.json())
-  // API functions
-  api.get('/api/coms/records', logic.getRecords)
-  api.post('/api/coms/records', logic.postRecord)
-  api.post('/api/coms/records/:id', logic.postRecord)
-  api.delete('/api/coms/records/:id', logic.deleteRecord)
-  api.get('/api/coms/records/:id/cards', logic.getCards)
-  api.post('/api/coms/records/:id/cards', logic.postCards)
-  api.get('/api/coms/records/:id/fingerprints', logic.getFingerprints)
-  api.post('/api/coms/records/:id/fingerprints', logic.postFingerprints)
-  api.post('/api/coms/records/:id/enroll', logic.postEnroll)
-  api.get('/api/coms/records/:id/info', logic.getInfo)
-  api.get('/api/coms/infos', logic.getInfos)
-  api.post('/api/coms/records/:id/info', logic.postInfo)
-  api.get('/api/coms/clockings', logic.getClockings)
-  api.get('/api/coms/clockings_debug', logic.getClockingsDebug)
-  api.post('/api/objects/query', objects.query)
-  api.post('/api/objects/sentence', objects.sentence)
-  api.get('/api/objects/entities', objects.getEntitiesDebug)
-  api.get('/api/objects/properties', objects.getPropertiesDebug)
-  api.get('/api/objects/relations', objects.getRelationsDebug)
-  api.post('/api/state/settings', state.post_settings)
-  api.get('/api/state/settings', state.get_settings)
-  api.get('/api/coms/timetypes', logic.getTimeTypes)
-  api.get('/api/coms/timetypes/:id', logic.getTimeType)
-  api.post('/api/coms/timetypes', logic.postTimeType)
-  api.post('/api/coms/timetypes/:id', logic.postTimeType)
-  api.delete('/api/coms/timetypes/:id', logic.deleteTimeType)
-  // Run http server
-  httpServer = api.listen(environment.api_listen.port, function () {
-    let address = httpServer.address()
-    logger.getLogger('main').info('API listening at port ' + address.port)
+/*
+Starts processes, like importation of files, etc.
+*/
+const initProcess = () => {
+  return new Promise((resolve, reject) => {
+    log.info('initProcess')
+    files.init(environment.exchange.files)
+    resolve()
   })
 }
 
@@ -137,8 +174,8 @@ function serviceFunctions (args) {
   })
 
   // Listen for the "install" events
-  svc.on('install', function () { logger.getLogger('main').info('Service installed') })
-  svc.on('uninstall', function () { logger.getLogger('main').info('Service uninstalled') })
+  svc.on('install', function () { console.log('Service installed') })
+  svc.on('uninstall', function () { console.log('Service uninstalled') })
 
   // Execute command
   switch (args[2]) {
@@ -146,3 +183,6 @@ function serviceFunctions (args) {
     case 'u':svc.uninstall(); break
   }
 }
+
+// Start Lemuria
+init()
