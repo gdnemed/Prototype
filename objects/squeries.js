@@ -49,29 +49,113 @@ const get = (db, variables, str, callback) => {
  -data: Data to insert
  -callback: Callback function
  */
-const put = (db, variables, str, data, callback) => {
-  if (!str._guide_) {
-    if (!preparePut(db, str)) {
-      callback(new Error('Syntax error'))
-      return
+const put = (stateService, db, variables, str, data, callback) => {
+  let e = str._entity_
+  if (e) {
+    let keysData = MODEL.ENTITIES[e].keys
+    if (keysData) {
+      searchFromKey(e, keysData, str._keys_, stateService, data, (err, id) => {
+        if (err) {
+          stateService.releaseKey(e, keysData)
+          callback(err)
+        } else {
+          if (id) {
+            executeUpdate(id, str, data, variables, (err, count) => {
+              // Once the job is done, release key and return
+              if (err) {
+                if (str._keys_) stateService.releaseKey(e, keysData)
+                callback(err)
+              } else {
+                if (str._keys_) stateService.releaseKey(e, keysData)
+                callback(null, count)
+              }
+            })
+          } else {
+            // On insert, we need to block key data to prevent parallel inserts over same key
+            let id = stateService.getIdFor(e, keysData)
+            executeInsert(id, keysData, str, data, variables, (err, rowid) => {
+              // Once the job is done, release key and return
+              if (err) {
+                stateService.releaseKey(e, keysData)
+                callback(err)
+              } else {
+                stateService.releaseKey(e, keysData)
+                callback(null, rowid)
+              }
+            })
+          }
+        }
+      })
+    } else callback(new Error('Key not found'))
+  } callback(new Error('Type not found'))
+}
+
+/*
+Searches a list of keys for this entity type.
+- entity: Entity type.
+- keysData: List of keys which must be satisfied for this entity type.
+- userKey: Concrete key the user want to use to search.
+- stateService: Service which blocks keys and gives id's
+- data: Data to insert/update
+Once done, calls callback function passing:
+- err: Error, if any
+- id: Id of the entity found for the userKey of for the first key if userKey not specified
+- conflict: True if there are other entities that have values
+for some of the keys which would be repeated if data is inserted.
+*/
+const searchFromKey = (entity, keysData, userKey, stateService, data, callback) => {
+  // Deny inserts or updates over this entity keys
+  stateService.blockKey(entity, keysData, data)
+  if (userKey == null) {
+    // No key specified, we search the first with data
+    for (let i = 0; i < keysData.length; i++) {
+      let key = keysData[i]
+      let ok = false
+      for (let j = 0; j < key.length; j++) {
+        if (data.hasOwnProperty(key[j])) ok = true
+      }
+      if (ok) {
+        userKey = key
+        break
+      }
     }
   }
-  executeUpdate(str, data, variables, callback)
 }
 
-const preparePut = (db, str) => {
-  db = str._inputs_ ? knexInputs : knexObjects
-  str._guide_ = {entity_fields: {},
-    property_fields: [],
-    property_subqueries: {},
-    op: str._op_,
-    key: str._key_
+const executeInsert = (id, str, data, variables, callback) => {
+  if (str._entity_) {
+    // We pass every data to a new object d
+    let d = getProperFields(str, data)
+    // And we add id to insert
+    d.id = id
+    knexObjects.insert(data).into('entity_1').then((rowid) => {
+      callback(null, rowid)
+    })
+    .catch((err) => callback(err))
   }
- /* let type = getType(str)
-  getFields(str, db, str._inputs_)
-*/
 }
 
+const executeUpdate = (id, str, data, variables, callback) => {
+  if (str._entity_) {
+    let d = getProperFields(str, data)
+    let s = knexObjects('entity_1')
+    s.where('id', id).update(d).then((count) => {
+      callback(null, count)
+    })
+    .catch((err) => callback(err))
+  }
+}
+
+const getProperFields = (str, data) => {
+  let d = {}
+  for (var p in str) {
+    if (str.hasOwnProperty(p) &&
+      p.charAt(0) !== '_' &&
+      typeof str[p] === 'string' &&
+      data[p] !== null) d[p] = data[p]
+  }
+  return d
+}
 /*
 Prepare str structure for future execution, adding _guide_ field, which will contain:
 - entity_fields: Field of the entity/inputs table.
@@ -117,7 +201,7 @@ const prepareGet = (db, str) => {
     let f = str._guide_.entity_fields
 
     // Select over ENTITY
-    filterEntity(str._guide_)
+    if (!str._guide_.subquery) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
     let e = sq => {
       selectEntity(sq, f, type, str._filter_, str._guide_)
     }
@@ -173,10 +257,6 @@ const selectEntity = (sq, f, type, filter, helper) => {
   else if (!helper.subquery) s.where('id', 0)
   s.as(helper.subquery ? helper.prefix + 'r' : 'e')
   return s
-}
-
-const filterEntity = (helper) => {
-  helper.variablesMapping.push(null) // 1 position in bindings is fixed
 }
 
 /*
@@ -441,9 +521,8 @@ const putRelationInfo = (db, str, info, i, subquery) => {
       subquery.column('dr' + i + '.t2 as ' + info.fields.t2)
       str._guide_.fields_to_remove.push(info.fields.t2)
     }
-    if (info.fields.id) {
-      subquery.column('dr' + i + (info.forward ? '.id2 as ' : '.id1 as ') + info.fields.id)
-    }
+    if (info.fields.id1) subquery.column('dr' + i + '.id1 as ' + info.fields.id1)
+    if (info.fields.id2) subquery.column('dr' + i + '.id2 as ' + info.fields.id2)
   }
 }
 
@@ -527,12 +606,10 @@ const prepareRelatedObject = (f, entry, forward, db) => {
       if (entry[rf] === 't1') {
         f.fields.t1 = rf
         nfields++
-      }
-      else if (entry[rf] === 't2') {
+      } else if (entry[rf] === 't2') {
         f.fields.t2 = rf
         nfields++
-      }
-      else if (entry[rf] === 'id') {
+      } else if (entry[rf] === 'id') {
         if (forward === null) f.fields.id1 = rf
         else if (forward) f.fields.id2 = rf
         else f.fields.id1 = rf
@@ -546,8 +623,10 @@ const prepareRelatedObject = (f, entry, forward, db) => {
       }
     }
   }
-  if (f.nextEntity) f.nextEntity._n_fields = nfields
-  if (f.isArray) prepareGet(db, f.nextEntity)
+  if (f.nextEntity) {
+    f.nextEntity._n_fields = nfields
+    if (f.isArray) prepareGet(db, f.nextEntity)
+  }
 }
 
 /*
@@ -568,20 +647,6 @@ const executeSelect = (str, variables, callback) => {
   str._guide_.statement
     .then((rows) => processRow(str, rows, 0, callback))
     .catch((err) => callback(err))
-}
-
-/*
-Update/Insert execution
-*/
-const executeUpdate = (str, data, variables, callback) => {
-  if (str._property_) {
-  } else {
-    // TODO: Block key before insert
-    // First, we
-    str._guide_.search_statement
-      .then((count) => callback(null, count))
-      .catch((err) => callback(err))
-  }
 }
 
 /*
@@ -810,8 +875,7 @@ module.exports = {
 
   get: get,
   put: put,
-  prepareGet: prepareGet,
-  preparePut: preparePut
+  prepareGet: prepareGet
 
 }
 /*

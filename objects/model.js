@@ -3,8 +3,8 @@
 // -------------------------------------------------------------------------------------------
 
 const ENTITIES = {
-  'card': {keys: ['code'], required: ['code']},
-  'record': {keys: ['code', 'document'],
+  'card': {keys: [['code']], required: ['code']},
+  'record': {keys: [['code'], ['document']],
     required: ['code', 'document', 'name'],
     related_from: {identifies: 'card'}}
 }
