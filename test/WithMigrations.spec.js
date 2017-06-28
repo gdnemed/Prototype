@@ -1,7 +1,8 @@
+/* global process, require, describe, beforeEach, it */
 process.env.NODE_ENV = 'test'
 
 let chai = require('chai')
-let should = chai.should()
+// let should = chai.should()
 let chaiHttp = require('chai-http')
 /* let server = require('../app') */
 
