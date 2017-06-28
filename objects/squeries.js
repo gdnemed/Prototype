@@ -24,6 +24,9 @@ const knexInputs = require('knex')({
 
 let nodeId = 1
 
+let dbObjects
+let dbInputs
+
 /*
 Main visible function for getting data.
 -db: Database
@@ -63,10 +66,10 @@ const put = (stateService, db, variables, str, data, callback) => {
             executeUpdate(id, str, data, variables, (err, count) => {
               // Once the job is done, release key and return
               if (err) {
-                if (str._keys_) stateService.releaseKey(e, keysData)
+                stateService.releaseKey(e, keysData)
                 callback(err)
               } else {
-                if (str._keys_) stateService.releaseKey(e, keysData)
+                stateService.releaseKey(e, keysData)
                 callback(null, count)
               }
             })
@@ -94,13 +97,13 @@ const put = (stateService, db, variables, str, data, callback) => {
 Searches a list of keys for this entity type.
 - entity: Entity type.
 - keysData: List of keys which must be satisfied for this entity type.
-- userKey: Concrete key the user want to use to search.
+- userKey: Concrete key the user want to use to search (useful when the fields of the key must change).
 - stateService: Service which blocks keys and gives id's
 - data: Data to insert/update
 Once done, calls callback function passing:
 - err: Error, if any
 - id: Id of the entity found for the userKey of for the first key if userKey not specified
-- conflict: True if there are other entities that have values
+- conflict: List of other id's which have values
 for some of the keys which would be repeated if data is inserted.
 */
 const searchFromKey = (entity, keysData, userKey, stateService, data, callback) => {
@@ -119,6 +122,35 @@ const searchFromKey = (entity, keysData, userKey, stateService, data, callback) 
         break
       }
     }
+  }
+  loadFromKey(keysData, 0, {}, (err, result) => {
+    if (err) callback(err)
+    else {
+
+    }
+  })
+}
+
+/*
+Loads entities from a key, and puts them in a map.
+- keysData: List of keys
+- i: Index of current key
+- result: Map id -> data where objects will be put
+*/
+const loadFromKey = (keysData, i, result, callback) => {
+  if (i >= keysData.length) callback()
+  else {
+    dbObjects.select().from('entity_' + nodeId).where()
+      .then((rows) => {
+        for (let j = 0; j < rows.length; j++) {
+          let id = 'id' + rows.id
+          if (!result[id]) result[id] = rows[j]
+          else {
+          }
+        }
+        loadFromKey(keysData, i + 1, result, callback)
+      })
+      .catch((err) => callback(err))
   }
 }
 
