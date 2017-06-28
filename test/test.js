@@ -28,7 +28,7 @@ describe('Data testing process', function () {
   it('Inserting an employee wit code should return 201', function (done) {
     chai.request(app).post('/api/coms/records').send({id: 5, name: 'Alberto'})
         .then(function (res) {
-          expect(res.statusCode).to.equal(201)
+          expect(res.statusCode).to.equal(200)
           done()
         }, function (error) {
           try {

@@ -4,16 +4,17 @@
   "description": "Communications module",
   "main": "lemuria.js",
   "dependencies": {
-    "sqlite3": "latest",
     "body-parser": "latest",
-    "express": "latest",
-    "request": "latest",
-    "moment-timezone": "latest",
-    "msgpack-lite": "latest",
-    "log4js": "latest",
     "chokidar": "latest",
     "csvtojson": "latest",
-    "knex": "latest"
+    "express": "latest",
+    "knex": "latest",
+    "log4js": "latest",
+    "moment-timezone": "latest",
+    "msgpack-lite": "latest",
+    "promise": "^8.0.0",
+    "request": "latest",
+    "sqlite3": "latest"
   },
   "scripts": {
     "test": "mocha"
@@ -23,6 +24,6 @@
   "devDependencies": {
     "chai": "latest",
     "chai-http": "latest",
-    "standard": "*"
+    "standard": "^10.0.2"
   }
 }
