@@ -29,7 +29,7 @@ const init = (objects, inputs, coms) => {
   if (!objectsService.prepare(prepGetRecords)) logger.error('prepGetRecords not prepared.')
 }
 
-const getRecords = (req, res) => {
+const getRecords = (req, res, session) => {
   /* objectsService.structuredGet('SPEC', {},
     {
       _entity_: '[record]',
@@ -45,15 +45,9 @@ const getRecords = (req, res) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(ret)
     }) */
-  let ts1 = new Date().getTime()
-  let now = moment.tz(ts1, 'GMT').format('YYYYMMDDHHmmss')
-  objectsService.get(null, {now: parseInt(now), today: parseInt(now.substring(0, 8))}, prepGetRecords, (err, ret) => {
+  objectsService.get(null, {now: session.now, today: session.today}, prepGetRecords, (err, ret) => {
     if (err) res.status(500).end(err.message)
-    else {
-      let ts2 = new Date().getTime()
-      logger.debug(ts2 - ts1)
-      res.status(200).jsonp(ret)
-    }
+    else res.status(200).jsonp(ret)
   })
 }
 

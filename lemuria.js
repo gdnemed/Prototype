@@ -8,6 +8,7 @@
 const fs = require('fs')
 const express = require('express')
 const bodyParser = require('body-parser')
+const moment = require('moment-timezone')
 
 const state = require('./state/state')
 const objects = require('./objects/objects')
@@ -18,7 +19,7 @@ const logic = require('./logic')
 const logger = require('./utils/log')
 const migrations = require('./migrations')
 
-let home, environment, customers, api, httpServer, logM, log
+let home, environment, databases, customers, api, httpServer, logM, log
 
 const init = () => {
   // Install/uninstall as a service
@@ -66,6 +67,7 @@ const initConfiguration = () => {
 const debugTestKnexRefs = (knexRefs) => {
   return new Promise((resolve, reject) => {
     log.info('Verifying migration')
+    databases = {SPEC: knexRefs}
     let kState = knexRefs['state']
     let kObjects = knexRefs['objects']
     let kInputs = knexRefs['inputs']
@@ -98,7 +100,7 @@ function initApiServer () {
     api = express()
     api.use(bodyParser.json())
     // API functions
-    api.get('/api/coms/records', logic.getRecords)
+    api.get('/api/coms/records', (req, res) => manageSession(req, res, logic.getRecords))
     api.post('/api/coms/records', logic.postRecord)
     api.post('/api/coms/records/:id', logic.postRecord)
     api.delete('/api/coms/records/:id', logic.deleteRecord)
@@ -134,6 +136,21 @@ function initApiServer () {
       }
     })
   })
+}
+
+/*
+Initialize session object for this API call, an executes f
+*/
+const manageSession = (req, res, f) => {
+  let customer = 'SPEC'
+  let ts = new Date().getTime()
+  let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
+  let session = {
+    name: customer,
+    bds: databases[customer],
+    now: parseInt(now),
+    today: parseInt(now.substring(0, 8))}
+  f(req, res, session)
 }
 
 const initServices = () => {
