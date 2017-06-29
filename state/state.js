@@ -1,58 +1,27 @@
 var utilsDb = require('../utils/db.js')
-var dbs = {}
-var node_id
-var current_id
+var sequences = {}
 
-exports.init = function (customers) {
-  node_id = 1
-  for (var i = 0; i < customers.length; i++) { dbs[customers[i]] = init_db(customers[i]) }
-}
-
-function init_db (customer) {
-  var db = utilsDb.createDatabase(customer, 'state')
-  db.run('CREATE TABLE if not exists settings (var text, code text)')
-  db.run('CREATE TABLE if not exists global_id(id integer)', [], function (err) {
-    if (err) {
-      console.log(err.message)
-      process.exit(0)
-    }
-    db.all('SELECT id from global_id', [], function (err, rows) {
-      if (err) {
-        console.log(err.message)
-        process.exit(0)
-      }
-      if (rows == null || rows.length == 0) {
-        db.run('INSERT INTO global_id(id) values (1)', [], function (e) {
-          if (e) {
-            console.log(e.message)
-            process.exit(0)
-          } else current_id = 1
-        })
-      } else current_id = rows[0].id
-    })
-  })
-  return db
-}
-
-exports.new_id = function (customer, callback) {
-  if (current_id == undefined) callback(new Error('not ready'))
+const newId = (session, callback) => {
+  if (sequences[session.name]) callback(null, sequences[session.name]++)
   else {
-    var db = dbs[customer]
-    db.run('UPDATE global_id set id=id+1', [], function (err, rows) {
-      current_id++
-      callback(err, current_id)
-    })
+    session.dbs['objects'].select('max(id)').from('entity_1')
+      .then((rows) => {
+        if (rows.length === 0) sequences[session.name] = 1
+        else sequences[session.name] = rows[0] + 1
+        callback(null, sequences[session.name]++)
+      })
+      .catch((err) => callback(err))
   }
 }
 
-exports.get_settings = function (req, res) {
+const get_settings = (req, res) => {
   select_settings('SPEC', function (err, result) {
     if (err)res.status(500).end(err.message)
     else res.status(200).jsonp(result)
   })
 }
 
-select_settings = function (customer, callback) {
+const select_settings = (customer, callback) => {
   var db = dbs[customer]
   db.all('SELECT setting,value from settings', [], function (err, rows) {
     if (err) callback(err)
@@ -64,14 +33,14 @@ select_settings = function (customer, callback) {
   })
 }
 
-exports.post_settings = function (req, res) {
+const post_settings = (req, res) => {
   update_settings('SPEC', req.body, function (err, result) {
     if (err)res.status(500).end(err.message)
     else res.status(200).jsonp(result)
   })
 }
 
-update_settings = function (customer, settings, callback) {
+const update_settings = (customer, settings, callback) => {
   var db = dbs[customer]
   var l = []
   for (var property in settings) {
@@ -100,4 +69,32 @@ function put_setting_item (db, l, i, callback) {
       }
     })
   }
+}
+
+/*
+Blocks entity type, to preserve keys.
+ - session: API session
+ - type: Entity type
+*/
+const blockType = (session, type, callback) => {
+  callback()
+}
+
+/*
+ Releases entity type.
+ - session: API session
+ - type: Entity type
+ */
+const releaseType = (session, entity, callback) => {
+  callback()
+}
+
+module.exports = {
+
+  post_settings: post_settings,
+  get_settings: get_settings,
+  newId: newId,
+  blockType: blockType,
+  releaseType: releaseType
+
 }

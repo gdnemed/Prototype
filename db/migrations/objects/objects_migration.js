@@ -1,7 +1,7 @@
 exports.up = (knex, Promise) => {
   return knex.schema
   // TODO: include 'nodeId' & indexes
-    .createTable('entity_', (table) => {
+    .createTable('entity_1', (table) => {
       table.integer('id').primary()
       table.string('type')
       table.string('name')
@@ -10,28 +10,28 @@ exports.up = (knex, Promise) => {
       table.string('document')
       table.string('code')
     })
-    .createTable('property_num_', (table) => {
+    .createTable('property_num_1', (table) => {
       table.integer('entity')
       table.string('property')
       table.integer('t1')
       table.integer('t2')
       table.integer('value')
     })
-    .createTable('property_str_', (table) => {
+    .createTable('property_str_1', (table) => {
       table.integer('entity')
       table.string('property')
       table.integer('t1')
       table.integer('t2')
       table.string('value')
     })
-    .createTable('property_bin_', (table) => {
+    .createTable('property_bin_1', (table) => {
       table.integer('entity')
       table.string('property')
       table.integer('t1')
       table.integer('t2')
       table.binary('value')
     })
-    .createTable('relation_', (table) => {
+    .createTable('relation_1', (table) => {
       table.string('relation')
       table.integer('id1')
       table.integer('id2')
@@ -44,9 +44,9 @@ exports.up = (knex, Promise) => {
 
 exports.down = function (knex, Promise) {
   return knex.schema
-    .dropTableIfExists('entity_')
-    .dropTableIfExists('property_num_')
-    .dropTableIfExists('property_str_')
-    .dropTableIfExists('property_bin_')
-    .dropTableIfExists('relation_')
+    .dropTableIfExists('entity_1')
+    .dropTableIfExists('property_num_1')
+    .dropTableIfExists('property_str_1')
+    .dropTableIfExists('property_bin_1')
+    .dropTableIfExists('relation_1')
 }

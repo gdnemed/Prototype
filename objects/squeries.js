@@ -6,91 +6,79 @@ const MODEL = require('./model')
 const CT = require.main.require('./CT')
 const logger = require.main.require('./utils/log').getLogger('db')
 
-const knexObjects = require('knex')({
-  client: 'sqlite3',
-  connection: {
-    filename: './db/SPEC/objects_1.db'
-  },
-  useNullAsDefault: true
-})
-
-const knexInputs = require('knex')({
-  client: 'sqlite3',
-  connection: {
-    filename: './db/SPEC/inputs_1_2017.db'
-  },
-  useNullAsDefault: true
-})
-
 let nodeId = 1
-
-let dbObjects
-let dbInputs
 
 /*
 Main visible function for getting data.
--db: Database
+-session: API session
 -variables: Variables used by the query
 -str: Structure for query
 -callback: Callback function
 */
-const get = (db, variables, str, callback) => {
+const get = (session, variables, str, callback) => {
   if (!str._guide_) {
-    if (!prepareGet(db, str)) {
+    if (!prepareGet(session, str)) {
       callback(new Error('Syntax error'))
       return
     }
   }
+  // It's always useful to have now and today values
+  if (!variables.now) variables.now = session.now
+  if (!variables.today) variables.today = session.today
+  // Do work
   executeSelect(str, variables, callback)
 }
 
 /*
  Main visible function for putting data.
+ -session: API session.
  -db: Database
  -variables: Variables used by the query
  -str: Structure for put process
  -data: Data to insert
  -callback: Callback function
  */
-const put = (stateService, db, variables, str, data, callback) => {
+const put = (session, stateService, variables, str, data, callback) => {
+  logger.debug(str)
   let e = str._entity_
   if (e) {
-    let keysData = MODEL.ENTITIES[e].keys
+    // Create keys structure, which maps fields to values
+    let keysData = []
+    let kDef = MODEL.ENTITIES[e].keys
+    for (let i = 0; i < kDef.length; i++) {
+      keysData.push({fields: kDef[i], values: []})
+    }
     if (keysData) {
-      searchFromKey(e, keysData, str._keys_, stateService, data, (err, id) => {
-        if (err) {
-          stateService.releaseKey(e, keysData)
-          callback(err)
-        } else {
+      searchFromKey(session, e, keysData, data._key_, stateService, str, data, (err, id) => {
+        if (err) release(session, e, stateService, callback, err)
+        else {
           if (id) {
-            executeUpdate(id, str, data, variables, (err, count) => {
-              // Once the job is done, release key and return
-              if (err) {
-                stateService.releaseKey(e, keysData)
-                callback(err)
-              } else {
-                stateService.releaseKey(e, keysData)
-                callback(null, count)
-              }
+            executeUpdate(session, id, str, e, data, variables, (err, count) => {
+              release(session, e, stateService, callback, err, count)
             })
           } else {
             // On insert, we need to block key data to prevent parallel inserts over same key
-            let id = stateService.getIdFor(e, keysData)
-            executeInsert(id, keysData, str, data, variables, (err, rowid) => {
-              // Once the job is done, release key and return
+            stateService.newId(session, (err, id) => {
               if (err) {
-                stateService.releaseKey(e, keysData)
-                callback(err)
+                release(session, e, stateService, callback, err)
               } else {
-                stateService.releaseKey(e, keysData)
-                callback(null, rowid)
+                executeInsert(session, id, str, e, data, variables, (err, rowid) => {
+                  release(session, e, stateService, callback, err, rowid)
+                })
               }
             })
           }
         }
       })
     } else callback(new Error('Key not found'))
-  } callback(new Error('Type not found'))
+  } else callback(new Error('Type not found'))
+}
+
+const release = (session, e, stateService, callback, err, data) => {
+  stateService.releaseType(session, e, (error) => {
+    if (error) logger.error(error)
+    callback(err, data)
+  })
 }
 
 /*
@@ -99,6 +87,7 @@ Searches a list of keys for this entity type.
 - keysData: List of keys which must be satisfied for this entity type.
 - userKey: Concrete key the user want to use to search (useful when the fields of the key must change).
 - stateService: Service which blocks keys and gives id's
+- str: Structured put
 - data: Data to insert/update
 Once done, calls callback function passing:
 - err: Error, if any
@@ -106,27 +95,72 @@ Once done, calls callback function passing:
 - conflict: List of other id's which have values
 for some of the keys which would be repeated if data is inserted.
 */
-const searchFromKey = (entity, keysData, userKey, stateService, data, callback) => {
-  // Deny inserts or updates over this entity keys
-  stateService.blockKey(entity, keysData, data)
+const searchFromKey = (session, entity, keysData, userKey, stateService, str, data, callback) => {
+  let finalKey
   if (userKey == null) {
     // No key specified, we search the first with data
     for (let i = 0; i < keysData.length; i++) {
-      let key = keysData[i]
-      let ok = false
+      let key = keysData[i].fields
+      let ok = true
+      let values = []
       for (let j = 0; j < key.length; j++) {
-        if (data.hasOwnProperty(key[j])) ok = true
+        let found = false
+        for (var p in str) {
+          if (str.hasOwnProperty(p)) {
+            if (str[p] === key[j] && data.hasOwnProperty(p)) {
+              values.push(data[p])
+              found = true
+              break
+            }
+          }
+        }
+        if (!found) {
+          ok = false
+          break
+        }
       }
       if (ok) {
-        userKey = key
+        finalKey = {fields: key, values: values}
         break
       }
     }
+  } else {
+    finalKey = {fields: [], values: []}
+    for (let i = 0; i < userKey.fields.length; i++) {
+      finalKey.fields.push(str[userKey.fields[i]])
+      finalKey.values.push(userKey.values[i])
+    }
   }
-  loadFromKey(keysData, 0, {}, (err, result) => {
+  if (finalKey == null) callback(new Error('No key values found'))
+  logger.debug(finalKey)
+  // Deny inserts or updates over this entity keys
+  stateService.blockType(session, entity, (err) => {
     if (err) callback(err)
     else {
-
+      // Now whe have the key. Do select
+      let db = session.dbs['objects']
+      let sentence = db.select('id').from('entity_' + nodeId)
+      for (let i = 0; i < finalKey.fields.length; i++) {
+        sentence.where(finalKey.fields[i], finalKey.values[i])
+      }
+      sentence.then((rows) => {
+        if (rows.length === 0) callback(null, null) // Insert
+        else if (rows.length > 1) callback(new Error('Ambiguous key: more than one entity found'))
+        else {
+          callback(null, rows[0].id)// Update
+          // Entity found. Now we must ensure every key is respected
+          /* loadKeyEntities(db, keysData, 0, {}, (err, ids) => {
+            if (err) callback(err)
+            else {
+              if (ids && ids.length > 0) {
+                if (ids.length > 1) callback(new Error('Key violated'))
+                else callback(null, ids[0])// Update
+              } else callback(null, null) // Insert
+            }
+          }) */
+        }
+      })
+      .catch((err) => callback(err))
     }
   })
 }
@@ -137,10 +171,10 @@ Loads entities from a key, and puts them in a map.
 - i: Index of current key
 - result: Map id -> data where objects will be put
 */
-const loadFromKey = (keysData, i, result, callback) => {
+const loadKeyEntities = (db, keysData, i, result, callback) => {
   if (i >= keysData.length) callback()
   else {
-    dbObjects.select().from('entity_' + nodeId).where()
+    db.select().from('entity_' + nodeId).where()
       .then((rows) => {
         for (let j = 0; j < rows.length; j++) {
           let id = 'id' + rows.id
@@ -148,43 +182,123 @@ const loadFromKey = (keysData, i, result, callback) => {
           else {
           }
         }
-        loadFromKey(keysData, i + 1, result, callback)
+        loadKeyEntities(db, keysData, i + 1, result, callback)
       })
       .catch((err) => callback(err))
   }
 }
 
-const executeInsert = (id, str, data, variables, callback) => {
-  if (str._entity_) {
+const executeInsert = (session, id, str, entity, data, variables, callback) => {
+  if (entity) {
     // We pass every data to a new object d
-    let d = getProperFields(str, data)
+    let d = getProperFields(str, entity, data)
+    let db = session.dbs['objects']
     // And we add id to insert
     d.id = id
-    knexObjects.insert(data).into('entity_1').then((rowid) => {
-      callback(null, rowid)
+    db.insert(d).into('entity_1').then((rowid) => {
+      subPuts(session, id, str, entity, data, variables, (err) => {
+        if (err) callback(new Error(`${entity} inserted with id ${id}, but errors found: ${err}`))
+        else callback(null, id)
+      })
     })
     .catch((err) => callback(err))
   }
 }
 
-const executeUpdate = (id, str, data, variables, callback) => {
-  if (str._entity_) {
-    let d = getProperFields(str, data)
-    let s = knexObjects('entity_1')
-    s.where('id', id).update(d).then((count) => {
-      callback(null, count)
+const executeUpdate = (session, id, str, entity, data, variables, callback) => {
+  if (entity) {
+    let d = getProperFields(str, entity, data)
+    let db = session.dbs['objects']
+    db('entity_1').where('id', id).update(d)
+    .then((count) => {
+      subPuts(session, id, str, entity, data, variables, (err) => {
+        if (err) callback(new Error(`${count} ${entity} updated, but errors found: ${err}`))
+        else callback(null, count)
+      })
     })
     .catch((err) => callback(err))
   }
 }
 
-const getProperFields = (str, data) => {
-  let d = {}
+/*
+Searches for properties and entities related with entity id, to be put
+*/
+const subPuts = (session, id, str, entity, data, variables, callback) => {
+  let l = []
+  for (var p in str) {
+    if (str.hasOwnProperty(p) &&
+      data.hasOwnProperty(p) &&
+      (str[p]._property_ || str[p]._property_)) l.push(p)
+  }
+  subput(l, 0, session, id, str, entity, data, variables, callback)
+}
+
+/*
+Iterates over the list of properties and entities to put, and calls proper function.
+*/
+const subput = (l, i, session, id, str, entity, data, variables, callback) => {
+  if (i >= l.length) callback()
+  else if (str[l[i]]._property_) {
+    putProperty(session, id, str[l[i]], entity, str[l[i]]._property_, data[l[i]], variables, (err) => {
+      if (err) callback(err)
+      else subput(l, i + 1, session, id, str, entity, data, variables, callback)
+    })
+  } else if (str[l[i]]._relation_) {
+    putRelation(session, id, str[l[i]], entity, str[l[i]]._relation_, data[l[i]], variables, (err) => {
+      if (err) callback(err)
+      else subput(l, i + 1, session, id, str, entity, data, variables, callback)
+    })
+  }
+}
+
+/*
+Inserts or updates a property for an entity
+ */
+const putProperty = (session, id, str, entity, property, data, variables, callback) => {
+  let modelProperty = MODEL.PROPERTIES[property]
+  if (modelProperty) {
+    let db = session.dbs['objects']
+    let s = db.from('property_' + modelProperty.type + '_' + nodeId)
+      .where('entity', id).where('property', property)
+    s.then((rows) => {
+      if (rows.length === 0) {
+        let p = {
+          entity: id,
+          property: property,
+          value: data,
+          t1: modelProperty.time ? CT.START_OF_TIME : CT.START_OF_DAYS,
+          t2: modelProperty.time ? CT.END_OF_TIME : CT.END_OF_DAYS
+        }
+        db('property_' + modelProperty.type + '_' + nodeId).insert(p)
+          .then((count) => {
+            callback()
+          })
+          .catch((err) => callback(err))
+      } else {
+        let p = {value: data}
+        db('property_' + modelProperty.type + '_' + nodeId)
+          .where('entity', id).where('property', property).update(p)
+          .then((count) => {
+            callback()
+          })
+          .catch((err) => callback(err))
+      }
+    })
+    .catch((err) => callback(err))
+  }
+}
+
+const putRelation = (session, id, str, entity, relation, data, variables, callback) => {
+
+}
+
+const getProperFields = (str, entity, data) => {
+  let d = {type: entity}
   for (var p in str) {
     if (str.hasOwnProperty(p) &&
       p.charAt(0) !== '_' &&
       typeof str[p] === 'string' &&
-      data[p] !== null) d[p] = data[p]
+      data[p] !== null) d[str[p]] = data[p]
   }
   return d
 }
@@ -211,8 +325,8 @@ Prepare str structure for future execution, adding _guide_ field, which will con
   statement to be executed.
 - relation_owner: Only for inputs which must be linked with owner entity
 */
-const prepareGet = (db, str) => {
-  db = str._inputs_ ? knexInputs : knexObjects
+const prepareGet = (session, str) => {
+  let db = session.dbs[str._inputs_ ? 'inputs' : 'objects']
   str._guide_ = {entity_fields: {},
     property_fields: [],
     property_subqueries: {},
