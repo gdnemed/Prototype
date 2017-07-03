@@ -39,6 +39,7 @@ const get = (session, variables, str, callback) => {
  -callback: Callback function
  */
 const put = (session, stateService, variables, str, data, callback) => {
+  logger.debug('PUT-------')
   logger.debug(str)
   let e = str._entity_
   if (e) {
@@ -49,32 +50,72 @@ const put = (session, stateService, variables, str, data, callback) => {
       keysData.push({fields: kDef[i], values: []})
     }
     if (keysData) {
-      searchFromKey(session, e, keysData, data._key_, stateService, str, data, (err, id) => {
+      searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data, (err, id) => {
         if (err) release(session, e, stateService, callback, err)
         else {
-          if (id) {
-            executeUpdate(session, id, str, e, data, variables, (err, count) => {
-              release(session, e, stateService, callback, err, count)
-            })
-          } else {
+          let params = {
+            session: session,
+            id: id,
+            str: str,
+            entity: e,
+            data: data,
+            variables: variables,
+            stateService: stateService,
+            callback: (err, idPut) => release(session, e, stateService, callback, err, idPut)
+          }
+          if (id) executeUpdate(params)
+          else {
             // On insert, we need to block key data to prevent parallel inserts over same key
             stateService.newId(session, (err, id) => {
-              if (err) {
-                release(session, e, stateService, callback, err)
-              } else {
-                executeInsert(session, id, str, e, data, variables, (err, rowid) => {
-                  release(session, e, stateService, callback, err, rowid)
-                })
+              if (err) release(session, e, stateService, callback, err)
+              else {
+                params.id = id
+                executeInsert(params)
               }
             })
           }
         }
       })
     } else callback(new Error('Key not found'))
+  } else if (str._input_) {
+    // Inputs insert/update.
+    // For the moment, only insert
+    // On insert, we need to block key data to prevent parallel inserts over same key
+    stateService.newInputId(session, (err, id) => {
+      if (err) callback(err)
+      else {
+        let params = {
+          session: session,
+          id: id,
+          str: str,
+          period: Math.floor(data.tmp / 100000000),
+          data: data,
+          variables: variables,
+          callback: callback
+        }
+        executeInsertInput(params)
+      }
+    })
   } else callback(new Error('Type not found'))
 }
 
+/*
+Gets the key fields provided by user to search before put
+ */
+const getUserKey = (str, data) => {
+  let uk
+  for (let p in str) {
+    if (str[p] && typeof str[p] === 'string' && str[p].startsWith('search:')) {
+      if (!uk) uk = {fields: [], values: []}
+      uk.fields.push(str[p].substring(7))
+      uk.values.push(data[p])
+    }
+  }
+  return uk
+}
+
 const release = (session, e, stateService, callback, err, data) => {
+  logger.debug('Release')
   stateService.releaseType(session, e, (error) => {
     if (error) logger.error(error)
     callback(err, data)
@@ -131,7 +172,10 @@ const searchFromKey = (session, entity, keysData, userKey, stateService, str, da
       finalKey.values.push(userKey.values[i])
     }
   }
-  if (finalKey == null) callback(new Error('No key values found'))
+  if (!finalKey || finalKey == null) {
+    callback(new Error('No key values found'))
+    return
+  }
   logger.debug(finalKey)
   // Deny inserts or updates over this entity keys
   stateService.blockType(session, entity, (err) => {
@@ -188,116 +232,307 @@ const loadKeyEntities = (db, keysData, i, result, callback) => {
   }
 }
 
-const executeInsert = (session, id, str, entity, data, variables, callback) => {
-  if (entity) {
+const executeInsert = (params) => {
+  if (params.entity) {
     // We pass every data to a new object d
-    let d = getProperFields(str, entity, data)
-    let db = session.dbs['objects']
+    let d = getProperFields(params.str, params.entity, params.data)
+    // Check required fields
+    let r = MODEL.ENTITIES[params.entity].required
+    if (r) {
+      for (let m = 0; m < r.length; m++) {
+        if (!d.hasOwnProperty(r[m])) {
+          params.callback(new Error(`${r[m]} required for ${params.entity}`))
+          return
+        }
+      }
+    }
+    let db = params.session.dbs['objects']
     // And we add id to insert
-    d.id = id
+    d.id = params.id
     db.insert(d).into('entity_1').then((rowid) => {
-      subPuts(session, id, str, entity, data, variables, (err) => {
-        if (err) callback(new Error(`${entity} inserted with id ${id}, but errors found: ${err}`))
-        else callback(null, id)
-      })
+      let f = params.callback
+      params.callback = (err) => {
+        if (err) f(new Error(`${params.entity} inserted with id ${params.id}, but errors found: ${err}`))
+        else f(null, params.id)
+      }
+      subPuts(params)
     })
-    .catch((err) => callback(err))
-  }
-}
-
-const executeUpdate = (session, id, str, entity, data, variables, callback) => {
-  if (entity) {
-    let d = getProperFields(str, entity, data)
-    let db = session.dbs['objects']
-    db('entity_1').where('id', id).update(d)
-    .then((count) => {
-      subPuts(session, id, str, entity, data, variables, (err) => {
-        if (err) callback(new Error(`${count} ${entity} updated, but errors found: ${err}`))
-        else callback(null, count)
-      })
-    })
-    .catch((err) => callback(err))
+    .catch((err) => params.callback(err))
   }
 }
 
 /*
-Searches for properties and entities related with entity id, to be put
-*/
-const subPuts = (session, id, str, entity, data, variables, callback) => {
-  let l = []
-  for (var p in str) {
-    if (str.hasOwnProperty(p) &&
-      data.hasOwnProperty(p) &&
-      (str[p]._property_ || str[p]._property_)) l.push(p)
+ params is an object with these properties:
+ session, id, str, entity, period, data, variables, callback
+ */
+const executeUpdate = (params) => {
+  if (params.entity) {
+    let d = getProperFields(params.str, params.entity, params.data)
+    // Check required fields
+    let r = MODEL.ENTITIES[params.entity].required
+    if (r) {
+      for (let m = 0; m < r.length; m++) {
+        if (d.hasOwnProperty(r[m]) && d[r[m]] == null) {
+          params.callback(new Error(`${r[m]} required for ${params.entity}`))
+          return
+        }
+      }
+    }
+    let db = params.session.dbs['objects']
+    db('entity_1').where('id', params.id).update(d)
+    .then((count) => {
+      let f = params.callback
+      params.callback = (err) => {
+        if (err) f(new Error(`${count} ${params.entity} updated, but errors found: ${err}`))
+        else f(null, params.id)
+      }
+      subPuts(params)
+    })
+    .catch((err) => params.callback(err))
   }
-  subput(l, 0, session, id, str, entity, data, variables, callback)
+}
+
+/*
+ params is an object with these properties:
+ session, id, str, entity, period, data, variables, callback
+ */
+const executeInsertInput = (params) => {
+  // We pass every data to a new object d
+  let d = getProperFields(params.str, null, params.data)
+  // Check required fields
+  let r = MODEL.INPUTS.required
+  if (r) {
+    for (let m = 0; m < r.length; m++) {
+      if (!d.hasOwnProperty(r[m])) {
+        params.callback(new Error(`${r[m]} required for input`))
+        return
+      }
+    }
+  }
+  let db = params.session.dbs['inputs']
+  let table = `input_${nodeId}_${params.period}`
+  // And we add id to insert
+  d.id = params.id
+  db.insert(d).into(table).then((rowid) => {
+    let f = params.callback
+    params.callback = (err) => {
+      if (err) f(new Error(`Input inserted with id ${params.id}, but errors found: ${err}`))
+      else f(null, params.id)
+    }
+    subPuts(params)
+  })
+  .catch((err) => params.callback(err))
+}
+
+/*
+Searches for properties and entities related with entity id, to be put
+params is an object with these properties:
+ session, id, str, entity, period, data, variables, callback
+*/
+const subPuts = (params) => {
+  let l = []
+  for (var p in params.str) {
+    if (params.str.hasOwnProperty(p) &&
+      params.data.hasOwnProperty(p) &&
+      (params.str[p]._property_ || params.str[p]._relation_)) l.push(p)
+  }
+  subput(l, 0, params)
 }
 
 /*
 Iterates over the list of properties and entities to put, and calls proper function.
 */
-const subput = (l, i, session, id, str, entity, data, variables, callback) => {
-  if (i >= l.length) callback()
-  else if (str[l[i]]._property_) {
-    putProperty(session, id, str[l[i]], entity, str[l[i]]._property_, data[l[i]], variables, (err) => {
-      if (err) callback(err)
-      else subput(l, i + 1, session, id, str, entity, data, variables, callback)
-    })
-  } else if (str[l[i]]._relation_) {
-    putRelation(session, id, str[l[i]], entity, str[l[i]]._relation_, data[l[i]], variables, (err) => {
-      if (err) callback(err)
-      else subput(l, i + 1, session, id, str, entity, data, variables, callback)
-    })
+const subput = (l, i, params) => {
+  if (i >= l.length) params.callback()
+  else {
+    if (params.str[l[i]]._property_) {
+      putProperty(params.str[l[i]]._property_, l[i], params, l, i)
+    } else if (params.str[l[i]]._relation_) {
+      putRelation(params.str[l[i]]._relation_, l[i], params, l, i)
+    }
   }
 }
 
 /*
 Inserts or updates a property for an entity
+- i: Index in the property list.
+- f: Callback function
  */
-const putProperty = (session, id, str, entity, property, data, variables, callback) => {
+const putProperty = (property, entry, params, l, i) => {
   let modelProperty = MODEL.PROPERTIES[property]
   if (modelProperty) {
-    let db = session.dbs['objects']
-    let s = db.from('property_' + modelProperty.type + '_' + nodeId)
-      .where('entity', id).where('property', property)
+    let val = params.data[entry]
+    let t1, t2
+    for (let prop in params.str[entry]) {
+      if (params.str[entry].hasOwnProperty(prop)) {
+        if (params.str[entry][prop] === 'value') val = params.data[prop]
+        else if (params.entity && params.str[entry][prop] === 't1') t1 = params.data[prop]
+        else if (params.entity && params.str[entry][prop] === 't2') t2 = params.data[prop]
+      }
+    }
+    let db = params.session.dbs[params.entity ? 'objects' : 'inputs']
+    let table = params.entity ? `property_${modelProperty.type}_${nodeId}`
+      : `input_data_${modelProperty.type}_${nodeId}_${params.period}`
+    let s = db.from(table)
+      .where(params.entity ? 'entity' : 'id', params.id).where('property', property)
     s.then((rows) => {
       if (rows.length === 0) {
-        let p = {
-          entity: id,
-          property: property,
-          value: data,
-          t1: modelProperty.time ? CT.START_OF_TIME : CT.START_OF_DAYS,
-          t2: modelProperty.time ? CT.END_OF_TIME : CT.END_OF_DAYS
+        // No previous value: insert
+        let p
+        if (params.entity) { // Entity property
+          p = {
+            entity: params.id,
+            property: property,
+            value: val
+          }
+          if (t1) p.t1 = t1
+          else p.t1 = modelProperty.time ? CT.START_OF_TIME : CT.START_OF_DAYS
+          if (!t2) p.t2 = t2
+          else p.t2 = modelProperty.time ? CT.END_OF_TIME : CT.END_OF_DAYS
+        } else { // Input property
+          p = {
+            id: params.id,
+            property: property,
+            value: val
+          }
         }
-        db('property_' + modelProperty.type + '_' + nodeId).insert(p)
-          .then((count) => {
-            callback()
-          })
-          .catch((err) => callback(err))
+        db(table).insert(p)
+          .then((count) => subput(l, i + 1, params))
+          .catch((err) => params.callback(err))
       } else {
-        let p = {value: data}
-        db('property_' + modelProperty.type + '_' + nodeId)
-          .where('entity', id).where('property', property).update(p)
-          .then((count) => {
-            callback()
-          })
-          .catch((err) => callback(err))
+        // If null value, it's a delete
+        if (val == null) {
+          db(table)
+            .where(params.entity ? 'entity' : 'id', params.id).where('property', property).delete()
+            .then((count) => subput(l, i + 1, params))
+            .catch((err) => params.callback(err))
+        } else {
+          // Update current value
+          let p = {value: val}
+          if (t1) p.t1 = t1
+          if (!t2) p.t2 = t2
+          db(table)
+            .where(params.entity ? 'entity' : 'id', params.id).where('property', property).update(p)
+            .then((count) => subput(l, i + 1, params))
+            .catch((err) => params.callback(err))
+        }
       }
     })
-    .catch((err) => callback(err))
+    .catch((err) => params.callback(err))
   }
 }
 
-const putRelation = (session, id, str, entity, relation, data, variables, callback) => {
-
+/*
+ Inserts or updates a relation for an entity
+ - i: Index in the property list.
+ - f: Callback function
+ */
+const putRelation = (relationDef, entry, params, l, i) => {
+  let relation, entity, t1, t2
+  let arrow = relationDef.indexOf('->')
+  let forward
+  if (arrow >= 0) forward = true
+  else {
+    arrow = relationDef.indexOf('<-')
+    if (arrow >= 0) forward = false
+    else {
+      params.callback(new Error(`Relation syntax error: ${relationDef}`))
+      return
+    }
+  }
+  relation = relationDef.substring(0, arrow)
+  entity = relationDef.substring(arrow + 2)
+  let newStr = {_entity_: entity}
+  let relObj = params.str[entry]
+  let relData = params.data[entry]
+  for (let p in relObj) {
+    if (relObj.hasOwnProperty(p)) {
+      switch (p) {
+        case '_relation_':
+          break
+        default:
+          if (relObj[p] === 't1') {
+            if (relData[p]) t1 = relData[p]
+          } else if (relObj[p] === 't2') {
+            if (relData[p]) t2 = relData[p]
+          } else newStr[p] = relObj[p]
+      }
+    }
+  }
+  let modelRelation = MODEL.RELATIONS[relation]
+  if (!modelRelation) {
+    params.callback(`${modelRelation} relation does not exist`)
+    return
+  }
+  // For entities (not inputs), time counts
+  if (params.entity) {
+    if (!t1) t1 = modelRelation.time ? CT.START_OF_TIME : CT.START_OF_DAYS
+    if (!t2) t2 = modelRelation.time ? CT.END_OF_TIME : CT.END_OF_DAYS
+  }
+  // Recursively call put
+  put(params.session, params.stateService,
+    params.variables, newStr, relData,
+    (err, id) => {
+      if (err) params.callback(err)
+      else {
+        let table
+        let db = params.session.dbs['objects']
+        let r
+        if (params.entity) { // Entities
+          table = 'relation_1'
+          r = {
+            relation: relation,
+            id1: forward ? params.id : id,
+            id2: forward ? id : params.id,
+            t1: t1,
+            t2: t2,
+            ord: 0,
+            node: 1
+          }
+        } else { // Inputs
+          table = 'input_rel_1_' + params.period
+          r = {
+            relation: relation,
+            id: params.id,
+            entity: id
+          }
+        }
+        // Entity is there, now we can create the relation properly
+        let s = db.from(table)
+          .where('relation', relation)
+        if (params.entity) s.where(forward ? 'id1' : 'id2', params.id) // entity
+        else s.where('id', params.id) // input
+        s.then((rows) => {
+          if (rows.length === 0) {
+            // Insert relation
+            db(table).insert(r).then((rowid) => {
+              // Next relation/property
+              subput(l, i + 1, params)
+            })
+            .catch((err) => params.callback(err))
+          } else {
+            // Update current relation
+            let u = db(table).where('relation', relation)
+            if (params.entity) u.where(forward ? 'id1' : 'id2', params.id)
+            else u.where('id', params.id)
+            u.update(r).then((count) => {
+              // Next relation/property
+              subput(l, i + 1, params)
+            })
+            .catch((err) => params.callback(err))
+          }
+        })
+        .catch((err) => params.callback(err))
+      }
+    })
 }
 
 const getProperFields = (str, entity, data) => {
-  let d = {type: entity}
+  let d = entity ? {type: entity} : {}
   for (var p in str) {
     if (str.hasOwnProperty(p) &&
       p.charAt(0) !== '_' &&
-      typeof str[p] === 'string' &&
+      typeof str[p] === 'string' && data[p] &&
       data[p] !== null) d[str[p]] = data[p]
   }
   return d
@@ -580,6 +815,9 @@ const joinProperty = (str, a, i, propertyTable, e, linkField) => {
     // Now, current relation columns. It could be just 'value' (the default)
     // or a list of fields.
     if (a[i].fields) {
+      if (a[i].fields.value) {
+        sq.column('ps' + i + '.value as ' + a[i].fields.value)
+      }
       // Not just value, but we seek also t1 and t2
       if (a[i].fields.t1) {
         sq.column('ps' + i + '.t1 as ' + a[i].fields.t1)
@@ -832,8 +1070,15 @@ const processRow = (str, rows, i, callback) => {
                                 if (r[j] === '_id_') delete rows[i]._id_
                                 else if (rows[i][r[j]] === CT.END_OF_TIME ||
                                   rows[i][r[j]] === CT.START_OF_TIME ||
-                                  rows[i][r[j]] === CT.END_OF_DAYS ||
+                                  rows[i][r[j]] === CT.START_OF_DAYS ||
                                   rows[i][r[j]] === CT.END_OF_DAYS) delete rows[i][r[j]]
+                              }
+                              // Also nulls
+                              for (let p in rows[i]) {
+                                // Nested relation have fields changed to r<i>_<field>
+                                if (rows[i].hasOwnProperty(p)) {
+                                  if (rows[i][p] === null) delete rows[i][p]
+                                }
                               }
                               // Next row
                               if (execution.change) processRow(str, rows, i + 1, callback)
