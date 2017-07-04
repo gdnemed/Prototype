@@ -32,7 +32,9 @@ const init = () => {
         .then(initApiServer())
         .then(initServices())
         .then(initProcess())
-        .catch((err) => log.error(`ERROR: cannot start Lemuria: ${err}`))
+        .catch((err) => {
+          log.error(`ERROR: cannot start Lemuria: ${err}`)
+        })
     }).catch((err) => logM.error(`ERROR: Migration failed: ${err}`))
   }
 }
@@ -81,7 +83,7 @@ const debugTestKnexRefs = (knexRefs) => {
       .catch((err) => logM.error('ERROR: in GET settings : ' + err))
 
     // testing knex ojbect that holds 'objects' db
-    kObjects.select().table('entity_')
+    kObjects.select().table('entity_1')
       .then((collection) => logM.debug('entity_ len  = ' + collection.length))
       .catch((err) => logM.error('ERROR: in GET entity_ : ' + err))
 
@@ -114,13 +116,13 @@ function initApiServer () {
     api.post('/api/coms/records/:id/info', logic.postInfo)
     api.get('/api/coms/clockings', logic.getClockings)
     api.get('/api/coms/clockings_debug', logic.getClockingsDebug)
-    api.post('/api/objects/query', objects.query)
-    api.post('/api/objects/sentence', objects.sentence)
+    api.post('/api/objects/query', (req, res) => manageSession(req, res, objects.query))
+    api.post('/api/objects/sentence', (req, res) => manageSession(req, res, objects.sentence))
     api.get('/api/objects/entities', objects.getEntitiesDebug)
     api.get('/api/objects/properties', objects.getPropertiesDebug)
     api.get('/api/objects/relations', objects.getRelationsDebug)
-    api.post('/api/state/settings', state.post_settings)
-    api.get('/api/state/settings', state.get_settings)
+    api.post('/api/state/settings', (req, res) => manageSession(req, res, state.postSettings))
+    api.get('/api/state/settings', (req, res) => manageSession(req, res, state.getSettings))
     api.get('/api/coms/timetypes', logic.getTimeTypes)
     api.get('/api/coms/timetypes/:id', logic.getTimeType)
     api.post('/api/coms/timetypes', logic.postTimeType)
@@ -147,7 +149,7 @@ const manageSession = (req, res, f) => {
   let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
   let session = {
     name: customer,
-    bds: databases[customer],
+    dbs: databases[customer],
     now: parseInt(now),
     today: parseInt(now.substring(0, 8))}
   f(req, res, session)
@@ -155,13 +157,16 @@ const manageSession = (req, res, f) => {
 
 const initServices = () => {
   return new Promise((resolve, reject) => {
-    log.info('initServices')
-    state.init(customers)
-    objects.init(environment.node_id, customers, state)
-    inputs.init(environment.node_id, customers)
-    logic.init(objects, inputs, coms)
-    coms.init(environment.coms_listen, logic)
-    resolve()
+    try {
+      log.info('initServices')
+      objects.init(environment.node_id, customers, state)
+      inputs.init(environment.node_id, customers)
+      logic.init(objects, inputs, coms)
+      coms.init(environment.coms_listen, logic)
+      resolve()
+    } catch (error) {
+      reject(new Error(`Error in services initialization: ${error}`))
+    }
   })
 }
 
@@ -171,8 +176,8 @@ Starts processes, like importation of files, etc.
 const initProcess = () => {
   return new Promise((resolve, reject) => {
     log.info('initProcess')
-    files.init(environment.exchange.files)
-    resolve()
+    if (files.init(environment.exchange.files)) resolve()
+    else reject(new Error('initProcess failed'))
   })
 }
 

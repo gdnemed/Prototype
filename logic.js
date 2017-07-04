@@ -26,7 +26,7 @@ const init = (objects, inputs, coms) => {
   objectsService = objects
   inputsService = inputs
   comsService = coms
-  if (!objectsService.prepare(prepGetRecords)) logger.error('prepGetRecords not prepared.')
+  // if (!objectsService.prepare(prepGetRecords)) logger.error('prepGetRecords not prepared.')
 }
 
 const getRecords = (req, res, session) => {

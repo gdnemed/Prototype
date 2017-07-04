@@ -1,10 +1,7 @@
-const moment = require('moment-timezone')
-
 const CT = require.main.require('./CT')
 const utilsDb = require.main.require('./utils/db.js')
 const logger = require.main.require('./utils/log').getLogger('db')
 const MODEL = require('./model')
-var structured = require('./structured')
 var squeries = require('./squeries')
 
 var dbs = {}
@@ -405,52 +402,19 @@ function put_related_entity (customer, entity, relation, forward, field, rows_db
 }
 // //////////////////////////////////
 
-exports.query = function (req, res) {
-  var db = dbs['SPEC']
-  let ts1 = new Date().getTime()
-  let now = moment.tz(ts1, 'GMT').format('YYYYMMDDHHmmss')
-  squeries.get(db, {now: parseInt(now), today: parseInt(now.substring(0, 8))}, req.body, function (err, ret) {
-    if (err) res.status(500).end(err.message)
-    else {
-      let ts2 = new Date().getTime()
-      logger.debug(ts2 - ts1)
-      res.status(200).jsonp(ret)
-    }
-  })
-}
-
-exports.sentence = function (req, res) {
-  var db = dbs['SPEC']
-  squeries.put(db, null, req.body.str, req.body.data, function (err, ret) {
+exports.query = function (req, res, session) {
+  squeries.get(session, {}, req.body, function (err, ret) {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
-  /* structured.structuredPut(
-    {
-      customer: 'SPEC',
-      db: db,
-      stateService: stateService,
-      str: req.body.str,
-      data: req.body.data,
-      callback: function (err, ret) {
-        if (err) res.status(500).end(err.message)
-        else res.status(200).jsonp(ret)
-      }
-    }) */
 }
 
-const structuredGet = (customer, variables, query, callback) => {
-  structured.structuredGet(dbs[customer], variables, query, callback)
+exports.sentence = function (req, res, session) {
+  squeries.put(session, stateService, {}, req.body.str, req.body.data, function (err, ret) {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(ret)
+  })
 }
-
-const structuredPut = (params) => {
-  params.db = dbs[params.customer]
-  params.stateService = stateService
-  structured.structuredPut(params)
-}
-
-exports.structuredPut = structuredPut
-exports.structuredGet = structuredGet
 
 function get_type_property (p) {
   return MODEL.PROPERTIES[p].type

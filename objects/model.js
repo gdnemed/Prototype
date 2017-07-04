@@ -19,6 +19,11 @@ const PROPERTIES = {
   'record': {type: 'str'}
 }
 
+const INPUTS = {
+  keys: [],
+  required: ['tmp', 'source']
+}
+
 const RELATIONS = {
   'identifies': {time: false}
 }
@@ -35,6 +40,7 @@ module.exports = {
   ENTITIES: ENTITIES,
   PROPERTIES: PROPERTIES,
   RELATIONS: RELATIONS,
+  INPUTS: INPUTS,
   getTypeProperty: getTypeProperty,
   getRelatedEntity: getRelatedEntity
 }

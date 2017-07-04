@@ -55,7 +55,7 @@ const init = () => {
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
     migrateSection(SECTIONS.STATE)
-      .then(() => knexRefs['state']('global_id').insert({id: 1}))
+     // .then(() => knexRefs['state']('global_id').insert({id: 1}))
       .then(() => migrateSection(SECTIONS.OBJECTS))
       .then(() => migrateSection(SECTIONS.INPUTS))
       .then(() => resolve(knexRefs))

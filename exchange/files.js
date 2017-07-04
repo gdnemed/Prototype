@@ -30,6 +30,7 @@ const init = (params) => {
   watch('RECORDS', processRecord, 'records', 'records', 'records')
   watch('TTYPES', processTtype, 'timetypes', 'timetypes', 'timetypes')
   watch('INFO', processInfo, 'infos', 'records/@/info', 'records/@/info')
+  return true
 }
 
 /*
