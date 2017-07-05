@@ -6,10 +6,9 @@
 
 const moment = require('moment-timezone')
 const logger = require.main.require('./utils/log').getLogger('coms')
+const squeries = require.main.require('./objects/squeries')
 
-var objectsService
-var inputsService
-var comsService
+let stateService, inputsService,comsService, mainModule
 
 let prepGetRecords = {
   _entity_: '[record]',
@@ -22,123 +21,114 @@ let prepGetRecords = {
   card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
 }
 
-const init = (objects, inputs, coms) => {
-  objectsService = objects
+let prepGetRecord = {
+  _entity_: 'record',
+  _filter_: {field: 'document', variable: 'id'},
+  name: 'name',
+  id: 'document',
+  code: 'code',
+  language: {_property_: 'language'},
+  validity: {_property_: '[validity]', start: 't1', end: 't2'},
+  timetype_grp: {_property_: '[ttgroup]', code: 'value', start: 't1', end: 't2'},
+  card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
+}
+
+let prepPutRecords = {
+  _entity_: 'record',
+  name: 'name',
+  id: 'document',
+  code: 'code',
+  language: {_property_: 'language'},
+  timetype_grp: {_property_: 'ttgroup', code: 'value', start: 't1', end: 't2'},
+  validity: {_property_: 'validity', start: 't1', end: 't2'},
+  card: {
+    _relation_: '[identifies<-card]',
+    code: 'code',
+    start: 't1',
+    end: 't2'
+  }
+}
+
+let prepGetCards = {
+  _entity_: 'record',
+  _related_: {
+    _relation_: '[<-identifies]',
+    code: 'code',
+    start: 't1',
+    end: 't2'
+  },
+  _filter_: {field: 'document', variable: 'id'}
+}
+
+let prepPutCards = {
+  _entity_: 'record',
+  _filter_: {field: 'document', variable: 'id'},
+  cards: {
+    _relation_: '[<-identifies]',
+    code: 'code',
+    start: 't1',
+    end: 't2'
+  }
+}
+
+const init = (state, inputs, coms) => {
+  stateService = state
   inputsService = inputs
   comsService = coms
   // if (!objectsService.prepare(prepGetRecords)) logger.error('prepGetRecords not prepared.')
 }
 
 const getRecords = (req, res, session) => {
-  /* objectsService.structuredGet('SPEC', {},
-    {
-      _entity_: '[record]',
-      name: 'name',
-      id: 'document',
-      code: 'code',
-      language: {_property_: 'language'},
-      validity: {_property_: '[validity]', start: 't1', end: 't2'},
-      timetype_grp: {_property_: '[ttgroup]', code: 'value', start: 't1', end: 't2'},
-      card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
-    },
-    (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(ret)
-    }) */
-  objectsService.get(null, {now: session.now, today: session.today}, prepGetRecords, (err, ret) => {
+  squeries.get(session, req.params, prepGetRecords, (err, ret) => {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
 }
 
-const postRecord = (req, res) => {
+const getRecord = (req, res, session) => {
+  squeries.get(session, req.params, prepGetRecord, (err, ret) => {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(ret)
+  })
+}
+
+const postRecord = (req, res, session) => {
   if (req.body.id) {
-    var str = {
-      _op_: 'put',
-      _entity_: 'record',
-      _key_: 'id',
-      name: 'name',
-      id: 'document',
-      code: 'code',
-      language: {_property_: 'language'},
-      timetype_grp: {_property_: '[ttgroup]', _op_: 'simple', code: 'value', start: 't1', end: 't2'},
-      validity: {_property_: '[validity]', _op_: 'simple', start: 't1', end: 't2'},
-      card: {
-        _relation_: '[<-identifies]',
-        _op_: 'simple',
-        _key_: 'code',
-        code: 'code',
-        start: 't1',
-        end: 't2'
-      }
-    }
-    objectsService.structuredPut(
-      {
-        customer: 'SPEC',
-        str: str,
-        data: req.body,
-        callback: (err, ret) => {
-          if (err) res.status(500).end(err.message)
-          else {
-            res.status(200).jsonp(ret)
-            nextVersion(ret)// Notify communications
-          }
+    logger.debug(req.body)
+    squeries.put(session,
+      stateService,
+      req.params,
+      prepPutRecords, req.body, (err, ret) => {
+        if (err) res.status(500).end(err.message)
+        else {
+          res.status(200).jsonp([ret])
+          nextVersion(session, [ret])// Notify communications
         }
       })
   } else res.status(400).end()
 }
 
-const deleteRecord = (req, res) => {
-  var customer = 'SPEC'
-  objectsService.deleteFromField(customer, 'record', 'document', req.params.id, function (err, rows) {
+const deleteRecord = (req, res, session) => {
+  squeries.del(session, req.params, {_entity_: 'record'}, null, function (err, rows) {
     if (err) res.status(500).end(err.message)
     else res.status(200).end()
   })
 }
 
-const getCards = (req, res) => {
-  objectsService.structuredGet('SPEC', {},
-    {
-      _entity_: 'record',
-      _subquery_: {
-        _relation_: '[<-identifies]',
-        code: 'code',
-        start: 't1',
-        end: 't2'
-      },
-      _filter_: 'document=\'' + req.params.id + '\''
-    },
-    (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(ret)
-    })
+const getCards = (req, res, session) => {
+  squeries.get(session, req.params, prepGetCards, (err, ret) => {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(ret)
+  })
 }
 
-const postCards = (req, res) => {
-  var str = {
-    _op_: 'search',
-    _entity_: 'record',
-    _filter_: 'document=\'' + req.params.id + '\'',
-    _subquery_: {
-      _relation_: '[<-identifies]',
-      _op_: 'simple',
-      _key_: 'code',
-      code: 'code',
-      start: 't1',
-      end: 't2'
-    }
-  }
-  objectsService.structuredPut(
-    {
-      customer: 'SPEC',
-      str: str,
-      data: req.body,
-      callback: (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else {
-          res.status(200).jsonp(ret)
-          nextVersion(ret)// Notify communications
-        }
+const postCards = (req, res, session) => {
+  squeries.put(session, {},
+    prepPutCards, req.body, (err, ret) => {
+      if (err) res.status(500).end(err.message)
+      else {
+        res.status(200).end(ret)
+        nextVersion(ret)// Notify communications
       }
     })
 }
@@ -146,13 +136,13 @@ const postCards = (req, res) => {
 /*
 Indicates something has changed, so the terminals should be updated
 */
-const nextVersion = (obj) => {
+const nextVersion = (session, obj) => {
   logger.debug('nextVersion')
   logger.debug(obj)
-  objectsService.structuredGet('SPEC', {},
+  squeries.get(session, {id: obj[0]},
     {
       _entity_: 'record',
-      _id_: obj,
+      _filter_: {field: 'id', variable: 'id'},
       code: 'code',
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
     },
@@ -240,14 +230,14 @@ const postInfo = (req, res) => {
     })
 }
 
-const initTerminal = (serial) => {
-  objectsService.structuredGet('SPEC', {},
+const initTerminal = (serial, customer) => {
+  let session = createSession(customer)
+  squeries.get(session, {},
     {
       _entity_: '[record]',
       code: 'code',
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
-    },
-    (err, ret) => {
+    }, (err, ret) => {
       if (err) logger.error(err)
       else {
         for (let i = 0; i < ret.length; i++) {
@@ -263,8 +253,6 @@ const initTerminal = (serial) => {
             }
           }
         }
-
-
       }
     })
 }
@@ -300,20 +288,37 @@ const postEnroll = (req, res) => {
     })
 }
 
-const getClockings = (req, res) => {
-  var customer = 'SPEC'
-  inputsService.getInputsComplete(customer, function (err, rows) {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(rows)
-  })
+const getClockings = (req, res, session) => {
+  squeries.get(session, req.params,
+    {
+      _inputs_: '201707',
+      tmp: 'tmp',
+      card: {_property_: 'card'},
+      record: {_property_: 'record'},
+      result: 'result'
+    }, (err, rows) => {
+      if (err) res.status(500).end(err.message)
+      else res.status(200).jsonp(rows)
+    })
 }
 
-const getClockingsDebug = (req, res) => {
-  var customer = 'SPEC'
-  inputsService.get_inputs(customer, function (err, r) {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp({input: r[0], input_data_str: r[1]})
-  })
+const getClockingsDebug = (req, res, session) => {
+  squeries.get(session, req.params,
+    {
+      _inputs_: '201707',
+      id: 'id',
+      tmp: 'tmp',
+      gmt: 'gmt',
+      card: {_property__: 'card'},
+      record: {_property__: 'record'},
+      result: 'result',
+      owner: 'owner',
+      reception: 'reception',
+      serial: 'serial'
+    }, (err, rows) => {
+      if (err) res.status(500).end(err.message)
+      else res.status(200).jsonp(rows)
+    })
 }
 
 const getTimeTypes = (req, res) => {
@@ -381,18 +386,46 @@ const deleteTimeType = (req, res) => {
 }
 
 const createClocking = (clocking, customer, callback) => {
-  objectsService.structuredGet('SPEC', {},
+  let session = createSession(customer)
+  // Find the owner
+  squeries.get(session, {record: clocking.record},
     {
       _entity_: 'record',
       id: 'id',
-      filter: 'code=\'' + clocking.record + '\''
+      _filter_: {field: 'code', variable: 'record'}
     }, (err, record) => {
       if (err) callback(err)
       else {
-        if (record) clocking.owner = record.id
-        inputsService.createClocking(clocking, customer, callback)
+        if (record && record.length > 0) clocking.owner = record[0].id
+        squeries.put(session, stateService, {},
+          {
+            _inputs_: 'input',
+            tmp: 'tmp',
+            gmt: 'gmt',
+            reception: 'reception',
+            owner: 'owner',
+            source: 'source',
+            result: 'result',
+            serial: 'serial',
+            card: {_property_: 'card'},
+            record: {_property_: 'record'}
+          }, clocking, callback)
+        // inputsService.createClocking(clocking, customer, callback)
       }
     })
+}
+
+const createSession = (customer) => {
+  if (!mainModule) mainModule = require.main.require('./lemuria')
+  let ts = new Date().getTime()
+  let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
+  let session = {
+    name: customer,
+    dbs: mainModule.getDatabases(customer),
+    now: parseInt(now),
+    today: parseInt(now.substring(0, 8))
+  }
+  return session
 }
 
 /*
@@ -414,6 +447,7 @@ const getPendingRegisters = (tab, tv, customer, node, serial) => {
 module.exports = {
   init: init,
   getRecords: getRecords,
+  getRecord: getRecord,
   postRecord: postRecord,
   deleteRecord: deleteRecord,
   getCards: getCards,

@@ -132,7 +132,7 @@ const genericReceive = (frame, socket) => {
         break
       default:
     }
-    logicService.initTerminal(info.serial)
+    logicService.initTerminal(info.serial, info.customer)
 // check_versions(info) <-with versions
   }
 }

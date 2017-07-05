@@ -7,7 +7,7 @@ exports.up = (knex, Promise) => {
     .createTable('input_1_' + month, (table) => {
       table.integer('id').primary()
       table.integer('tmp')
-      table.integer('gmt') //TODO: veure table.timestamp
+      table.integer('gmt') // TODO: veure table.timestamp
       table.integer('reception')
       table.integer('owner')
       table.integer('result')
@@ -17,19 +17,19 @@ exports.up = (knex, Promise) => {
     // (id integer, property integer, value text)',
     .createTable('input_data_str_1_' + month, (table) => {
       table.integer('id')
-      table.integer('property')
-      table.string('text')
+      table.string('property')
+      table.string('value')
     })
     // (id integer, property integer, value integer)
     .createTable('input_data_num_1_' + month, (table) => {
       table.integer('id')
-      table.integer('property')
+      table.string('property')
       table.integer('value')
     })
     // (id integer, property integer, value blob)
     .createTable('input_data_bin_1_' + month, (table) => {
       table.integer('id')
-      table.integer('property')
+      table.string('property')
       table.binary('value')
     })
     // (id integer, relation integer, entity integer)

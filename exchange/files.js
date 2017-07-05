@@ -168,19 +168,19 @@ const processRecord = (r, yesterday, records) => {
   if (r.NAME && r.NAME !== '') record.name = r.NAME
   if (r.LANGUAGE && r.LANGUAGE !== '') record.language = r.LANGUAGE
   if ((r.START && r.START !== '') || (r.END && r.END !== '')) {
-    record.validity = [{}]
-    if (r.START && r.START !== '') record.validity[0].start = r.START + '000000'
-    if (r.END && r.END !== '') record.validity[0].end = r.END + '235959'
+    record.validity = {} // For the moment, only 1
+    if (r.START && r.START !== '') record.validity.start = r.START
+    if (r.END && r.END !== '') record.validity.end = r.END
   }
   if (r.CARD) {
-    record.card = [{code: r.CARD}]
-    if (record.validity && record.validity.start) record.card[0].start = record.validity[0].start
-    if (record.validity && record.validity.end) record.card[0].end = record.validity[0].end
+    record.card = {code: r.CARD} // [{code: r.CARD}] For the moment, only 1
+    if (record.validity && record.validity.start) record.card.start = record.validity.start
+    if (record.validity && record.validity.end) record.card.end = record.validity.end
   }
   if (r.TTGROUP) {
-    record.timetype_grp = [{code: r.TTGROUP}]
-    if (record.validity && record.validity.start) record.ttgroup[0].start = record.validity[0].start
-    if (record.validity && record.validity.end) record.ttgroup[0].end = record.validity[0].end
+    record.timetype_grp = {code: r.TTGROUP} // [{code: r.TTGROUP}] For the moment, only 1
+    if (record.validity && record.validity.start) record.timetype_grp.start = record.validity.start
+    if (record.validity && record.validity.end) record.timetype_grp.end = record.validity.end
   }
 
   let id = 'ID' + r.ID

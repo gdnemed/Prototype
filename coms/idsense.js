@@ -32,7 +32,6 @@ const sendFrame = (j, seq, socket) => {
   b.writeUInt16LE(b.length, 0)
   b.writeUInt16LE(seq, 2)
   str.copy(b, 4)
-
   socket.write(b)
 }
 
@@ -48,7 +47,13 @@ const receive = (data, socket, logicService) => {
 
 const newClocking = (data, socket, logicService) => {
   var info = socket.specInfo
-  var clocking = {serial: info.serial, record: data.id, card: data.card, result: data.resp, source: 0}
+  var clocking = {
+    serial: info.serial,
+    record: data.id + '',
+    card: data.card,
+    result: data.resp,
+    source: 0
+  }
   clocking.reception = moment.tz(new Date().getTime(), 'GMT').format('YYYYMMDDHHmmss')
   clocking.gmt = moment.tz(data.tmp * 1000, 'GMT').format('YYYYMMDDHHmmss')
   clocking.tmp = moment.tz(data.tmp * 1000, info.timezone).format('YYYYMMDDHHmmss')

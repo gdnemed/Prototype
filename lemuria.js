@@ -103,19 +103,20 @@ function initApiServer () {
     api.use(bodyParser.json())
     // API functions
     api.get('/api/coms/records', (req, res) => manageSession(req, res, logic.getRecords))
-    api.post('/api/coms/records', logic.postRecord)
-    api.post('/api/coms/records/:id', logic.postRecord)
-    api.delete('/api/coms/records/:id', logic.deleteRecord)
-    api.get('/api/coms/records/:id/cards', logic.getCards)
-    api.post('/api/coms/records/:id/cards', logic.postCards)
+    api.get('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.getRecord))
+    api.post('/api/coms/records', (req, res) => manageSession(req, res, logic.postRecord))
+    api.post('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.postRecord))
+    api.delete('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.deleteRecord))
+    api.get('/api/coms/records/:id/cards', (req, res) => manageSession(req, res, logic.getCards))
+    api.post('/api/coms/records/:id/cards', (req, res) => manageSession(req, res, logic.postCards))
     api.get('/api/coms/records/:id/fingerprints', logic.getFingerprints)
     api.post('/api/coms/records/:id/fingerprints', logic.postFingerprints)
     api.post('/api/coms/records/:id/enroll', logic.postEnroll)
     api.get('/api/coms/records/:id/info', logic.getInfo)
     api.get('/api/coms/infos', logic.getInfos)
     api.post('/api/coms/records/:id/info', logic.postInfo)
-    api.get('/api/coms/clockings', logic.getClockings)
-    api.get('/api/coms/clockings_debug', logic.getClockingsDebug)
+    api.get('/api/coms/clockings', (req, res) => manageSession(req, res, logic.getClockings))
+    api.get('/api/coms/clockings_debug', (req, res) => manageSession(req, res, logic.getClockingsDebug))
     api.post('/api/objects/query', (req, res) => manageSession(req, res, objects.query))
     api.post('/api/objects/sentence', (req, res) => manageSession(req, res, objects.sentence))
     api.get('/api/objects/entities', objects.getEntitiesDebug)
@@ -155,13 +156,17 @@ const manageSession = (req, res, f) => {
   f(req, res, session)
 }
 
+const getDatabases = (customer) => {
+  return databases[customer]
+}
+
 const initServices = () => {
   return new Promise((resolve, reject) => {
     try {
       log.info('initServices')
       objects.init(environment.node_id, customers, state)
       inputs.init(environment.node_id, customers)
-      logic.init(objects, inputs, coms)
+      logic.init(state, inputs, coms)
       coms.init(environment.coms_listen, logic)
       resolve()
     } catch (error) {
@@ -203,6 +208,10 @@ function serviceFunctions (args) {
     case 'i':svc.install(); break
     case 'u':svc.uninstall(); break
   }
+}
+
+module.exports = {
+  getDatabases: getDatabases
 }
 
 // Start Lemuria
