@@ -110,17 +110,17 @@ const del = (session, variables, str, data, callback) => {
   let e = str._entity_
   if (e) {
     let db = session.dbs['objects']
-    db('property_num_' + nodeId).where('entity', id).delete
+    db('property_num_' + nodeId).where('entity', id).delete()
       .then((count) => {
-        db('property_str_' + nodeId).where('entity', id).delete
+        db('property_str_' + nodeId).where('entity', id).delete()
           .then((count) => {
-            db('property_bin_' + nodeId).where('entity', id).delete
+            db('property_bin_' + nodeId).where('entity', id).delete()
               .then((count) => {
-                db('relation_' + nodeId).where('id1', id).orWhere('id2', id).delete
+                db('relation_' + nodeId).where('id1', id).orWhere('id2', id).delete()
                   .then((count) => {
                     db('entity_' + nodeId).where('id', id).delete()
                       .then((count) => {
-                        callback(count)
+                        callback(null,count)
                       })
                       .catch((err) => callback(err))
                   })
@@ -134,13 +134,13 @@ const del = (session, variables, str, data, callback) => {
   } else if (str._input_) {
     let db = session.dbs['inputs']
     let period = variables.period
-    db(`input_data_num_${nodeId}_${period}`).where('entity', id).delete
+    db(`input_data_num_${nodeId}_${period}`).where('entity', id).delete()
       .then((count) => {
-        db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete
+        db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete()
           .then((count) => {
-            db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete
+            db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete()
               .then((count) => {
-                db(`input_rel_${nodeId}_${period}`).where('id1', id).orWhere('id2', id).delete
+                db(`input_rel_${nodeId}_${period}`).where('id1', id).orWhere('id2', id).delete()
                   .then((count) => {
                     db(`input_${nodeId}_${period}`).where('id', id).delete()
                       .then((count) => {
@@ -174,7 +174,6 @@ const getUserKey = (str, data) => {
 }
 
 const release = (session, e, stateService, callback, err, data) => {
-  logger.debug('Release')
   stateService.releaseType(session, e, (error) => {
     if (error) logger.error(error)
     callback(err, data)
@@ -235,7 +234,6 @@ const searchFromKey = (session, entity, keysData, userKey, stateService, str, da
     callback(new Error('No key values found'))
     return
   }
-  logger.debug(finalKey)
   // Deny inserts or updates over this entity keys
   stateService.blockType(session, entity, (err) => {
     if (err) callback(err)
@@ -402,7 +400,6 @@ const subPuts = (params) => {
 Iterates over the list of properties and entities to put, and calls proper function.
 */
 const subput = (l, i, params) => {
-  logger.debug(`subput ${i}`)
   if (i >= l.length) {
     params.callback()
   } else {
@@ -420,7 +417,6 @@ Inserts or updates a property for an entity
 - f: Callback function
  */
 const putProperty = (property, entry, params, l, i) => {
-  logger.debug(`putProperty ${property} on ${entry}`)
   let modelProperty = MODEL.PROPERTIES[property]
   if (modelProperty) {
     let val = params.data[entry]
@@ -593,11 +589,7 @@ const modifyRelation = (rows, db, r, table, relation, forward, isArray, params, 
       // Next relation/property
       subput(l, i + 1, params)
     })
-      .catch((err) => {
-        logger.debug(r)
-        logger.debug(u.toSQL())
-        params.callback(err)
-      })
+      .catch((err) => params.callback(err))
   }
 }
 
@@ -838,7 +830,6 @@ const joins = (db, str, e, f, type) => {
     // Transform to raw for better use
     let sql = str._guide_.statement.toSQL()
     str._guide_.statement = db.raw(sql.sql, sql.bindings)
-    logger.debug(str._guide_.statement.toSQL())
   }
 }
 
@@ -873,7 +864,6 @@ const joinProperty = (str, a, i, propertyTable, e, linkField) => {
       let pType = a[i].type
       j.onIn('ps' + i + '.property', [pType])
       str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
-      logger.debug('push null property')
       if (!str._inputs_) {
         // Now date
         let withtime = MODEL.PROPERTIES[pType].time
@@ -1161,7 +1151,6 @@ const processRow = (str, rows, i, session, variables, callback) => {
                                   rows[i][r[j]] === CT.END_OF_DAYS) delete rows[i][r[j]]
                               }
                               // Also nulls
-                              logger.trace(rows[i])
                               for (let p in rows[i]) {
                                 // Nested relation have fields changed to r<i>_<field>
                                 if (rows[i].hasOwnProperty(p)) {

@@ -8,7 +8,7 @@ const moment = require('moment-timezone')
 const logger = require.main.require('./utils/log').getLogger('coms')
 const squeries = require.main.require('./objects/squeries')
 
-let stateService, inputsService,comsService, mainModule
+let stateService, comsService, mainModule
 
 let prepGetRecords = {
   _entity_: '[record]',
@@ -71,9 +71,24 @@ let prepPutCards = {
   }
 }
 
-const init = (state, inputs, coms) => {
+let prepPutEnroll = {
+  _entity_: 'record',
+  _filter_: {field: 'document', variable: 'id'},
+  enroll: {_property_: 'enroll'}
+}
+
+let prepPutInfo = {
+  _entity_: 'record',
+  _filter_: {field: 'document', variable: 'id'},
+  _subquery_: {
+    _property_: 'info',
+    value: 'value',
+    date: 't1'
+  }
+}
+
+const init = (state, coms) => {
   stateService = state
-  inputsService = inputs
   comsService = coms
   // if (!objectsService.prepare(prepGetRecords)) logger.error('prepGetRecords not prepared.')
 }
@@ -109,10 +124,25 @@ const postRecord = (req, res, session) => {
 }
 
 const deleteRecord = (req, res, session) => {
-  squeries.del(session, req.params, {_entity_: 'record'}, null, function (err, rows) {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).end()
-  })
+  // First, search record real id
+  squeries.get(session, req.params,
+    {
+      _entity_: 'record',
+      id: 'id',
+      _filter_: {field: 'document', variable: 'id'}
+    }, (err, record) => {
+      if (err) res.status(500).end(err.message)
+      else {
+        // Now, delete
+        if (record && record.length > 0) {
+          squeries.del(session, {id: record[0].id}, {_entity_: 'record'},
+            null, (err, rows) => {
+              if (err) res.status(500).end(err.message)
+              else res.status(200).end()
+            })
+        } else res.status(404).end()
+      }
+    })
 }
 
 const getCards = (req, res, session) => {
@@ -165,11 +195,11 @@ const nextVersion = (session, obj) => {
     })
 }
 
-const getInfo = (req, res) => {
-  objectsService.structuredGet('SPEC', {},
+const getInfo = (req, res, session) => {
+  squeries.get(session, req.params,
     {
       _entity_: 'record',
-      _filter_: 'document=\'' + req.params.id + '\'',
+      _filter_: {field: 'document', variable: 'id'},
       id: 'document',
       info: {
         _property_: 'info',
@@ -183,8 +213,8 @@ const getInfo = (req, res) => {
     })
 }
 
-const getInfos = (req, res) => {
-  objectsService.structuredGet('SPEC', {},
+const getInfos = (req, res, session) => {
+  squeries.get(session, req.params,
     {
       _entity_: '[record]',
       id: 'document',
@@ -200,33 +230,11 @@ const getInfos = (req, res) => {
     })
 }
 
-const postInfo = (req, res) => {
-  logger.trace('postRecord')
-  logger.trace(req.body)
-  var str = {
-    _op_: 'search',
-    _entity_: 'record',
-    _filter_: 'document=\'' + req.params.id + '\'',
-    _subquery_: {
-      _property_: 'info',
-      _op_: 'simple',
-      _key_: 'value',
-      value: 'value',
-      date: 't1'
-    }
-  }
-  objectsService.structuredPut(
-    {
-      customer: 'SPEC',
-      str: str,
-      data: req.body,
-      callback: (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else {
-          res.status(200).jsonp(ret)
-          nextVersion(ret)// Notify communications
-        }
-      }
+const postInfo = (req, res, session) => {
+  squeries.put(session, req.params,
+    prepPutInfo, req.body, (err, result) => {
+      if (err) res.status(500).end(err.message)
+      else res.status(200).end()
     })
 }
 
@@ -243,12 +251,12 @@ const initTerminal = (serial, customer) => {
         for (let i = 0; i < ret.length; i++) {
           if (ret[i].code && ret[i].code !== null) {
             let r = {id: parseInt(ret[i].code)}
-            comsService.globalSend('record_insert', {records: [r]})
+            comsService.send(serial, 'record_insert', {records: [r]})
             let card = ret[i].card
             if (card) {
               for (let j = 0; j < card.length; j++) {
                 let e = {card: card[j].code, id: parseInt(ret[i].code)}
-                comsService.globalSend('card_insert', {cards: [e]})
+                comsService.send(serial, 'card_insert', {cards: [e]})
               }
             }
           }
@@ -257,35 +265,24 @@ const initTerminal = (serial, customer) => {
     })
 }
 
-const getFingerprints = (req, res) => {
+const getFingerprints = (req, res, session) => {
+  res.status(501).end()
 }
 
-const postFingerprints = (req, res) => {
+const postFingerprints = (req, res, session) => {
+  res.status(501).end()
 }
 
-const postEnroll = (req, res) => {
-  var str = {
-    _op_: 'search',
-    _entity_: 'record',
-    _filter_: 'document=\'' + req.params.id + '\'',
-    enroll: {
-      _property_: 'enroll',
-      _op_: 'simple'
-    }
-  }
-  objectsService.structuredPut(
-    {
-      customer: 'SPEC',
-      str: str,
-      data: req.body,
-      callback: (err, ret) => {
+const postEnroll = (req, res, session) => {
+  squeries.put(session, req.params,
+      prepPutEnroll, req.body,
+      (err, ret) => {
         if (err) res.status(500).end(err.message)
         else {
           res.status(200).jsonp(ret)
           nextVersion(ret)// Notify communications
         }
-      }
-    })
+      })
 }
 
 const getClockings = (req, res, session) => {
@@ -321,8 +318,8 @@ const getClockingsDebug = (req, res, session) => {
     })
 }
 
-const getTimeTypes = (req, res) => {
-  objectsService.structuredGet('SPEC', {},
+const getTimeTypes = (req, res, session) => {
+  squeries.get(session, req.params,
     {
       _entity_: '[timetype]',
       name: 'name',
@@ -335,54 +332,63 @@ const getTimeTypes = (req, res) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(ret)
     })
-  /* var customer = 'SPEC'
-  objectsService.get_entities(customer, 'timetype', 'id,code,name', function (err, rows) {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(rows)
-  }) */
 }
 
-const getTimeType = (req, res) => {
-  var customer = 'SPEC'
-  objectsService.get_entity(customer, 'timetype', 'code', req.params.id, '', function (err, rows) {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(rows)
-  })
+const getTimeType = (req, res, session) => {
+  squeries.get(session, req.params,
+    {
+      _entity_: '[timetype]',
+      _filter_: {field: 'code', variable: 'id'},
+      name: 'name',
+      id: 'id',
+      code: 'code',
+      intnames: 'intname',
+      timetype_grp: {_property_: '[ttgroup]', code: 'value'}
+    },
+    (err, ret) => {
+      if (err) res.status(500).end(err.message)
+      else res.status(200).jsonp(ret)
+    })
 }
 
-const postTimeType = (req, res) => {
-  logger.trace('postRecord')
-  logger.trace(req.body)
+const postTimeType = (req, res, session) => {
   var str = {
-    _op_: 'put',
     _entity_: 'timetype',
-    _key_: 'code',
     name: 'name',
     code: 'code',
     language: 'intname',
     ttgroup: {_property_: '[ttgroup]', _op_: 'multiple'}
   }
-  objectsService.structuredPut(
-    {
-      customer: 'SPEC',
-      str: str,
-      data: req.body,
-      callback: (err, ret) => {
+  squeries.put(session, req.params, str,
+      req.body, (err, ret) => {
         if (err) res.status(500).end(err.message)
         else {
           res.status(200).jsonp(ret)
           nextVersion(ret)// Notify communications
         }
-      }
-    })
+      })
 }
 
-const deleteTimeType = (req, res) => {
-  var customer = 'SPEC'
-  objectsService.deleteFromField(customer, 'timetype', 'code', req.params.id, function (err, rows) {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).end()
-  })
+const deleteTimeType = (req, res, session) => {
+  // First, search time type real id
+  squeries.get(session, req.params,
+    {
+      _entity_: 'timetype',
+      id: 'id',
+      _filter_: {field: 'code', variable: 'id'}
+    }, (err, record) => {
+      if (err) res.status(500).end(err.message)
+      else {
+        // Now, delete
+        if (record && record.length > 0) {
+          squeries.del(session, {id: record[0].id}, {_entity_: 'timetype'},
+            null, (err, rows) => {
+              if (err) res.status(500).end(err.message)
+              else res.status(200).end()
+            })
+        } else res.status(404).end()
+      }
+    })
 }
 
 const createClocking = (clocking, customer, callback) => {

@@ -68,24 +68,23 @@ function putSettingItem (db, l, i, callback) {
   else {
     var setting = l[i].setting
     var value = l[i].value
-    db.all('SELECT value from settings where setting=?', [setting], function (err, rows) {
-      if (err) callback(err)
-      else if (rows == null || rows.length == 0) {
-        let o = {
-          setting: setting,
-          value: value
+    db.select('value').from('settings').where('setting',setting)
+      .then((rows) => {
+        if (rows == null || rows.length === 0) {
+          let o = {
+            setting: setting,
+            value: value
+          }
+          db.insert(o).into('settings')
+            .then((rowid) => putSettingItem(db, l, i + 1, callback))
+            .catch((err) => callback(err))
+        } else {
+          db('settings').update({value: value}).where('setting', setting)
+            .then((count) => putSettingItem(db, l, i + 1, callback))
+            .catch((err) => callback(err))
         }
-        db.insert(o).into('settings').then((rowid) => {
-          putSettingItem(db, l, i + 1, callback)
-        })
-        .catch((err) => callback(err))
-      } else {
-        db('settings').update({value: value}).where('setting', setting).then((count) => {
-          putSettingItem(db, l, i + 1, callback)
-        })
-        .catch((err) => callback(err))
-      }
-    })
+      })
+      .catch((err) => callback(err))
   }
 }
 

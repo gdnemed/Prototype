@@ -11,15 +11,13 @@ const bodyParser = require('body-parser')
 const moment = require('moment-timezone')
 
 const state = require('./state/state')
-const objects = require('./objects/objects')
-const inputs = require('./inputs/inputs')
 const coms = require('./coms/coms')
 const files = require('./exchange/files')
 const logic = require('./logic')
 const logger = require('./utils/log')
 const migrations = require('./migrations')
 
-let home, environment, databases, customers, api, httpServer, logM, log
+let home, environment, customers, api, httpServer, logM, log
 
 const init = () => {
   // Install/uninstall as a service
@@ -62,20 +60,18 @@ const initConfiguration = () => {
     }
   }
   // it will be: customers = {SPEC: {}}
-  customers = ['SPEC']
+  customers = {SPEC: {}}
 }
 
 // debug: verifies that each knex object for each db exists
 const debugTestKnexRefs = (knexRefs) => {
   return new Promise((resolve, reject) => {
     log.info('Verifying migration')
-    databases = {SPEC: knexRefs}
     let kState = knexRefs['state']
     let kObjects = knexRefs['objects']
     let kInputs = knexRefs['inputs']
 
-    // TODO: uncomment this when DB work is done
-    // customers['SPEC'].dbs = knexRefs
+    customers['SPEC'].dbs = knexRefs
 
     // testing knex ojbect that holds 'state' db
     kState.select().table('settings')
@@ -109,26 +105,21 @@ function initApiServer () {
     api.delete('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.deleteRecord))
     api.get('/api/coms/records/:id/cards', (req, res) => manageSession(req, res, logic.getCards))
     api.post('/api/coms/records/:id/cards', (req, res) => manageSession(req, res, logic.postCards))
-    api.get('/api/coms/records/:id/fingerprints', logic.getFingerprints)
-    api.post('/api/coms/records/:id/fingerprints', logic.postFingerprints)
-    api.post('/api/coms/records/:id/enroll', logic.postEnroll)
-    api.get('/api/coms/records/:id/info', logic.getInfo)
-    api.get('/api/coms/infos', logic.getInfos)
-    api.post('/api/coms/records/:id/info', logic.postInfo)
+    api.get('/api/coms/records/:id/fingerprints', (req, res) => manageSession(req, res, logic.getFingerprints))
+    api.post('/api/coms/records/:id/fingerprints', (req, res) => manageSession(req, res, logic.postFingerprints))
+    api.post('/api/coms/records/:id/enroll', (req, res) => manageSession(req, res, logic.postEnroll))
+    api.get('/api/coms/records/:id/info', (req, res) => manageSession(req, res, logic.getInfo))
+    api.get('/api/coms/infos', (req, res) => manageSession(req, res, logic.getInfos))
+    api.post('/api/coms/records/:id/info', (req, res) => manageSession(req, res, logic.postInfo))
     api.get('/api/coms/clockings', (req, res) => manageSession(req, res, logic.getClockings))
     api.get('/api/coms/clockings_debug', (req, res) => manageSession(req, res, logic.getClockingsDebug))
-    api.post('/api/objects/query', (req, res) => manageSession(req, res, objects.query))
-    api.post('/api/objects/sentence', (req, res) => manageSession(req, res, objects.sentence))
-    api.get('/api/objects/entities', objects.getEntitiesDebug)
-    api.get('/api/objects/properties', objects.getPropertiesDebug)
-    api.get('/api/objects/relations', objects.getRelationsDebug)
     api.post('/api/state/settings', (req, res) => manageSession(req, res, state.postSettings))
     api.get('/api/state/settings', (req, res) => manageSession(req, res, state.getSettings))
-    api.get('/api/coms/timetypes', logic.getTimeTypes)
-    api.get('/api/coms/timetypes/:id', logic.getTimeType)
-    api.post('/api/coms/timetypes', logic.postTimeType)
-    api.post('/api/coms/timetypes/:id', logic.postTimeType)
-    api.delete('/api/coms/timetypes/:id', logic.deleteTimeType)
+    api.get('/api/coms/timetypes', (req, res) => manageSession(req, res, logic.getTimeTypes))
+    api.get('/api/coms/timetypes/:id', (req, res) => manageSession(req, res, logic.getTimeType))
+    api.post('/api/coms/timetypes', (req, res) => manageSession(req, res, logic.postTimeType))
+    api.post('/api/coms/timetypes/:id', (req, res) => manageSession(req, res, logic.postTimeType))
+    api.delete('/api/coms/timetypes/:id', (req, res) => manageSession(req, res, logic.deleteTimeType))
     // Run http server
     httpServer = api.listen(environment.api_listen.port, (err) => {
       if (err) reject(err)
@@ -150,23 +141,21 @@ const manageSession = (req, res, f) => {
   let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
   let session = {
     name: customer,
-    dbs: databases[customer],
+    dbs: customers[customer].dbs,
     now: parseInt(now),
     today: parseInt(now.substring(0, 8))}
   f(req, res, session)
 }
 
 const getDatabases = (customer) => {
-  return databases[customer]
+  return customers[customer].dbs
 }
 
 const initServices = () => {
   return new Promise((resolve, reject) => {
     try {
       log.info('initServices')
-      objects.init(environment.node_id, customers, state)
-      inputs.init(environment.node_id, customers)
-      logic.init(state, inputs, coms)
+      logic.init(state, coms)
       coms.init(environment.coms_listen, logic)
       resolve()
     } catch (error) {

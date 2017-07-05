@@ -54,3 +54,40 @@ exports.down = function (knex, Promise) {
     .dropTableIfExists('input_rel_1')
     .dropTableIfExists('local_id')
 }
+
+/* Comentari per tenir la creació antiga, amb els índexos
+ function initDB (customer) {
+ var db = utilsDb.createDatabase(customer, 'inputs', nodeId, '2017')
+ db.run('CREATE TABLE if not exists input_' + nodeId + '_201705 ' +
+ '(id integer, tmp integer, gmt integer, reception integer, ' +
+ 'owner integer, result integer, source integer, serial text)')
+ db.run('CREATE TABLE if not exists input_data_str_' + nodeId + '_201705 ' +
+ '(id integer, property integer, value text)', function () {
+ db.run('CREATE INDEX if not exists i_input_data_str_' +
+ nodeId + '_201705_p on input_data_str_' + nodeId + '_201705 (property)')
+ db.run('CREATE INDEX if not exists i_input_data_str_' +
+ nodeId + '_201705_i on input_data_str_' + nodeId + '_201705 (id)')
+ })
+ db.run('CREATE TABLE if not exists input_data_num_' + nodeId + '_201705 ' +
+ '(id integer, property integer, value integer)', function () {
+ db.run('CREATE INDEX if not exists i_input_data_num_' +
+ nodeId + '_201705_p on input_data_num_' + nodeId + '_201705 (property)')
+ db.run('CREATE INDEX if not exists i_input_data_num_' +
+ nodeId + '_201705_i on input_data_num_' + nodeId + '_201705 (id)')
+ })
+ db.run('CREATE TABLE if not exists input_data_bin_' + nodeId + '_201705 ' +
+ '(id integer, property integer, value blob)', function () {
+ db.run('CREATE INDEX if not exists i_input_data_bin_' +
+ nodeId + '_201705_p on input_data_bin_' + nodeId + '_201705 (property)')
+ db.run('CREATE INDEX if not exists i_input_data_bin_' +
+ nodeId + '_201705_i on input_data_bin_' + nodeId + '_201705 (id)')
+ })
+ db.run('CREATE TABLE if not exists input_rel_' + nodeId + '_201705 ' +
+ '(id integer, relation integer, entity integer)', function () {
+ db.run('CREATE INDEX if not exists i_input_rel_' +
+ nodeId + '_201705_r on input_rel_' + nodeId + '_201705 (relation)')
+ db.run('CREATE INDEX if not exists i_input_rel_' +
+ nodeId + '_201705_i on input_rel_' + nodeId + '_201705 (id)')
+ })
+
+ */

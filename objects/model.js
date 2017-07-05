@@ -6,7 +6,8 @@ const ENTITIES = {
   'card': {keys: [['code']], required: ['code']},
   'record': {keys: [['code'], ['document']],
     required: ['code', 'document', 'name'],
-    related_from: {identifies: 'card'}}
+    related_from: {identifies: 'card'}},
+  'timetype': {keys: [['code']], required: ['code', 'intname']}
 }
 
 const PROPERTIES = {

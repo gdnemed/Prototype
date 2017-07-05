@@ -146,12 +146,11 @@ const globalSend = (command, data) => {
   }
 }
 
-const send = (serial, command, data, callback) => {
+const send = (serial, command, data) => {
   var socket = clients['id' + serial]
   if (socket) {
     sendData(socket, command, data)
-    callback()
-  } else callback(new Error('Serial ' + serial + ' not found'))
+  } else return new Error('Serial ' + serial + ' not found')
 }
 
 /*
