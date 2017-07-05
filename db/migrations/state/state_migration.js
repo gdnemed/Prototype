@@ -4,13 +4,9 @@ exports.up = function (knex) {
       table.string('var')
       table.string('code')
     })
-    .createTable('global_id', (table) => {
-      table.integer('id').primary()
-    })
 }
 
 exports.down = (knex) => {
   return knex.schema
     .dropTableIfExists('settings')
-    .dropTableIfExists('global_id')
 }

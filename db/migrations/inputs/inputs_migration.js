@@ -38,11 +38,6 @@ exports.up = (knex, Promise) => {
       table.integer('relation')
       table.integer('entity')
     })
-    // (id integer, relation integer, entity integer)
-    // TODO: falta un "seed" que injecta el valor (1)
-    .createTable('local_id', (table) => {
-      table.integer('id')
-    })
 }
 
 exports.down = function (knex, Promise) {
@@ -52,7 +47,6 @@ exports.down = function (knex, Promise) {
     .dropTableIfExists('input_data_num_1')
     .dropTableIfExists('input_data_bin_1')
     .dropTableIfExists('input_rel_1')
-    .dropTableIfExists('local_id')
 }
 
 /* Comentari per tenir la creació antiga, amb els índexos
