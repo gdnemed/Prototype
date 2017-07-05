@@ -71,10 +71,54 @@ let prepPutCards = {
   }
 }
 
+let prepGetTimeTypes = {
+  _entity_: '[timetype]',
+  name: 'name',
+  code: 'code',
+  text: 'intname',
+  timetype_grp: {_property_: '[ttgroup]', code: 'value'}
+}
+
+let prepGetTimeType = {
+  _entity_: 'timetype',
+  _filter_: {field: 'code', variable: 'id'},
+  code: 'code',
+  text: 'intname',
+  timetype_grp: {_property_: '[ttgroup]', code: 'value'}
+}
+
+let prpPutTtype = {
+  _entity_: 'timetype',
+  code: 'code',
+  text: 'intname',
+  ttgroup: {_property_: 'ttgroup', _op_: 'multiple'}
+}
+
 let prepPutEnroll = {
   _entity_: 'record',
   _filter_: {field: 'document', variable: 'id'},
   enroll: {_property_: 'enroll'}
+}
+
+let prepGetInfo = {
+  _entity_: 'record',
+  _filter_: {field: 'document', variable: 'id'},
+  id: 'document',
+  info: {
+    _property_: 'info',
+    value: 'value',
+    date: 't1'
+  }
+}
+
+let prepGetInfos = {
+  _entity_: '[record]',
+  id: 'document',
+  info: {
+    _property_: 'info',
+    value: 'value',
+    date: 't1'
+  }
 }
 
 let prepPutInfo = {
@@ -85,6 +129,40 @@ let prepPutInfo = {
     value: 'value',
     date: 't1'
   }
+}
+
+let prepGetClockings = {
+  _inputs_: '201707',
+  tmp: 'tmp',
+  card: {_property_: 'card'},
+  record: {_property_: 'record'},
+  result: 'result'
+}
+
+let prepGetClockingsDebug = {
+  _inputs_: '201707',
+  id: 'id',
+  tmp: 'tmp',
+  gmt: 'gmt',
+  card: {_property__: 'card'},
+  record: {_property__: 'record'},
+  result: 'result',
+  owner: 'owner',
+  reception: 'reception',
+  serial: 'serial'
+}
+
+let prepPutClocking = {
+  _inputs_: 'input',
+  tmp: 'tmp',
+  gmt: 'gmt',
+  reception: 'reception',
+  owner: 'owner',
+  source: 'source',
+  result: 'result',
+  serial: 'serial',
+  card: {_property_: 'card'},
+  record: {_property_: 'record'}
 }
 
 const init = (state, coms) => {
@@ -109,7 +187,6 @@ const getRecord = (req, res, session) => {
 
 const postRecord = (req, res, session) => {
   if (req.body.id) {
-    logger.debug(req.body)
     squeries.put(session,
       stateService,
       req.params,
@@ -117,7 +194,7 @@ const postRecord = (req, res, session) => {
         if (err) res.status(500).end(err.message)
         else {
           res.status(200).jsonp([ret])
-          nextVersion(session, [ret])// Notify communications
+          nextVersion(session, [ret], 'record')// Notify communications
         }
       })
   } else res.status(400).end()
@@ -153,12 +230,12 @@ const getCards = (req, res, session) => {
 }
 
 const postCards = (req, res, session) => {
-  squeries.put(session, {},
+  squeries.put(session, stateService, {},
     prepPutCards, req.body, (err, ret) => {
       if (err) res.status(500).end(err.message)
       else {
         res.status(200).end(ret)
-        nextVersion(ret)// Notify communications
+        nextVersion(session, ret, 'card')// Notify communications
       }
     })
 }
@@ -166,9 +243,10 @@ const postCards = (req, res, session) => {
 /*
 Indicates something has changed, so the terminals should be updated
 */
-const nextVersion = (session, obj) => {
+const nextVersion = (session, obj, type) => {
   logger.debug('nextVersion')
   logger.debug(obj)
+  if (type !== 'record') return
   squeries.get(session, {id: obj[0]},
     {
       _entity_: 'record',
@@ -197,33 +275,14 @@ const nextVersion = (session, obj) => {
 
 const getInfo = (req, res, session) => {
   squeries.get(session, req.params,
-    {
-      _entity_: 'record',
-      _filter_: {field: 'document', variable: 'id'},
-      id: 'document',
-      info: {
-        _property_: 'info',
-        value: 'value',
-        date: 't1'
-      }
-    },
-    (err, ret) => {
+    prepGetInfo, (err, ret) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(ret)
     })
 }
 
 const getInfos = (req, res, session) => {
-  squeries.get(session, req.params,
-    {
-      _entity_: '[record]',
-      id: 'document',
-      info: {
-        _property_: 'info',
-        value: 'value',
-        date: 't1'
-      }
-    },
+  squeries.get(session, req.params, prepGetInfos,
     (err, ret) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(ret)
@@ -231,7 +290,7 @@ const getInfos = (req, res, session) => {
 }
 
 const postInfo = (req, res, session) => {
-  squeries.put(session, req.params,
+  squeries.put(session, stateService, req.params,
     prepPutInfo, req.body, (err, result) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).end()
@@ -274,60 +333,35 @@ const postFingerprints = (req, res, session) => {
 }
 
 const postEnroll = (req, res, session) => {
-  squeries.put(session, req.params,
+  squeries.put(session, stateService, req.params,
       prepPutEnroll, req.body,
       (err, ret) => {
         if (err) res.status(500).end(err.message)
         else {
           res.status(200).jsonp(ret)
-          nextVersion(ret)// Notify communications
+          nextVersion(session, ret, 'enroll')// Notify communications
         }
       })
 }
 
 const getClockings = (req, res, session) => {
-  squeries.get(session, req.params,
-    {
-      _inputs_: '201707',
-      tmp: 'tmp',
-      card: {_property_: 'card'},
-      record: {_property_: 'record'},
-      result: 'result'
-    }, (err, rows) => {
+  squeries.get(session, req.params, prepGetClockings,
+    (err, rows) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(rows)
     })
 }
 
 const getClockingsDebug = (req, res, session) => {
-  squeries.get(session, req.params,
-    {
-      _inputs_: '201707',
-      id: 'id',
-      tmp: 'tmp',
-      gmt: 'gmt',
-      card: {_property__: 'card'},
-      record: {_property__: 'record'},
-      result: 'result',
-      owner: 'owner',
-      reception: 'reception',
-      serial: 'serial'
-    }, (err, rows) => {
+  squeries.get(session, req.params, prepGetClockingsDebug,
+    (err, rows) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(rows)
     })
 }
 
 const getTimeTypes = (req, res, session) => {
-  squeries.get(session, req.params,
-    {
-      _entity_: '[timetype]',
-      name: 'name',
-      id: 'id',
-      code: 'code',
-      intnames: 'intname',
-      timetype_grp: {_property_: '[ttgroup]', code: 'value'}
-    },
+  squeries.get(session, req.params, prepGetTimeTypes,
     (err, ret) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(ret)
@@ -335,16 +369,7 @@ const getTimeTypes = (req, res, session) => {
 }
 
 const getTimeType = (req, res, session) => {
-  squeries.get(session, req.params,
-    {
-      _entity_: '[timetype]',
-      _filter_: {field: 'code', variable: 'id'},
-      name: 'name',
-      id: 'id',
-      code: 'code',
-      intnames: 'intname',
-      timetype_grp: {_property_: '[ttgroup]', code: 'value'}
-    },
+  squeries.get(session, req.params, prepGetTimeType,
     (err, ret) => {
       if (err) res.status(500).end(err.message)
       else res.status(200).jsonp(ret)
@@ -352,19 +377,12 @@ const getTimeType = (req, res, session) => {
 }
 
 const postTimeType = (req, res, session) => {
-  var str = {
-    _entity_: 'timetype',
-    name: 'name',
-    code: 'code',
-    language: 'intname',
-    ttgroup: {_property_: '[ttgroup]', _op_: 'multiple'}
-  }
-  squeries.put(session, req.params, str,
+  squeries.put(session, stateService, req.params, prpPutTtype,
       req.body, (err, ret) => {
         if (err) res.status(500).end(err.message)
         else {
           res.status(200).jsonp(ret)
-          nextVersion(ret)// Notify communications
+          nextVersion(session, ret, 'timetype')// Notify communications
         }
       })
 }
@@ -403,19 +421,7 @@ const createClocking = (clocking, customer, callback) => {
       if (err) callback(err)
       else {
         if (record && record.length > 0) clocking.owner = record[0].id
-        squeries.put(session, stateService, {},
-          {
-            _inputs_: 'input',
-            tmp: 'tmp',
-            gmt: 'gmt',
-            reception: 'reception',
-            owner: 'owner',
-            source: 'source',
-            result: 'result',
-            serial: 'serial',
-            card: {_property_: 'card'},
-            record: {_property_: 'record'}
-          }, clocking, callback)
+        squeries.put(session, stateService, {}, prepPutClocking, clocking, callback)
         // inputsService.createClocking(clocking, customer, callback)
       }
     })

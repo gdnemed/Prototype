@@ -32,12 +32,6 @@ describe('API Routes', () => {
         collection.length.should.equal(0)
       })
 
-    kState.select().table('global_id')
-      .then((collection) => {
-        collection.length.should.equal(1)
-        collection[0].id.should.equal(1)
-      })
-
     done()
   })
 

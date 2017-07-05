@@ -80,13 +80,13 @@ const debugTestKnexRefs = (knexRefs) => {
 
     // testing knex ojbect that holds 'objects' db
     kObjects.select().table('entity_1')
-      .then((collection) => logM.debug('entity_ len  = ' + collection.length))
-      .catch((err) => logM.error('ERROR: in GET entity_ : ' + err))
+      .then((collection) => logM.debug('entity_1 len  = ' + collection.length))
+      .catch((err) => logM.error('ERROR: in GET entity_1 : ' + err))
 
     // testing knex ojbect that holds 'inputs' db
-    kInputs.select().table('local_id')
-      .then((collection) => logM.debug('local_id len  = ' + collection.length))
-      .catch((err) => logM.error('ERROR: in GET local_id : ' + err))
+    kInputs.select().table('input_1_201707')
+      .then((collection) => logM.debug('input_1_201707 len  = ' + collection.length))
+      .catch((err) => logM.error('ERROR: in GET input_1_201707 : ' + err))
 
     resolve()
   })
@@ -98,6 +98,8 @@ function initApiServer () {
     api = express()
     api.use(bodyParser.json())
     // API functions
+    api.post('/api/state/settings', (req, res) => manageSession(req, res, state.postSettings))
+    api.get('/api/state/settings', (req, res) => manageSession(req, res, state.getSettings))
     api.get('/api/coms/records', (req, res) => manageSession(req, res, logic.getRecords))
     api.get('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.getRecord))
     api.post('/api/coms/records', (req, res) => manageSession(req, res, logic.postRecord))
@@ -113,8 +115,6 @@ function initApiServer () {
     api.post('/api/coms/records/:id/info', (req, res) => manageSession(req, res, logic.postInfo))
     api.get('/api/coms/clockings', (req, res) => manageSession(req, res, logic.getClockings))
     api.get('/api/coms/clockings_debug', (req, res) => manageSession(req, res, logic.getClockingsDebug))
-    api.post('/api/state/settings', (req, res) => manageSession(req, res, state.postSettings))
-    api.get('/api/state/settings', (req, res) => manageSession(req, res, state.getSettings))
     api.get('/api/coms/timetypes', (req, res) => manageSession(req, res, logic.getTimeTypes))
     api.get('/api/coms/timetypes/:id', (req, res) => manageSession(req, res, logic.getTimeType))
     api.post('/api/coms/timetypes', (req, res) => manageSession(req, res, logic.postTimeType))

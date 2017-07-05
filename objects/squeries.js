@@ -599,7 +599,10 @@ const getProperFields = (str, entity, data) => {
     if (str.hasOwnProperty(p) &&
       p.charAt(0) !== '_' &&
       typeof str[p] === 'string' && data[p] !== undefined &&
-      data[p] !== null) d[str[p]] = data[p]
+      data[p] !== null) {
+      if (str[p] === 'intname') d[str[p]] = JSON.stringify(data[p])
+      else d[str[p]] = data[p]
+    }
   }
   return d
 }
@@ -628,11 +631,14 @@ Prepare str structure for future execution, adding _guide_ field, which will con
 */
 const prepareGet = (session, str) => {
   let db = session.dbs[str._inputs_ ? 'inputs' : 'objects']
-  str._guide_ = {entity_fields: {},
+  str._guide_ = {
+    entity_fields: {},
     property_fields: [],
     property_subqueries: {},
     direct_relations: [],
-    variablesMapping: []}
+    variablesMapping: [],
+    fields_to_parse: []
+  }
   let type = getType(str)
   // Get information if this is a subquery from a relation
   if (str._prefix_) {
@@ -989,6 +995,7 @@ const getFields = (str, session, forInputs) => {
         property !== '_related_') {
       } else if (typeof str[property] === 'string') {
         str._guide_.entity_fields[str[property]] = property
+        if (str[property] === 'intname') str._guide_.fields_to_parse.push(property)
       } else {
         // Properties or relations
         let type = str[property]._property_
@@ -1149,6 +1156,12 @@ const processRow = (str, rows, i, session, variables, callback) => {
                                   rows[i][r[j]] === CT.START_OF_TIME ||
                                   rows[i][r[j]] === CT.START_OF_DAYS ||
                                   rows[i][r[j]] === CT.END_OF_DAYS) delete rows[i][r[j]]
+                              }
+                              r = str._guide_.fields_to_parse
+                              for (let j = 0; j < r.length; j++) {
+                                if (rows[i][r[j]] !== undefined && rows[i][r[j]] !== null) {
+                                  rows[i][r[j]] = JSON.parse(rows[i][r[j]])
+                                }
                               }
                               // Also nulls
                               for (let p in rows[i]) {

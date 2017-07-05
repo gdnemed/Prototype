@@ -36,8 +36,10 @@ describe('Data testing process', function () {
               console.log('Sever nor responding')
               process.exit(0)
             }
-          } catch (e) {}
-          done(e)
+            done()
+          } catch (e) {
+            done(e)
+          }
         })
   })
 })

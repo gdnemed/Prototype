@@ -206,11 +206,13 @@ const processRecord = (r, yesterday, records) => {
 }
 
 const processTtype = (r, yesterday, ttypes) => {
-  let ttype = {code: r.CODE}
-  if (r.NAME && r.NAME !== '') ttype.name = r.NAME
-  if (r.LANGUAGE && r.LANGUAGE !== '') ttype.language = r.LANGUAGE
-  if (r.TTGROUP && r.TTGROUP !== '') ttype.ttgroup = [ r.TTGROUP ]
-  ttypes[ttype.code + ttype.language + ttype.ttgroup] = ttype
+  let ttype = ttypes[r.CODE]
+  if (!ttype) {
+    ttype = {code: r.CODE, text: {}}
+    ttypes[r.CODE] = ttype
+  }
+  if (r.LANGUAGE && r.LANGUAGE !== '') ttype.text[r.LANGUAGE] = r.TEXT
+  if (r.TTGROUP && r.TTGROUP !== '') ttype.ttgroup = r.TTGROUP // For the moment, only 1 group
 }
 
 const processInfo = (r, yesterday, infos) => {
