@@ -27,25 +27,25 @@ const init = (params) => {
   remoteDir = params.dir
   workDir = params.workdir
   createOutput = params.output
-  watch('RECORDS', processRecord, 'records', 'records')
-  watch('TTYPES', processTtype, 'timetypes', 'timetypes')
-  watch('INFO', processTtype, 'records/@/info', 'records/@/info')
+  watch('RECORDS', processRecord, 'records', 'records', 'records')
+  watch('TTYPES', processTtype, 'timetypes', 'timetypes', 'timetypes')
+  watch('INFO', processInfo, 'infos', 'records/@/info', 'records/@/info')
   return true
 }
 
 /*
 Watches over an import file
 */
-const watch = (importType, fJson, pathPost, pathDelete) => {
+const watch = (importType, fJson, pathGet, pathPost, pathDelete) => {
   chokidar.watch(remoteDir + '/' + importType + '.DWN', {ignored: /(^|[/\\])\../})
-    .on('add', path => moveImportFile(path, importType, fJson, pathPost, pathDelete))
+    .on('add', path => moveImportFile(path, importType, fJson, pathGet, pathPost, pathDelete))
 }
 
 /*
 Renames the original file to DWT, brings it to working directory,
 deletes the original file, and begins import process.
 */
-const moveImportFile = (path, importType, fJson, pathPost, pathDelete) => {
+const moveImportFile = (path, importType, fJson, pathGet, pathPost, pathDelete) => {
   logger.debug(path)
   if (fs.existsSync(path)) {
     let newPath = path.substring(0, path.length - 1) + 'T'
@@ -60,8 +60,8 @@ const moveImportFile = (path, importType, fJson, pathPost, pathDelete) => {
           if (createOutput) {
             let logPath = workDir + '/' + 'pending' + '/' + importType + '_' + now + '.LOG'
             let output = fs.createWriteStream(logPath)
-            output.once('open', () => importPrepare(endPath, importType, fJson, pathPost, pathDelete, output, now))
-          } else importPrepare(endPath, importType, fJson, pathPost, pathDelete, null, now)
+            output.once('open', () => importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, output, now))
+          } else importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, null, now)
         } catch (err) { logger.error(err) }
       }
     })
@@ -76,11 +76,11 @@ const outPut = (stream, message) => {
 /*
 Gets information from server, to manage total import.
 */
-const importPrepare = (path, importType, fJson, pathPost, pathDelete, output, now) => {
+const importPrepare = (path, importType, fJson, pathGet, pathPost, pathDelete, output, now) => {
   logger.info('Start of ' + importType + ' import')
   if (output) outPut(output, 'Start')
   let errMsg
-  call('GET', pathPost, null, (err, response, bodyResponse) => {
+  call('GET', pathGet, null, (err, response, bodyResponse) => {
     if (err) {
       logger.debug(err)
       errMsg = err.message
@@ -214,6 +214,18 @@ const processTtype = (r, yesterday, ttypes) => {
 }
 
 const processInfo = (r, yesterday, infos) => {
+  // ID,INFO,HEADER,TEXT,DATE
+  let info = {id: r.ID}
+  if (r.INFO && r.INFO !== '') info.name = r.INFO
+  if (r.HEADER && r.HEADER !== '') info.value = r.HEADER
+  if (r.TEXT && r.TEXT !== '') info.value += ',' + r.TEXT
+  if (r.DATE && r.DATE !== '') info.date = r.DATE
+  if (infos[info.id] == null) {
+    infos[info.id] = info
+  } else {
+    let info2 = infos[info.id]
+    info2.value += ';' + info.value
+  }
 }
 
 /*
