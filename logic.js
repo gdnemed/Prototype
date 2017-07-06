@@ -8,7 +8,7 @@ const moment = require('moment-timezone')
 const logger = require.main.require('./utils/log').getLogger('coms')
 const squeries = require.main.require('./objects/squeries')
 
-let stateService, comsService, mainModule
+let stateService, comsService, main
 
 let prepGetRecords = {
   _entity_: '[record]',
@@ -87,7 +87,7 @@ let prepGetTimeType = {
   timetype_grp: {_property_: '[ttgroup]', code: 'value'}
 }
 
-let prpPutTtype = {
+let prepPutTtype = {
   _entity_: 'timetype',
   code: 'code',
   text: 'intname',
@@ -168,51 +168,42 @@ let prepPutClocking = {
 const init = (state, coms) => {
   stateService = state
   comsService = coms
-  // if (!objectsService.prepare(prepGetRecords)) logger.error('prepGetRecords not prepared.')
+  if (!main) main = require.main.require('./lemuria')
 }
 
-const getRecords = (req, res, session) => {
-  squeries.get(session, req.params, prepGetRecords, (err, ret) => {
+const get = (req, res, session, str) => {
+  squeries.get(session, req.params, str, (err, ret) => {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
 }
 
-const getRecord = (req, res, session) => {
-  squeries.get(session, req.params, prepGetRecord, (err, ret) => {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(ret)
-  })
+const put = (req, res, session, str) => {
+  squeries.put(session,
+    stateService,
+    req.params,
+    str, req.body, (err, ret) => {
+      if (err) res.status(500).end(err.message)
+      else {
+        res.status(200).jsonp([ret])
+        nextVersion(session, [ret], str._entity_)// Notify communications
+      }
+    })
 }
 
-const postRecord = (req, res, session) => {
-  if (req.body.id) {
-    squeries.put(session,
-      stateService,
-      req.params,
-      prepPutRecords, req.body, (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else {
-          res.status(200).jsonp([ret])
-          nextVersion(session, [ret], 'record')// Notify communications
-        }
-      })
-  } else res.status(400).end()
-}
-
-const deleteRecord = (req, res, session) => {
+const del = (req, res, session, filter, entity) => {
   // First, search record real id
   squeries.get(session, req.params,
     {
-      _entity_: 'record',
+      _entity_: entity,
       id: 'id',
-      _filter_: {field: 'document', variable: 'id'}
+      _filter_: filter
     }, (err, record) => {
       if (err) res.status(500).end(err.message)
       else {
         // Now, delete
         if (record && record.length > 0) {
-          squeries.del(session, {id: record[0].id}, {_entity_: 'record'},
+          squeries.del(session, {id: record[0].id}, {_entity_: entity},
             null, (err, rows) => {
               if (err) res.status(500).end(err.message)
               else res.status(200).end()
@@ -222,22 +213,33 @@ const deleteRecord = (req, res, session) => {
     })
 }
 
-const getCards = (req, res, session) => {
-  squeries.get(session, req.params, prepGetCards, (err, ret) => {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(ret)
-  })
+const apiCall = (op, param1, param2) => {
+  return (req, res) => main.manageSession(req, res,
+    (req, res, session) => op(req, res, session, param1, param2))
 }
 
-const postCards = (req, res, session) => {
-  squeries.put(session, stateService, {},
-    prepPutCards, req.body, (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else {
-        res.status(200).end(ret)
-        nextVersion(session, ret, 'card')// Notify communications
-      }
-    })
+const initAPI = (api) => {
+  if (!main) main = require.main.require('./lemuria')
+  api.get('/api/coms/records', apiCall(get, prepGetRecords))
+  api.get('/api/coms/records/:id', apiCall(get, prepGetRecord))
+  api.post('/api/coms/records', apiCall(put, prepPutRecords))
+  api.post('/api/coms/records/:id', apiCall(put, prepPutRecords))
+  api.delete('/api/coms/records/:id', apiCall(del, {field: 'document', variable: 'id'}, 'record'))
+  api.get('/api/coms/records/:id/cards', apiCall(get, prepGetCards))
+  api.post('/api/coms/records/:id/cards', apiCall(put, prepPutCards))
+  api.get('/api/coms/records/:id/fingerprints', (req, res) => res.status(501).end())
+  api.post('/api/coms/records/:id/fingerprints', (req, res) => res.status(501).end())
+  api.post('/api/coms/records/:id/enroll', apiCall(put, prepPutEnroll))
+  api.get('/api/coms/records/:id/info', apiCall(get, prepGetInfo))
+  api.get('/api/coms/infos', apiCall(get, prepGetInfos))
+  api.post('/api/coms/records/:id/info', apiCall(put, prepPutInfo))
+  api.get('/api/coms/clockings', apiCall(get, prepGetClockings))
+  api.get('/api/coms/clockings_debug', apiCall(get, prepGetClockingsDebug))
+  api.get('/api/coms/timetypes', apiCall(get, prepGetTimeTypes))
+  api.get('/api/coms/timetypes/:id', apiCall(get, prepGetTimeType))
+  api.post('/api/coms/timetypes', apiCall(put, prepPutTtype))
+  api.post('/api/coms/timetypes/:id', apiCall(put, prepPutTtype))
+  api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
 }
 
 /*
@@ -273,30 +275,6 @@ const nextVersion = (session, obj, type) => {
     })
 }
 
-const getInfo = (req, res, session) => {
-  squeries.get(session, req.params,
-    prepGetInfo, (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(ret)
-    })
-}
-
-const getInfos = (req, res, session) => {
-  squeries.get(session, req.params, prepGetInfos,
-    (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(ret)
-    })
-}
-
-const postInfo = (req, res, session) => {
-  squeries.put(session, stateService, req.params,
-    prepPutInfo, req.body, (err, result) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).end()
-    })
-}
-
 const initTerminal = (serial, customer) => {
   let session = createSession(customer)
   squeries.get(session, {},
@@ -324,91 +302,6 @@ const initTerminal = (serial, customer) => {
     })
 }
 
-const getFingerprints = (req, res, session) => {
-  res.status(501).end()
-}
-
-const postFingerprints = (req, res, session) => {
-  res.status(501).end()
-}
-
-const postEnroll = (req, res, session) => {
-  squeries.put(session, stateService, req.params,
-      prepPutEnroll, req.body,
-      (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else {
-          res.status(200).jsonp(ret)
-          nextVersion(session, ret, 'enroll')// Notify communications
-        }
-      })
-}
-
-const getClockings = (req, res, session) => {
-  squeries.get(session, req.params, prepGetClockings,
-    (err, rows) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(rows)
-    })
-}
-
-const getClockingsDebug = (req, res, session) => {
-  squeries.get(session, req.params, prepGetClockingsDebug,
-    (err, rows) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(rows)
-    })
-}
-
-const getTimeTypes = (req, res, session) => {
-  squeries.get(session, req.params, prepGetTimeTypes,
-    (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(ret)
-    })
-}
-
-const getTimeType = (req, res, session) => {
-  squeries.get(session, req.params, prepGetTimeType,
-    (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else res.status(200).jsonp(ret)
-    })
-}
-
-const postTimeType = (req, res, session) => {
-  squeries.put(session, stateService, req.params, prpPutTtype,
-      req.body, (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else {
-          res.status(200).jsonp(ret)
-          nextVersion(session, ret, 'timetype')// Notify communications
-        }
-      })
-}
-
-const deleteTimeType = (req, res, session) => {
-  // First, search time type real id
-  squeries.get(session, req.params,
-    {
-      _entity_: 'timetype',
-      id: 'id',
-      _filter_: {field: 'code', variable: 'id'}
-    }, (err, record) => {
-      if (err) res.status(500).end(err.message)
-      else {
-        // Now, delete
-        if (record && record.length > 0) {
-          squeries.del(session, {id: record[0].id}, {_entity_: 'timetype'},
-            null, (err, rows) => {
-              if (err) res.status(500).end(err.message)
-              else res.status(200).end()
-            })
-        } else res.status(404).end()
-      }
-    })
-}
-
 const createClocking = (clocking, customer, callback) => {
   let session = createSession(customer)
   // Find the owner
@@ -428,12 +321,11 @@ const createClocking = (clocking, customer, callback) => {
 }
 
 const createSession = (customer) => {
-  if (!mainModule) mainModule = require.main.require('./lemuria')
   let ts = new Date().getTime()
   let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
   let session = {
     name: customer,
-    dbs: mainModule.getDatabases(customer),
+    dbs: main.getDatabases(customer),
     now: parseInt(now),
     today: parseInt(now.substring(0, 8))
   }
@@ -458,25 +350,8 @@ const getPendingRegisters = (tab, tv, customer, node, serial) => {
 
 module.exports = {
   init: init,
-  getRecords: getRecords,
-  getRecord: getRecord,
-  postRecord: postRecord,
-  deleteRecord: deleteRecord,
-  getCards: getCards,
-  postCards: postCards,
-  getInfo: getInfo,
-  getInfos: getInfos,
-  postInfo: postInfo,
-  postEnroll: postEnroll,
-  getClockings: getClockings,
-  getClockingsDebug: getClockingsDebug,
+  initAPI: initAPI,
   initTerminal: initTerminal,
-  getFingerprints: getFingerprints,
-  postFingerprints: postFingerprints,
   createClocking: createClocking,
-  getPendingRegisters: getPendingRegisters,
-  getTimeTypes: getTimeTypes,
-  getTimeType: getTimeType,
-  postTimeType: postTimeType,
-  deleteTimeType: deleteTimeType
+  getPendingRegisters: getPendingRegisters
 }

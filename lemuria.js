@@ -100,26 +100,7 @@ function initApiServer () {
     // API functions
     api.post('/api/state/settings', (req, res) => manageSession(req, res, state.postSettings))
     api.get('/api/state/settings', (req, res) => manageSession(req, res, state.getSettings))
-    api.get('/api/coms/records', (req, res) => manageSession(req, res, logic.getRecords))
-    api.get('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.getRecord))
-    api.post('/api/coms/records', (req, res) => manageSession(req, res, logic.postRecord))
-    api.post('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.postRecord))
-    api.delete('/api/coms/records/:id', (req, res) => manageSession(req, res, logic.deleteRecord))
-    api.get('/api/coms/records/:id/cards', (req, res) => manageSession(req, res, logic.getCards))
-    api.post('/api/coms/records/:id/cards', (req, res) => manageSession(req, res, logic.postCards))
-    api.get('/api/coms/records/:id/fingerprints', (req, res) => manageSession(req, res, logic.getFingerprints))
-    api.post('/api/coms/records/:id/fingerprints', (req, res) => manageSession(req, res, logic.postFingerprints))
-    api.post('/api/coms/records/:id/enroll', (req, res) => manageSession(req, res, logic.postEnroll))
-    api.get('/api/coms/records/:id/info', (req, res) => manageSession(req, res, logic.getInfo))
-    api.get('/api/coms/infos', (req, res) => manageSession(req, res, logic.getInfos))
-    api.post('/api/coms/records/:id/info', (req, res) => manageSession(req, res, logic.postInfo))
-    api.get('/api/coms/clockings', (req, res) => manageSession(req, res, logic.getClockings))
-    api.get('/api/coms/clockings_debug', (req, res) => manageSession(req, res, logic.getClockingsDebug))
-    api.get('/api/coms/timetypes', (req, res) => manageSession(req, res, logic.getTimeTypes))
-    api.get('/api/coms/timetypes/:id', (req, res) => manageSession(req, res, logic.getTimeType))
-    api.post('/api/coms/timetypes', (req, res) => manageSession(req, res, logic.postTimeType))
-    api.post('/api/coms/timetypes/:id', (req, res) => manageSession(req, res, logic.postTimeType))
-    api.delete('/api/coms/timetypes/:id', (req, res) => manageSession(req, res, logic.deleteTimeType))
+    logic.initAPI(api)
     // Run http server
     httpServer = api.listen(environment.api_listen.port, (err) => {
       if (err) reject(err)
@@ -200,7 +181,8 @@ function serviceFunctions (args) {
 }
 
 module.exports = {
-  getDatabases: getDatabases
+  getDatabases: getDatabases,
+  manageSession: manageSession
 }
 
 // Start Lemuria

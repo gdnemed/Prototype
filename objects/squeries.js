@@ -423,9 +423,9 @@ const putProperty = (property, entry, params, l, i) => {
     let t1, t2
     for (let prop in params.str[entry]) {
       if (params.str[entry].hasOwnProperty(prop)) {
-        if (params.str[entry][prop] === 'value') val = params.data[prop]
-        else if (params.entity && params.str[entry][prop] === 't1') t1 = params.data[prop]
-        else if (params.entity && params.str[entry][prop] === 't2') t2 = params.data[prop]
+        if (params.str[entry][prop] === 'value') val = params.data[entry][prop]
+        else if (params.entity && params.str[entry][prop] === 't1') t1 = params.data[entry][prop]
+        else if (params.entity && params.str[entry][prop] === 't2') t2 = params.data[entry][prop]
       }
     }
     let db = params.session.dbs[params.entity ? 'objects' : 'inputs']

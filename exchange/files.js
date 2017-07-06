@@ -171,6 +171,8 @@ const processRecord = (r, yesterday, records) => {
     record.validity = {} // For the moment, only 1
     if (r.START && r.START !== '') record.validity.start = r.START
     if (r.END && r.END !== '') record.validity.end = r.END
+  } else if (r.START === '' && r.END === '') {
+    record.validity = {}
   }
   if (r.CARD) {
     record.card = {code: r.CARD} // [{code: r.CARD}] For the moment, only 1
@@ -254,7 +256,7 @@ const sendOrder = (l, i, apiPath, elemsToDelete, output, nObjects, nErrors, call
     if (elemsToDelete['ID' + id]) delete elemsToDelete['ID' + id]
     // Add item id
     let pos = apiPath.indexOf('@')
-    let url = pos < 0 ? apiPath + '/' + id
+    let url = pos < 0 ? apiPath // + '/' + id More general to put id in body
     : apiPath.substring(0, pos) + l[i].id + apiPath.substr(pos + 1)
     logger.debug('call ' + url)
     nObjects++
@@ -266,7 +268,11 @@ const sendOrder = (l, i, apiPath, elemsToDelete, output, nObjects, nErrors, call
       } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
         let msg = 'Error ' + response.statusCode + ' : ' + bodyResponse
         logger.debug(msg)
-        if (output) outPut(output, msg)
+        if (output) {
+          outPut(output, msg)
+          outPut(output, url)
+          outPut(output, JSON.stringify(r))
+        }
         nErrors++
       }
       sendOrder(l, i + 1, apiPath, elemsToDelete, output, nObjects, nErrors, callback)
@@ -312,10 +318,10 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
 
     // Add item id
     let pos = apiPath.indexOf('@')
-    let url = pos < 0 ? apiPath + '/' + l[i].id
-    : apiPath.substring(0, pos) + l[i].id + apiPath.substr(pos + 1)
+    let url = pos < 0 ? apiPath + '/' + l[i]
+    : apiPath.substring(0, pos) + l[i] + apiPath.substr(pos + 1)
 
-    call('DELETE', url, l[i], (err) => {
+    call('DELETE', url, null, (err) => {
       if (err) {
         logger.debug(err)
         if (output) output.print(err)
