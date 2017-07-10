@@ -1,8 +1,9 @@
 exports.up = function (knex) {
   return knex.schema
     .createTable('settings', (table) => {
-      table.string('var')
-      table.string('code')
+      table.string('setting')
+      table.string('value')
+      table.index(['setting'], 'i_setting')
     })
 }
 

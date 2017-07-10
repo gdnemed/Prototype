@@ -266,7 +266,8 @@ const nextVersion = (session, obj, type) => {
             for (let i = 0; i < card.length; i++) {
               if (ret.code) {
                 comsService.globalSend('record_insert', {records: {id: parseInt(ret.code)}})
-                comsService.globalSend('card_insert', {cards: {card: card[i].code, id: parseInt(ret.code)}})
+                comsService.globalSend('card_insert', {cards: [{card: card[i].code, id: parseInt(ret.code)}]})
+                comsService.globalPush()
               }
             }
           }
@@ -294,6 +295,7 @@ const initTerminal = (serial, customer) => {
               for (let j = 0; j < card.length; j++) {
                 let e = {card: card[j].code, id: parseInt(ret[i].code)}
                 comsService.send(serial, 'card_insert', {cards: [e]})
+                comsService.globalPush()
               }
             }
           }

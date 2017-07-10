@@ -9,6 +9,12 @@ exports.up = (knex, Promise) => {
       table.string('intname')
       table.string('document')
       table.string('code')
+      table.index(['id'], 'id')
+      table.index(['type', 'name'], 'i_tname')
+      table.index(['type', 'name2'], 'i_tname2')
+      table.index(['type', 'name', 'name2'], 'i_tnamec')
+      table.index(['type', 'code'], 'i_tcode')
+      table.index(['type', 'document'], 'i_tdocument')
     })
     .createTable('property_num_1', (table) => {
       table.integer('entity')
@@ -16,6 +22,8 @@ exports.up = (knex, Promise) => {
       table.integer('t1')
       table.integer('t2')
       table.integer('value')
+      table.index(['property', 'entity', 't1', 't2'], 'i_pn_pe')
+      table.index(['property', 'value', 't1', 't2'], 'i_pn_pv')
     })
     .createTable('property_str_1', (table) => {
       table.integer('entity')
@@ -23,6 +31,8 @@ exports.up = (knex, Promise) => {
       table.integer('t1')
       table.integer('t2')
       table.string('value')
+      table.index(['property', 'entity', 't1', 't2'], 'i_ps_pe')
+      table.index(['property', 'value', 't1', 't2'], 'i_ps_pv')
     })
     .createTable('property_bin_1', (table) => {
       table.integer('entity')
@@ -30,6 +40,7 @@ exports.up = (knex, Promise) => {
       table.integer('t1')
       table.integer('t2')
       table.binary('value')
+      table.index(['property', 'entity', 't1', 't2'], 'i_pb_pe')
     })
     .createTable('relation_1', (table) => {
       table.string('relation')
@@ -39,6 +50,8 @@ exports.up = (knex, Promise) => {
       table.integer('t2')
       table.integer('ord')
       table.integer('node')
+      table.index(['relation', 'id1'], 'i_r1')
+      table.index(['relation', 'id2'], 'i_r2')
     })
 }
 
@@ -50,41 +63,3 @@ exports.down = function (knex, Promise) {
     .dropTableIfExists('property_bin_1')
     .dropTableIfExists('relation_1')
 }
-
-/* Comentari per tenir la creació antiga amb els índexos
- function initDB (customer) {
- var db = utilsDb.createDatabase(customer, 'objects', nodeId)
-
- db.run('CREATE TABLE if not exists entity_' + nodeId +
- ' (id integer, type text, name text, name2 text, intname text, document text, code text)', [], function () {
- db.run('CREATE UNIQUE INDEX if not exists i_entity_' + nodeId + '_id on entity_' + nodeId + ' (id)')
- db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_code on entity_' + nodeId + ' (type,code)', resSQL)
- db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_name on entity_' + nodeId + ' (type,name)', resSQL)
- db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_nc on entity_' + nodeId + ' (type,name,name2)', resSQL)
- db.run('CREATE INDEX if not exists i_entity_' + nodeId + '_document on entity_' + nodeId + ' (type,document)', resSQL)
- })
- db.run('CREATE TABLE if not exists property_num_' + nodeId +
- ' (entity integer, property text, t1 integer, t2 integer, value integer)', [], function () {
- db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pe on property_num_' + nodeId + ' (entity,property,t1,t2)', resSQL)
- db.run('CREATE INDEX if not exists i_property_num_' + nodeId + '_pv on property_num_' + nodeId + ' (value,property,t1,t2)', resSQL)
- })
-
- db.run('CREATE TABLE if not exists property_str_' + nodeId +
- ' (entity integer, property text, t1 integer, t2 integer, value text)', [], function () {
- db.run('CREATE INDEX if not exists i_property_str_' + nodeId + '_pe on property_str_' + nodeId + ' (entity,property,t1,t2)', resSQL)
- db.run('CREATE INDEX if not exists i_property_str_' + nodeId + '_pv on property_str_' + nodeId + ' (value,property,t1,t2)', resSQL)
- })
-
- db.run('CREATE TABLE if not exists property_bin_' + nodeId +
- ' (entity integer, property text, t1 integer, t2 integer, value blob)', [], function () {
- db.run('CREATE INDEX if not exists i_property_bin_' + nodeId + '_pe on property_bin_' + nodeId + ' (entity,property,t1,t2)', resSQL)
- })
-
- db.run('CREATE TABLE if not exists relation_' + nodeId +
- ' (relation text, id1 integer, id2 integer, t1 integer, t2 integer, ord integer, node integer)', [], function () {
- db.run('CREATE INDEX if not exists i_relation_' + nodeId + '_r1 on relation_' + nodeId + ' (relation,id1)')
- db.run('CREATE INDEX if not exists i_relation_' + nodeId + '_r2 on relation_' + nodeId + ' (relation,id2)')
- })
- return db
- }
- */

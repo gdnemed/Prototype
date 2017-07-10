@@ -31,7 +31,10 @@ const init = (listen, logic) => {
 }
 
 const listenFunction = (socket) => {
-  var info = {name: socket.remoteAddress + ':' + socket.remotePort}
+  var info = {
+    name: socket.remoteAddress + ':' + socket.remotePort,
+    queue: []
+  }
   logger.debug('connection from ' + info.name)
   socket.specInfo = info
 
@@ -97,7 +100,7 @@ const receive = (dataBuffer, socket) => {
 
     var data = msgpack.decode(b)
     data.seq = s
-    logger.trace('socket ' + info.name)
+    logger.trace('<- socket ' + info.name)
     logger.trace(data)
     // each type of terminal, needs its own processing
     switch (info.type) {
@@ -142,6 +145,21 @@ const globalSend = (command, data) => {
     if (clients.hasOwnProperty(property)) {
       var socket = clients[property]
       if (socket.specInfo.identified) sendData(socket, command, data)
+    }
+  }
+}
+
+const globalPush = () => {
+  for (var property in clients) {
+    if (clients.hasOwnProperty(property)) {
+      var socket = clients[property]
+      if (socket.specInfo.identified) {
+        switch (socket.specInfo.type) {
+          case 'idSense':
+            idsense.pushQueue(socket)
+            break
+        }
+      }
     }
   }
 }
@@ -202,6 +220,7 @@ module.exports = {
 
   init: init,
   send: send,
-  globalSend: globalSend
+  globalSend: globalSend,
+  globalPush: globalPush
 
 }

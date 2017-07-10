@@ -25,7 +25,7 @@ const init = () => {
   else {
     // Run it as a program
     initConfiguration()
-    migrations.init().then((knexRefs) => {
+    migrations.init('sqlite', 'SPEC', '2017').then((knexRefs) => {
       debugTestKnexRefs(knexRefs)
         .then(initApiServer())
         .then(initServices())

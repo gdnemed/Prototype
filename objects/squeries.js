@@ -120,7 +120,7 @@ const del = (session, variables, str, data, callback) => {
                   .then((count) => {
                     db('entity_' + nodeId).where('id', id).delete()
                       .then((count) => {
-                        callback(null,count)
+                        callback(null, count)
                       })
                       .catch((err) => callback(err))
                   })
@@ -491,7 +491,6 @@ const putRelation = (relationDef, entry, params, l, i) => {
     isArray = true
     relationDef = relationDef.substring(1, relationDef.length - 1)
   }
-  let relation, entity, t1, t2
   let arrow = relationDef.indexOf('->')
   let forward
   if (arrow >= 0) forward = true
@@ -503,11 +502,24 @@ const putRelation = (relationDef, entry, params, l, i) => {
       return
     }
   }
+  let relation, entity
   relation = relationDef.substring(0, arrow)
   entity = relationDef.substring(arrow + 2)
+  putElemRelation(entry, relation, entity, forward, isArray, 0, l, i, params)
+}
+
+/*
+Treats every single element related with the main entity to put
+*/
+const putElemRelation = (entry, relation, entity, forward, isArray, n, l, i, params) => {
+  /* if (isArray && n >= params.data[entry].length) {
+    subput(l, i + 1, params)
+    return
+  } */
   let newStr = {_entity_: entity}
   let relObj = params.str[entry]
-  let relData = params.data[entry]
+  let relData = /* isArray ? params.data[entry][n] : */ params.data[entry]
+  let t1, t2
   for (let p in relObj) {
     if (relObj.hasOwnProperty(p)) {
       switch (p) {
@@ -565,13 +577,19 @@ const putRelation = (relationDef, entry, params, l, i) => {
           .where('relation', relation)
         if (params.entity) s.where(forward ? 'id1' : 'id2', params.id) // entity
         else s.where('id', params.id) // input
-        s.then((rows) => modifyRelation(rows, db, r, table, relation, forward, isArray, params, l, i))
+        s.then((rows) => {
+          modifyRelation(rows, db, r, table, relation, forward, isArray, params, l, i, (err) => {
+            if (err) params.callback(err)
+            /* else if (isArray) putElemRelation(entry, relation, entity, forward, isArray, n + 1, l, i, params)
+            */else subput(l, i + 1, params)
+          })
+        })
           .catch((err) => params.callback(err))
       }
     })
 }
 
-const modifyRelation = (rows, db, r, table, relation, forward, isArray, params, l, i) => {
+const modifyRelation = (rows, db, r, table, relation, forward, isArray, params, l, i, callback) => {
   if (rows.length === 0) {
     // Insert relation
     db(table).insert(r).then((rowid) => {
@@ -579,15 +597,19 @@ const modifyRelation = (rows, db, r, table, relation, forward, isArray, params, 
       subput(l, i + 1, params)
     })
       .catch((err) => params.callback(err))
+  } if (rows.length > 1) {
+    historicModifier(rows, r, relation, forward, table, db, (err) => {
+      if (err) params.callback(err)
+      else subput(l, i + 1, params) // Next relation/property
+    })
   } else {
-    // TODO: if (isArray) ... Historical modifier
-    // Update current relation
+    // Only 1 register: Update current relation
     let u = db(table).where('relation', relation)
     if (params.entity) u.where(forward ? 'id1' : 'id2', params.id)
     else u.where('id', params.id)
     u.update(r).then((count) => {
-      // Next relation/property
-      subput(l, i + 1, params)
+      /* if (isArray) callback()
+      else */ subput(l, i + 1, params) // Next relation/property
     })
       .catch((err) => params.callback(err))
   }
@@ -1356,6 +1378,33 @@ const executePropertySq = (str, type, rows, i, execution, callback) => {
     .catch((err) => callback(err))
     execution.change = true
   } else callback()
+}
+
+/*
+Modifies historical lists of a relation (rows), inserting the new element r.
+ params.id contains the id of the entity to modify.
+ */
+const historicModifier = (rows, r, relation, forward, table, db, callback) => {
+  for (let i = 0; i < rows.length; i++) {
+    let e = rows[i]
+    // Work only if there is common time
+    if (e.t1 <= r.t2 && e.t2 >= r.t1) {
+      if (r.t1 > e.t1 && r.t2 < e.t2) {
+        // e  ............................
+        // r        .................
+      } else if (r.t1 < e.t1 && r.t2 > e.t2) {
+        // e        .................
+        // r  ............................
+      } else if (r.t2 <= e.t2 && r.t2 >= e.t1) {
+        // e        .................
+        // r  ...............
+      } else if (r.t1 <= e.t2 && r.t1 >= e.t1) {
+        // e  ...............
+        // r        .................
+      }
+    }
+  }
+  callback()
 }
 
 module.exports = {
