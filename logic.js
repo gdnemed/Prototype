@@ -7,6 +7,7 @@
 const moment = require('moment-timezone')
 const logger = require.main.require('./utils/log').getLogger('coms')
 const squeries = require.main.require('./objects/squeries')
+const CT = require.main.require('./CT')
 
 let stateService, comsService, main
 
@@ -39,8 +40,8 @@ let prepPutRecords = {
   id: 'document',
   code: 'code',
   language: {_property_: 'language'},
-  timetype_grp: {_property_: 'ttgroup', code: 'value', start: 't1', end: 't2'},
-  validity: {_property_: 'validity', start: 't1', end: 't2'},
+  timetype_grp: {_property_: '[ttgroup]', code: 'value', start: 't1', end: 't2'},
+  validity: {_property_: '[validity]', start: 't1', end: 't2'},
   card: {
     _relation_: '[identifies<-card]',
     code: 'code',
@@ -182,7 +183,7 @@ const put = (req, res, session, str) => {
   squeries.put(session,
     stateService,
     req.params,
-    str, req.body, (err, ret) => {
+    str, req.body, extraTreatment, (err, ret) => {
       if (err) res.status(500).end(err.message)
       else {
         res.status(200).jsonp([ret])
@@ -204,7 +205,7 @@ const del = (req, res, session, filter, entity) => {
         // Now, delete
         if (record && record.length > 0) {
           squeries.del(session, {id: record[0].id}, {_entity_: entity},
-            null, (err, rows) => {
+            extraTreatment, (err, rows) => {
               if (err) res.status(500).end(err.message)
               else res.status(200).end()
             })
@@ -243,33 +244,81 @@ const initAPI = (api) => {
 }
 
 /*
+Treatment for revision control and drop flag.
+*/
+const extraTreatment = (session, id, isInsert, isDelete, callback) => {
+  let db = session.dbs['objects']
+  let vc = {property: 'revision', entity: id, value: 1, t1: CT.START_OF_TIME, t2: CT.END_OF_TIME}
+  let ts = new Date().getTime()
+  let now = moment.tz(ts, 'GMT').format('YYYYMMDD')
+  let day = parseInt(now)
+  let d = {property: 'drop', entity: id, value: day, t1: CT.START_OF_TIME, t2: CT.END_OF_TIME}
+  if (isInsert) {
+    db.insert(vc).into('property_num_1').then((rowid) => {
+      d.value = 0
+      db.insert(d).into('property_num_1').then((rowid) => callback(null, id))
+      .catch((err) => callback(err))
+    })
+    .catch((err) => callback(err))
+  } else if (isDelete) {
+    db('property_num_1').increment('value', 1)
+      .where('entity', id).where('property', 'revision')
+      .then((rowid) => {
+        db('property_num_1').where('entity', id).where('property', 'drop')
+          .then((rowid) => callback(null, id))
+          .catch((err) => callback(err))
+      })
+      .catch((err) => callback(err))
+  } else { // Update: increment revision and set drop = 0
+    db('property_num_1').increment('value', 1)
+      .where('entity', id).where('property', 'revision')
+      .then((rowid) => {
+        d.value = 0
+        db('property_num_1').where('entity', id).where('property', 'drop')
+          .update(d)
+          .then((rowid) => {
+            callback(null, id)
+          })
+          .catch((err) => callback(err))
+      })
+      .catch((err) => callback(err))
+  }
+}
+
+/*
 Indicates something has changed, so the terminals should be updated
 */
 const nextVersion = (session, obj, type) => {
-  logger.debug('nextVersion')
-  logger.debug(obj)
+  // logger.debug('nextVersion')
+  // logger.debug(obj)
   if (type !== 'record') return
+  // Get current object state in database
   squeries.get(session, {id: obj[0]},
     {
       _entity_: 'record',
       _filter_: {field: 'id', variable: 'id'},
       code: 'code',
+      version: {_property_: 'revision'},
+      drop: {_property_: 'drop'},
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
     },
     (err, ret) => {
       if (err) logger.error(err)
       else {
-        logger.debug(ret)
+        let code = parseInt(ret.code)
+        let cardList
         if (ret) {
-          let card = ret.card
-          if (card) {
-            for (let i = 0; i < card.length; i++) {
+          logger.debug(ret)
+          cardList = ret.card
+          if (cardList) {
+            for (let i = 0; i < cardList.length; i++) {
               if (ret.code) {
-                comsService.globalSend('record_insert', {records: {id: parseInt(ret.code)}})
-                comsService.globalSend('card_insert', {cards: [{card: card[i].code, id: parseInt(ret.code)}]})
-                comsService.globalPush()
+                comsService.globalSend('record_insert', {records: {id: code}})
+                comsService.globalSend('card_insert', {cards: [{card: cardList[i].code, id: code}]})
               }
             }
+          } else {
+            comsService.globalSend('record_delete', {records: {id: code}})
           }
         }
       }
@@ -295,7 +344,6 @@ const initTerminal = (serial, customer) => {
               for (let j = 0; j < card.length; j++) {
                 let e = {card: card[j].code, id: parseInt(ret[i].code)}
                 comsService.send(serial, 'card_insert', {cards: [e]})
-                comsService.globalPush()
               }
             }
           }

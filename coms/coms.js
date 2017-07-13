@@ -33,7 +33,8 @@ const init = (listen, logic) => {
 const listenFunction = (socket) => {
   var info = {
     name: socket.remoteAddress + ':' + socket.remotePort,
-    queue: []
+    queue: [],
+    ackCount: 0
   }
   logger.debug('connection from ' + info.name)
   socket.specInfo = info
@@ -149,21 +150,6 @@ const globalSend = (command, data) => {
   }
 }
 
-const globalPush = () => {
-  for (var property in clients) {
-    if (clients.hasOwnProperty(property)) {
-      var socket = clients[property]
-      if (socket.specInfo.identified) {
-        switch (socket.specInfo.type) {
-          case 'idSense':
-            idsense.pushQueue(socket)
-            break
-        }
-      }
-    }
-  }
-}
-
 const send = (serial, command, data) => {
   var socket = clients['id' + serial]
   if (socket) {
@@ -220,7 +206,6 @@ module.exports = {
 
   init: init,
   send: send,
-  globalSend: globalSend,
-  globalPush: globalPush
+  globalSend: globalSend
 
 }

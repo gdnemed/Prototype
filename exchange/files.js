@@ -168,21 +168,21 @@ const processRecord = (r, yesterday, records) => {
   if (r.NAME && r.NAME !== '') record.name = r.NAME
   if (r.LANGUAGE && r.LANGUAGE !== '') record.language = r.LANGUAGE
   if ((r.START && r.START !== '') || (r.END && r.END !== '')) {
-    record.validity = {} // For the moment, only 1
-    if (r.START && r.START !== '') record.validity.start = r.START
-    if (r.END && r.END !== '') record.validity.end = r.END
+    record.validity = [{}]
+    if (r.START && r.START !== '') record.validity[0].start = r.START
+    if (r.END && r.END !== '') record.validity[0].end = r.END
   } else if (r.START === '' && r.END === '') {
-    record.validity = {}
+    record.validity = [{}]
   }
   if (r.CARD) {
-    record.card = {code: r.CARD} // [{code: r.CARD}] For the moment, only 1
-    if (record.validity && record.validity.start) record.card.start = record.validity.start
-    if (record.validity && record.validity.end) record.card.end = record.validity.end
+    record.card = [{code: r.CARD}]
+    if (record.validity && record.validity[0].start) record.card[0].start = record.validity[0].start
+    if (record.validity && record.validity[0].end) record.card[0].end = record.validity[0].end
   }
   if (r.TTGROUP) {
-    record.timetype_grp = {code: r.TTGROUP} // [{code: r.TTGROUP}] For the moment, only 1
-    if (record.validity && record.validity.start) record.timetype_grp.start = record.validity.start
-    if (record.validity && record.validity.end) record.timetype_grp.end = record.validity.end
+    record.timetype_grp = [{code: r.TTGROUP}]
+    if (record.validity && record.validity[0].start) record.timetype_grp[0].start = record.validity[0].start
+    if (record.validity && record.validity[0].end) record.timetype_grp[0].end = record.validity[0].end
   }
 
   let id = 'ID' + r.ID
@@ -196,13 +196,9 @@ const processRecord = (r, yesterday, records) => {
       if (first.card) first.card.push(record.card[0])
       else first.card = record.card
     }
-    if (record.ttgroup) {
-      if (first.ttgroup) first.ttgroup.push(record.ttgroup[0])
-      else first.ttgroup = record.ttgroup
-    }
-    if (record.validity) {
-      if (first.validity) first.validity.push(record.ttgroup[0])
-      else first.validity = record.validity
+    if (record.timetype_grp) {
+      if (first.timetype_grp) first.timetype_grp.push(record.timetype_grp[0])
+      else first.timetype_grp = record.timetype_grp
     }
   } else records[id] = record
 }
@@ -324,7 +320,7 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
     call('DELETE', url, null, (err) => {
       if (err) {
         logger.debug(err)
-        if (output) output.print(err)
+        if (output) outPut(output, err)
       }
       deleteOrder(l, i + 1, apiPath, output, callback)
     })

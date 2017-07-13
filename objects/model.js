@@ -16,6 +16,8 @@ const PROPERTIES = {
   'enroll': {type: 'num', time: true},
   'validity': {type: 'num', time: false},
   'ttgroup': {type: 'str', time: false},
+  'revision': {type: 'num', time: false},
+  'drop': {type: 'num', time: false},
   'card': {type: 'str'},
   'record': {type: 'str'}
 }

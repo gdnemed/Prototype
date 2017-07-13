@@ -4,6 +4,7 @@
 
 const MODEL = require('./model')
 const CT = require.main.require('./CT')
+const utils = require.main.require('./utils/utils')
 const logger = require.main.require('./utils/log').getLogger('db')
 
 let nodeId = 1
@@ -38,7 +39,7 @@ const get = (session, variables, str, callback) => {
  -data: Data to insert
  -callback: Callback function
  */
-const put = (session, stateService, variables, str, data, callback) => {
+const put = (session, stateService, variables, str, data, extraFunction, callback) => {
   let e = str._entity_
   if (e) {
     // Create keys structure, which maps fields to values
@@ -59,6 +60,7 @@ const put = (session, stateService, variables, str, data, callback) => {
             data: data,
             variables: variables,
             stateService: stateService,
+            extraFunction: extraFunction,
             callback: (err, idPut) => release(session, e, stateService, callback, err, idPut)
           }
           if (id) executeUpdate(params)
@@ -100,7 +102,7 @@ const put = (session, stateService, variables, str, data, callback) => {
 /*
 Generic delete function
  */
-const del = (session, variables, str, data, callback) => {
+const del = (session, variables, str, data, extraFunction, callback) => {
   let id = variables.id
   if (!id) {
     callback(new Error('No id defined'))
@@ -120,7 +122,8 @@ const del = (session, variables, str, data, callback) => {
                   .then((count) => {
                     db('entity_' + nodeId).where('id', id).delete()
                       .then((count) => {
-                        callback(null, count)
+                        if (extraFunction) extraFunction(session, id, false, true, callback)
+                        else callback(null, count)
                       })
                       .catch((err) => callback(err))
                   })
@@ -310,7 +313,11 @@ const executeInsert = (params) => {
       let f = params.callback
       params.callback = (err) => {
         if (err) f(new Error(`${params.entity} inserted with id ${params.id}, but errors found: ${err}`))
-        else f(null, params.id)
+        else {
+          // If extra treatment, call function. If not, just callback
+          if (params.extraFunction) params.extraFunction(params.session, params.id, true, false, f)
+          else f(null, params.id)
+        }
       }
       subPuts(params)
     })
@@ -341,7 +348,11 @@ const executeUpdate = (params) => {
       let f = params.callback
       params.callback = (err) => {
         if (err) f(new Error(`${count} ${params.entity} updated, but errors found: ${err}`))
-        else f(null, params.id)
+        else {
+          // If extra treatment, call function. If not, just callback
+          if (params.extraFunction) params.extraFunction(params.session, params.id, false, false, f)
+          else f(null, params.id)
+        }
       }
       subPuts(params)
     })
@@ -404,6 +415,8 @@ const subput = (l, i, params) => {
     params.callback()
   } else {
     if (params.str[l[i]]._property_) {
+      // PER PROVES, DESCOMENTAR
+      subput(l, i + 1, params)
       putProperty(params.str[l[i]]._property_, l[i], params, l, i)
     } else if (params.str[l[i]]._relation_) {
       putRelation(params.str[l[i]]._relation_, l[i], params, l, i)
@@ -417,67 +430,101 @@ Inserts or updates a property for an entity
 - f: Callback function
  */
 const putProperty = (property, entry, params, l, i) => {
+  let isArray = false
+  if (property.charAt(0) === '[') {
+    isArray = true
+    property = property.substring(1, property.length - 1)
+  }
   let modelProperty = MODEL.PROPERTIES[property]
-  if (modelProperty) {
-    let val = params.data[entry]
-    let t1, t2
-    for (let prop in params.str[entry]) {
-      if (params.str[entry].hasOwnProperty(prop)) {
-        if (params.str[entry][prop] === 'value') val = params.data[entry][prop]
-        else if (params.entity && params.str[entry][prop] === 't1') t1 = params.data[entry][prop]
-        else if (params.entity && params.str[entry][prop] === 't2') t2 = params.data[entry][prop]
+  if (!modelProperty) {
+    params.callback(`${property} property does not exist`)
+    return
+  }
+  let propObj = params.str[entry]
+  let propDataList = isArray ? params.data[entry] : [params.data[entry]]
+  if (propObj._total_) prepareTotalHistoric(propDataList)
+  putElemProperty(property, modelProperty, propObj, propDataList, 0, l, i, params)
+}
+
+const putElemProperty = (property, modelProperty, propObj, propDataList, n, l, i, params) => {
+  if (n >= propDataList.length) subput(l, i + 1, params)
+  else {
+    let elem = propDataList[n]
+    let r = {property: property}
+    for (let p in propObj) {
+      if (propObj.hasOwnProperty(p)) {
+        if (propObj[p] === 't1') {
+          if (propObj[p]) r.t1 = typeof elem[p] === 'string' ? parseInt(elem[p]) : elem[p]
+        } else if (propObj[p] === 't2') {
+          if (propObj[p]) r.t2 = typeof elem[p] === 'string' ? parseInt(elem[p]) : elem[p]
+        } else if (propObj[p] === 'value') r.value = elem[p]
       }
     }
+    if (typeof elem === 'string' || typeof elem === 'number') r.value = elem
+    // For entities (not inputs), time counts
+    if (params.entity) {
+      r.entity = params.id
+      if (!r.t1) r.t1 = modelProperty.time ? CT.START_OF_TIME : CT.START_OF_DAYS
+      if (!r.t2) r.t2 = modelProperty.time ? CT.END_OF_TIME : CT.END_OF_DAYS
+    } else {
+      // Input
+      r.id = params.id
+    }
+
     let db = params.session.dbs[params.entity ? 'objects' : 'inputs']
     let table = params.entity ? `property_${modelProperty.type}_${nodeId}`
       : `input_data_${modelProperty.type}_${nodeId}_${params.period}`
     let s = db.from(table)
       .where(params.entity ? 'entity' : 'id', params.id).where('property', property)
     s.then((rows) => {
-      if (rows.length === 0) {
-        // No previous value: insert
-        let p
-        if (params.entity) { // Entity property
-          p = {
-            entity: params.id,
-            property: property,
-            value: val
-          }
-          if (t1) p.t1 = t1
-          else p.t1 = modelProperty.time ? CT.START_OF_TIME : CT.START_OF_DAYS
-          if (t2) p.t2 = t2
-          else p.t2 = modelProperty.time ? CT.END_OF_TIME : CT.END_OF_DAYS
-        } else { // Input property
-          p = {
-            id: params.id,
-            property: property,
-            value: val
-          }
-        }
-        db(table).insert(p)
-          .then((count) => subput(l, i + 1, params))
-          .catch((err) => params.callback(err))
+      if (params.entity) {
+        historicModifier(rows, r, table, db, (err) => {
+          if (err) params.callback(err)
+          else putElemProperty(property, modelProperty, propObj, propDataList, n + 1, l, i, params)
+        })
       } else {
-        // If null value, it's a delete
-        if (val == null) {
-          db(table)
-            .where(params.entity ? 'entity' : 'id', params.id).where('property', property).delete()
-            .then((count) => subput(l, i + 1, params))
+        // Inputs properties
+        if (rows.length === 0) {
+          db(table).insert(r)
+            .then((count) => putElemProperty(property, modelProperty, propObj, propDataList, n + 1, l, i, params))
             .catch((err) => params.callback(err))
         } else {
-          // Update current value
-          let p = {value: val}
-          if (t1) p.t1 = t1
-          if (!t2) p.t2 = t2
           db(table)
-            .where(params.entity ? 'entity' : 'id', params.id).where('property', property).update(p)
-            .then((count) => subput(l, i + 1, params))
+            .where('id', params.id).where('property', property).update(r)
+            .then((count) => putElemProperty(property, modelProperty, propObj, propDataList, n + 1, l, i, params))
             .catch((err) => params.callback(err))
         }
       }
     })
-    .catch((err) => params.callback(err))
-  } else params.callback(new Error(`Property ${property} not defined`))
+      .catch((err) => params.callback(err))
+  }
+}
+
+/*
+ Order list and insert nulls, for total imports.
+*/
+const prepareTotalHistoric = (l) => {
+  l.sort((a, b) => {
+    if (a.t1) {
+      if (b.t1) return a.t1 - b.t1
+      else return 1
+    } else return -1
+  })
+  let current = CT.START_OF_DAYS
+  let limit = l.length
+  for (let j = 0; j < limit; j++) {
+    if (l[j].t1) {
+      if (l[j].t1 > current) {
+        l.splice(j, 0, {blank: true, t1: current, t2: utils.previousDay(l[j].t1)})
+        limit++
+        j++
+      }
+    }
+    if (l[j].t2) {
+      if (l[j].t2 < CT.END_OF_DAYS) current = utils.nextDay(l[j].t2)
+    } else current = CT.END_OF_DAYS
+  }
+  if (current !== CT.END_OF_DAYS) l.push({blank: true, t1: current, t2: CT.END_OF_DAYS})
 }
 
 /*
@@ -505,113 +552,91 @@ const putRelation = (relationDef, entry, params, l, i) => {
   let relation, entity
   relation = relationDef.substring(0, arrow)
   entity = relationDef.substring(arrow + 2)
-  putElemRelation(entry, relation, entity, forward, isArray, 0, l, i, params)
-}
-
-/*
-Treats every single element related with the main entity to put
-*/
-const putElemRelation = (entry, relation, entity, forward, isArray, n, l, i, params) => {
-  /* if (isArray && n >= params.data[entry].length) {
-    subput(l, i + 1, params)
-    return
-  } */
-  let newStr = {_entity_: entity}
-  let relObj = params.str[entry]
-  let relData = /* isArray ? params.data[entry][n] : */ params.data[entry]
-  let t1, t2
-  for (let p in relObj) {
-    if (relObj.hasOwnProperty(p)) {
-      switch (p) {
-        case '_relation_':
-          break
-        default:
-          if (relObj[p] === 't1') {
-            if (relData[p]) t1 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
-          } else if (relObj[p] === 't2') {
-            if (relData[p]) t2 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
-          } else newStr[p] = relObj[p]
-      }
-    }
-  }
   let modelRelation = MODEL.RELATIONS[relation]
   if (!modelRelation) {
     params.callback(`${relation} relation does not exist`)
     return
   }
-  // For entities (not inputs), time counts
-  if (params.entity) {
-    if (!t1) t1 = modelRelation.time ? CT.START_OF_TIME : CT.START_OF_DAYS
-    if (!t2) t2 = modelRelation.time ? CT.END_OF_TIME : CT.END_OF_DAYS
-  }
-  // Recursively call put
-  put(params.session, params.stateService,
-    params.variables, newStr, relData,
-    (err, id) => {
-      if (err) params.callback(err)
-      else {
-        let table
-        let db = params.session.dbs['objects']
-        let r
-        if (params.entity) { // Entities
-          table = 'relation_1'
-          r = {
-            relation: relation,
-            id1: forward ? params.id : id,
-            id2: forward ? id : params.id,
-            t1: t1,
-            t2: t2,
-            ord: 0,
-            node: 1
-          }
-        } else { // Inputs
-          table = 'input_rel_1_' + params.period
-          r = {
-            relation: relation,
-            id: params.id,
-            entity: id
-          }
-        }
-        // Entity is there, now we can create the relation properly
-        let s = db.from(table)
-          .where('relation', relation)
-        if (params.entity) s.where(forward ? 'id1' : 'id2', params.id) // entity
-        else s.where('id', params.id) // input
-        s.then((rows) => {
-          modifyRelation(rows, db, r, table, relation, forward, isArray, params, l, i, (err) => {
-            if (err) params.callback(err)
-            /* else if (isArray) putElemRelation(entry, relation, entity, forward, isArray, n + 1, l, i, params)
-            */else subput(l, i + 1, params)
-          })
-        })
-          .catch((err) => params.callback(err))
-      }
-    })
+  let newStr = {_entity_: entity}
+  let relObj = params.str[entry]
+  let relDataList = isArray ? params.data[entry] : [params.data[entry]]
+  if (relObj._total_) prepareTotalHistoric(relDataList)
+  putElemRelation(newStr, relObj, relation, modelRelation, relDataList, forward, 0, l, i, params)
 }
 
-const modifyRelation = (rows, db, r, table, relation, forward, isArray, params, l, i, callback) => {
-  if (rows.length === 0) {
-    // Insert relation
-    db(table).insert(r).then((rowid) => {
-      // Next relation/property
-      subput(l, i + 1, params)
-    })
-      .catch((err) => params.callback(err))
-  } if (rows.length > 1) {
-    historicModifier(rows, r, relation, forward, table, db, (err) => {
-      if (err) params.callback(err)
-      else subput(l, i + 1, params) // Next relation/property
-    })
-  } else {
-    // Only 1 register: Update current relation
-    let u = db(table).where('relation', relation)
-    if (params.entity) u.where(forward ? 'id1' : 'id2', params.id)
-    else u.where('id', params.id)
-    u.update(r).then((count) => {
-      /* if (isArray) callback()
-      else */ subput(l, i + 1, params) // Next relation/property
-    })
-      .catch((err) => params.callback(err))
+/*
+Treats every single element related with the main entity to put
+*/
+const putElemRelation = (newStr, relObj, relation, modelRelation, relDataList, forward, n, l, i, params) => {
+  if (n >= relDataList.length) subput(l, i + 1, params) // Next relation/property
+  else {
+    let relData = relDataList[n]
+    let t1, t2
+    for (let p in relObj) {
+      if (relObj.hasOwnProperty(p)) {
+        switch (p) {
+          case '_relation_':
+            break
+          default:
+            if (relObj[p] === 't1') {
+              if (relData[p]) t1 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
+            } else if (relObj[p] === 't2') {
+              if (relData[p]) t2 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
+            } else newStr[p] = relObj[p]
+        }
+      }
+    }
+    // For entities (not inputs), time counts
+    if (params.entity) {
+      if (!t1) t1 = modelRelation.time ? CT.START_OF_TIME : CT.START_OF_DAYS
+      if (!t2) t2 = modelRelation.time ? CT.END_OF_TIME : CT.END_OF_DAYS
+    }
+    // Recursively call put
+    put(params.session, params.stateService,
+      params.variables, newStr, relData, params.extraFunction,
+      (err, id) => {
+        if (err) params.callback(err)
+        else {
+          let table
+          let db = params.session.dbs['objects']
+          let r
+          if (params.entity) { // Entities
+            table = 'relation_1'
+            r = {
+              relation: relation,
+              id1: forward ? params.id : id,
+              id2: forward ? id : params.id,
+              t1: t1,
+              t2: t2,
+              ord: 0,
+              node: 1
+            }
+          } else { // Inputs
+            table = 'input_rel_1_' + params.period
+            r = {
+              relation: relation,
+              id: params.id,
+              entity: id
+            }
+          }
+          // Entity is there, now we can create the relation properly
+          let s = db.from(table)
+            .where('relation', relation)
+          if (params.entity) s.where(forward ? 'id1' : 'id2', params.id) // entity
+          else s.where('id', params.id) // input
+          s.then((rows) => {
+            if (params.entity) {
+              historicModifier(rows, r, table, db, (err) => {
+                if (err) params.callback(err)
+                else putElemRelation(newStr, relObj, relation, modelRelation, relDataList, forward, n + 1, l, i, params)
+              })
+            } else {
+              // TODO: Inputs relations
+            }
+          })
+            .catch((err) => params.callback(err))
+        }
+      })
   }
 }
 
@@ -1384,27 +1409,184 @@ const executePropertySq = (str, type, rows, i, execution, callback) => {
 Modifies historical lists of a relation (rows), inserting the new element r.
  params.id contains the id of the entity to modify.
  */
-const historicModifier = (rows, r, relation, forward, table, db, callback) => {
+const historicModifier = (rows, r, table, db, callback) => {
+  // Elements to modify list
+  let mods = []
+  let doNothing = false
+  // Iterate over historic
   for (let i = 0; i < rows.length; i++) {
     let e = rows[i]
+    let sameObject = r.property ? e.value === r.value : e.id1 === r.id1 && e.id2 === r.id2
+    // If everything is equal, do nothing
+    if (e.t1 === r.t1 && e.t2 === r.t2 && sameObject) {
+      doNothing = true
+      break
+    }
     // Work only if there is common time
     if (e.t1 <= r.t2 && e.t2 >= r.t1) {
       if (r.t1 > e.t1 && r.t2 < e.t2) {
         // e  ............................
         // r        .................
-      } else if (r.t1 < e.t1 && r.t2 > e.t2) {
+        mods.push({type: 1, e, r})
+      } else if (r.t1 <= e.t1 && r.t2 >= e.t2) {
         // e        .................
         // r  ............................
+        mods.push({type: 2, e, r})
       } else if (r.t2 <= e.t2 && r.t2 >= e.t1) {
         // e        .................
         // r  ...............
+        mods.push({type: 3, e, r})
       } else if (r.t1 <= e.t2 && r.t1 >= e.t1) {
         // e  ...............
         // r        .................
+        mods.push({type: 4, e, r})
       }
     }
   }
-  callback()
+  if (doNothing) callback()
+  else if (mods.length > 0) modifyHistoricEntry(db, table, mods, 0, false, callback)
+  else {
+    // No mix with other entries: just insert
+    db.insert(r).into(table).then((count) => { callback() })
+      .catch((err) => callback(err))
+  }
+}
+
+const modifyHistoricEntry = (db, table, mods, i, inserted, callback) => {
+  if (i >= mods.length) callback()
+  else {
+    // a.e is be database element and a.r new element coming from API
+    let a = mods[i]
+    let nextStep = (inserted) => modifyHistoricEntry(db, table, mods, i + 1, inserted, callback)
+    let differentValue, reg, regNew
+    if (a.e.relation) {
+      differentValue = a.e.id1 !== a.r.id1 || a.e.id2 !== a.r.id2
+      reg = db(table).where('relation', a.e.relation)
+        .where('id1', a.e.id1).where('id2', a.e.id2).where('t1', a.e.t1)
+      regNew = db(table).where('relation', a.r.relation)
+        .where('id1', a.r.id1).where('id2', a.r.id2)
+        .where('t1', a.r.t1)
+    } else {
+      differentValue = a.e.value !== a.r.value
+      reg = db(table).where('property', a.e.property)
+        .where('entity', a.e.entity).where('value', a.e.value).where('t1', a.e.t1)
+      regNew = db(table).where('property', a.r.property)
+        .where('entity', a.r.entity).where('value', a.r.value)
+        .where('t1', a.r.t1)
+    }
+    switch (a.type) {
+      case 1:// New into last
+        if (differentValue) {
+          // Last must be split
+          let rigthR
+          if (a.e.relation) {
+            rigthR = {
+              relation: a.e.relation,
+              id1: a.e.id1,
+              id2: a.e.id2,
+              t1: utils.nextTime(a.r.t2),
+              t2: a.e.t2,
+              ord: 0,
+              node: 1
+            }
+          } else {
+            rigthR = {
+              property: a.e.property,
+              entity: a.e.entity,
+              t1: utils.nextTime(a.r.t2),
+              t2: a.e.t2,
+              value: a.e.value
+            }
+          }
+          a.e.t2 = utils.previousTime(a.r.t1)
+          reg.update(a.e)
+            .then((count) => {
+              db.insert(rigthR).into(table).then((count) => {
+                if (a.r.remove) nextStep(true)
+                else {
+                  db.insert(a.r).into(table).then((count) => nextStep(true))
+                    .catch((err) => callback(err))
+                }
+              })
+                .catch((err) => callback(err))
+            })
+            .catch((err) => callback(err))
+        } else nextStep(true)
+        break
+      case 2:// Last into new. Simply override
+        if (inserted || a.r.remove) {
+          reg.delete().then((count) => nextStep(true))
+            .catch((err) => callback(err))
+        } else {
+          reg.update(a.r)
+            .then((count) => nextStep(true))
+            .catch((err) => callback(err))
+        }
+        break
+      case 3:// New contains left limit
+        if (differentValue && !a.r.remove) {
+          a.e.t1 = utils.nextTime(a.r.t2)
+          reg.update(a.e)
+            .then((count) => {
+              if (inserted) nextStep(true)
+              else {
+                db.insert(a.r).into(table).then((count) => nextStep(true))
+                  .catch((err) => callback(err))
+              }
+            })
+            .catch((err) => callback(err))
+        } else {
+          reg.delete()
+            .then((count) => {
+              if (a.r.remove) nextStep(true)
+              else if (inserted) {
+                a.r.t2 = a.e.t2
+                // r was already inserted: delete db register and update r to new t2
+                regNew.update(a.r)
+                  .then((count) => nextStep(inserted))
+                  .catch((err) => callback(err))
+              } else {
+                // r was not inserted, so insert it now
+                db.insert(a.r).into(table).then((count) => nextStep(true))
+                  .catch((err) => callback(err))
+              }
+            })
+            .catch((err) => callback(err))
+        }
+        break
+      case 4:// New contains right limit
+        if (differentValue && !a.r.remove) {
+          a.e.t2 = utils.previousTime(a.r.t1)
+          reg.update(a.e)
+            .then((count) => {
+              if (inserted) nextStep(true)
+              else {
+                db.insert(a.r).into(table).then((count) => nextStep(true))
+                  .catch((err) => callback(err))
+              }
+            })
+            .catch((err) => callback(err))
+        } else {
+          reg.delete()
+            .then((count) => {
+              if (a.r.remove) nextStep(true)
+              else if (inserted) {
+                a.r.t1 = a.e.t1
+                // r was already inserted: delete db register and update r to new t2
+                regNew.update(a.r)
+                  .then((count) => nextStep(true))
+                  .catch((err) => callback(err))
+              } else {
+                // r was not inserted, so insert it now
+                db.insert(a.r).into(table).then((count) => nextStep(true))
+                  .catch((err) => callback(err))
+              }
+            })
+            .catch((err) => callback(err))
+        }
+        break
+    }
+  }
 }
 
 module.exports = {

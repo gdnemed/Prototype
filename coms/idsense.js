@@ -12,10 +12,13 @@ Places information in the queue to be sent to terminal.
 */
 const send = (socket, command, data) => {
   socket.specInfo.queue.push({command: command, data: data})
+  // If no ack pending, send frame
+  if (socket.specInfo.ackCount === 0) pushQueue(socket)
 }
 
 const receive = (data, socket, logicService) => {
   if (data.ack) {
+    socket.specInfo.ackCount--
     pushQueue(socket)
   } else {
     switch (data.cmd) {
@@ -37,7 +40,10 @@ const sendQueueItem = (socket, command, data) => {
     case 'card_insert':data.cmd = 2; break
     case 'record_insert':data.cmd = 3; break
     case 'clock':data.cmd = 5; break
+    default:logger.error('Command not found: ' + command)
+      return
   }
+  socket.specInfo.ackCount++
   sendFrame(data, socket.specInfo.seq, socket)
   socket.specInfo.seq++
 }
@@ -85,7 +91,6 @@ module.exports = {
   send: send,
   ack: ack,
   nack: nack,
-  receive: receive,
-  pushQueue: pushQueue
+  receive: receive
 
 }
