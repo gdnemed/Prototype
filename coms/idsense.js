@@ -2,10 +2,10 @@
 // idSense specific module.
 // -------------------------------------------------------------------------------------------
 
-const moment = require('moment-timezone')
 const msgpack = require('msgpack-lite')
 
 const logger = require.main.require('./utils/log').getLogger('coms')
+const utils = require.main.require('./utils/utils')
 
 /*
 Places information in the queue to be sent to terminal.
@@ -39,6 +39,9 @@ const sendQueueItem = (socket, command, data) => {
   switch (command) {
     case 'card_insert':data.cmd = 2; break
     case 'record_insert':data.cmd = 3; break
+    case 'record_delete':logger.debug(command)
+      logger.debug(data)
+      return
     case 'clock':data.cmd = 5; break
     default:logger.error('Command not found: ' + command)
       return
@@ -74,9 +77,9 @@ const newClocking = (data, socket, logicService) => {
     result: data.resp,
     source: 0
   }
-  clocking.reception = moment.tz(new Date().getTime(), 'GMT').format('YYYYMMDDHHmmss')
-  clocking.gmt = moment.tz(data.tmp * 1000, 'GMT').format('YYYYMMDDHHmmss')
-  clocking.tmp = moment.tz(data.tmp * 1000, info.timezone).format('YYYYMMDDHHmmss')
+  clocking.reception = utils.now()
+  clocking.gmt = utils.tsToTime(data.tmp * 1000, 'GMT')
+  clocking.tmp = utils.tsToTime(data.tmp * 1000, info.timezone)
   logger.trace(clocking)
   logicService.createClocking(clocking, info.customer, function (err) {
     if (err) {

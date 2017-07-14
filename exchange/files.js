@@ -8,6 +8,7 @@ const moment = require('moment-timezone')
 const chokidar = require('chokidar')
 const csvtojson = require('csvtojson')
 const request = require('request')
+const equal = require('deep-equal')
 const logger = require.main.require('./utils/log').getLogger('files')
 
 let ONE_DAY = 86400000
@@ -82,11 +83,11 @@ const importPrepare = (path, importType, fJson, pathGet, pathPost, pathDelete, o
   let errMsg
   call('GET', pathGet, null, (err, response, bodyResponse) => {
     if (err) {
-      logger.debug(err)
+      logger.error(err)
       errMsg = err.message
     } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
       errMsg = 'Error ' + response.statusCode + ' : ' + bodyResponse
-      logger.debug(errMsg)
+      logger.error(errMsg)
     } else {
       // Create Map from server response
       let elemsToDelete = {}
@@ -95,8 +96,6 @@ const importPrepare = (path, importType, fJson, pathGet, pathPost, pathDelete, o
         if (importType === 'TTYPES') elemsToDelete['ID' + d[i].code] = d[i]
         else elemsToDelete['ID' + d[i].id] = d[i]
       }
-      logger.trace('elemsToDelete')
-      logger.trace(elemsToDelete)
       importProcess(elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now)
     }
 
@@ -123,6 +122,7 @@ const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDel
       logger.error(err)
       endImport(path, importType, output, now, false)
     } else {
+      cleanMap(elemsToDelete, elems)
       sendOrders(pathPost, elems, elemsToDelete, output, (nObjects, nErrors) => {
         if (output) outPut(output, nObjects + ' lines processed. ' + nErrors + ' errors.')
         deleteOrders(pathDelete, elemsToDelete, output,
@@ -130,6 +130,44 @@ const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDel
       })
     }
   })
+}
+
+/*
+Removes elements which are equal to those in Lemuria system.
+*/
+const cleanMap = (elemsToDelete, elems) => {
+  let l = []
+  for (let k in elems) {
+    if (elems.hasOwnProperty(k)) {
+      if (elemsToDelete[k]) {
+        // We must order arrays before comparing
+        orderArrays(elemsToDelete[k])
+        orderArrays(elems[k])
+        if (equal(elemsToDelete[k], elems[k])) l.push(k)
+      }
+    }
+  }
+  for (let i = 0; i < l.length; i++) {
+    delete elems[l[i]]
+    delete elemsToDelete[l[i]]
+  }
+}
+
+/*
+Sorts every array into the object using field 'start'
+*/
+const orderArrays = (o) => {
+  for (let p in o) {
+    if (o.hasOwnProperty(p)) {
+      if (Array.isArray(o[p])) {
+        o[p].sort((a, b) => {
+          if (a.start) return -1
+          else if (b.start) return 1
+          else return a.start - b.start
+        })
+      }
+    }
+  }
 }
 
 /*
@@ -169,8 +207,8 @@ const processRecord = (r, yesterday, records) => {
   if (r.LANGUAGE && r.LANGUAGE !== '') record.language = r.LANGUAGE
   if ((r.START && r.START !== '') || (r.END && r.END !== '')) {
     record.validity = [{}]
-    if (r.START && r.START !== '') record.validity[0].start = r.START
-    if (r.END && r.END !== '') record.validity[0].end = r.END
+    if (r.START && r.START !== '') record.validity[0].start = parseInt(r.START)
+    if (r.END && r.END !== '') record.validity[0].end = parseInt(r.END)
   } else if (r.START === '' && r.END === '') {
     record.validity = [{}]
   }
@@ -259,11 +297,11 @@ const sendOrder = (l, i, apiPath, elemsToDelete, output, nObjects, nErrors, call
     call('POST', url, r, (err, response, bodyResponse) => {
       if (err) {
         nErrors++
-        logger.debug(err)
+        logger.error(err)
         if (output) outPut(output, err.message)
       } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
         let msg = 'Error ' + response.statusCode + ' : ' + bodyResponse
-        logger.debug(msg)
+        logger.error(msg)
         if (output) {
           outPut(output, msg)
           outPut(output, url)
@@ -319,7 +357,7 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
 
     call('DELETE', url, null, (err) => {
       if (err) {
-        logger.debug(err)
+        logger.error(err)
         if (output) outPut(output, err)
       }
       deleteOrder(l, i + 1, apiPath, output, callback)

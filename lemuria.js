@@ -16,6 +16,7 @@ const files = require('./exchange/files')
 const logic = require('./logic')
 const logger = require('./utils/log')
 const migrations = require('./migrations')
+const squeries = require.main.require('./objects/squeries')
 
 let home, environment, customers, api, httpServer, logM, log
 
@@ -100,6 +101,8 @@ function initApiServer () {
     // API functions
     api.post('/api/state/settings', (req, res) => manageSession(req, res, state.postSettings))
     api.get('/api/state/settings', (req, res) => manageSession(req, res, state.getSettings))
+    // For testing
+    api.post('/api/objects/query', (req, res) => manageSession(req, res, query))
     logic.initAPI(api)
     // Run http server
     httpServer = api.listen(environment.api_listen.port, (err) => {
@@ -110,6 +113,13 @@ function initApiServer () {
         resolve()
       }
     })
+  })
+}
+
+const query = (req, res, session) => {
+  squeries.get(session, req.params, req.body, (err, ret) => {
+    if (err) res.status(500).end(err.message)
+    else res.status(200).jsonp(ret)
   })
 }
 

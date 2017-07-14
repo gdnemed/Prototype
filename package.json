@@ -10,6 +10,7 @@
     "express": "latest",
     "knex": "latest",
     "log4js": "latest",
+    "deep-equal": "latest",
     "moment-timezone": "latest",
     "msgpack-lite": "latest",
     "promise": "^8.0.0",

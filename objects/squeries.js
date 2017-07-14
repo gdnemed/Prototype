@@ -315,7 +315,7 @@ const executeInsert = (params) => {
         if (err) f(new Error(`${params.entity} inserted with id ${params.id}, but errors found: ${err}`))
         else {
           // If extra treatment, call function. If not, just callback
-          if (params.extraFunction) params.extraFunction(params.session, params.id, true, false, f)
+          if (params.extraFunction) params.extraFunction(params.session, d.id, true, false, f)
           else f(null, params.id)
         }
       }
@@ -415,8 +415,6 @@ const subput = (l, i, params) => {
     params.callback()
   } else {
     if (params.str[l[i]]._property_) {
-      // PER PROVES, DESCOMENTAR
-      subput(l, i + 1, params)
       putProperty(params.str[l[i]]._property_, l[i], params, l, i)
     } else if (params.str[l[i]]._relation_) {
       putRelation(params.str[l[i]]._relation_, l[i], params, l, i)
@@ -442,7 +440,7 @@ const putProperty = (property, entry, params, l, i) => {
   }
   let propObj = params.str[entry]
   let propDataList = isArray ? params.data[entry] : [params.data[entry]]
-  if (propObj._total_) prepareTotalHistoric(propDataList)
+  if (propObj._total_) prepareTotalHistoric(propDataList, modelProperty.time)
   putElemProperty(property, modelProperty, propObj, propDataList, 0, l, i, params)
 }
 
@@ -503,14 +501,14 @@ const putElemProperty = (property, modelProperty, propObj, propDataList, n, l, i
 /*
  Order list and insert nulls, for total imports.
 */
-const prepareTotalHistoric = (l) => {
+const prepareTotalHistoric = (l, withtime) => {
   l.sort((a, b) => {
     if (a.t1) {
       if (b.t1) return a.t1 - b.t1
       else return 1
     } else return -1
   })
-  let current = CT.START_OF_DAYS
+  let current = withtime ? CT.START_OF_TIME : CT.START_OF_DAYS
   let limit = l.length
   for (let j = 0; j < limit; j++) {
     if (l[j].t1) {
@@ -521,10 +519,12 @@ const prepareTotalHistoric = (l) => {
       }
     }
     if (l[j].t2) {
-      if (l[j].t2 < CT.END_OF_DAYS) current = utils.nextDay(l[j].t2)
-    } else current = CT.END_OF_DAYS
+      if (l[j].t2 < (withtime ? CT.END_OF_TIME : CT.END_OF_DAYS)) current = utils.nextDay(l[j].t2)
+    } else current = withtime ? CT.END_OF_TIME : CT.END_OF_DAYS
   }
-  if (current !== CT.END_OF_DAYS) l.push({blank: true, t1: current, t2: CT.END_OF_DAYS})
+  if (current !== (withtime ? CT.END_OF_TIME : CT.END_OF_DAYS)) {
+    l.push({blank: true, t1: current, t2: (withtime ? CT.END_OF_TIME : CT.END_OF_DAYS)})
+  }
 }
 
 /*
@@ -560,7 +560,7 @@ const putRelation = (relationDef, entry, params, l, i) => {
   let newStr = {_entity_: entity}
   let relObj = params.str[entry]
   let relDataList = isArray ? params.data[entry] : [params.data[entry]]
-  if (relObj._total_) prepareTotalHistoric(relDataList)
+  if (relObj._total_) prepareTotalHistoric(relDataList, modelRelation.time)
   putElemRelation(newStr, relObj, relation, modelRelation, relDataList, forward, 0, l, i, params)
 }
 

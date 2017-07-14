@@ -8,6 +8,7 @@ const moment = require('moment-timezone')
 const logger = require.main.require('./utils/log').getLogger('coms')
 const squeries = require.main.require('./objects/squeries')
 const CT = require.main.require('./CT')
+const utils = require.main.require('./utils/utils')
 
 let stateService, comsService, main
 
@@ -193,23 +194,17 @@ const put = (req, res, session, str) => {
 }
 
 const del = (req, res, session, filter, entity) => {
-  // First, search record real id
-  squeries.get(session, req.params,
-    {
-      _entity_: entity,
-      id: 'id',
-      _filter_: filter
-    }, (err, record) => {
+  // We don't really delete, we just put a value in 'drop'
+  let str = {_entity_: entity,
+    id: filter.field,
+    drop: {_property_: 'drop'}
+  }
+  squeries.put(session, stateService, {}, str,
+    {drop: utils.now(), id: req.params[filter.variable]}, null, (err, rows) => {
       if (err) res.status(500).end(err.message)
       else {
-        // Now, delete
-        if (record && record.length > 0) {
-          squeries.del(session, {id: record[0].id}, {_entity_: entity},
-            extraTreatment, (err, rows) => {
-              if (err) res.status(500).end(err.message)
-              else res.status(200).end()
-            })
-        } else res.status(404).end()
+        res.status(200).end()
+        nextVersion(session, [rows], str._entity_)// Notify communications
       }
     })
 }
@@ -261,21 +256,12 @@ const extraTreatment = (session, id, isInsert, isDelete, callback) => {
     })
     .catch((err) => callback(err))
   } else if (isDelete) {
-    db('property_num_1').increment('value', 1)
-      .where('entity', id).where('property', 'revision')
-      .then((rowid) => {
-        db('property_num_1').where('entity', id).where('property', 'drop')
-          .then((rowid) => callback(null, id))
-          .catch((err) => callback(err))
-      })
-      .catch((err) => callback(err))
   } else { // Update: increment revision and set drop = 0
     db('property_num_1').increment('value', 1)
       .where('entity', id).where('property', 'revision')
       .then((rowid) => {
-        d.value = 0
         db('property_num_1').where('entity', id).where('property', 'drop')
-          .update(d)
+          .update({value: 0})
           .then((rowid) => {
             callback(null, id)
           })
@@ -310,7 +296,7 @@ const nextVersion = (session, obj, type) => {
         if (ret) {
           logger.debug(ret)
           cardList = ret.card
-          if (cardList) {
+          if (cardList && ret.drop === 0) {
             for (let i = 0; i < cardList.length; i++) {
               if (ret.code) {
                 comsService.globalSend('record_insert', {records: {id: code}})

@@ -5,6 +5,14 @@
 const moment = require('moment-timezone')
 const CT = require.main.require('./CT')
 
+const now = (timezone = 'GMT') => {
+  return parseInt(moment.tz(new Date().getTime(), timezone).format('YYYYMMDDHHmmss'))
+}
+
+const tsToTime = (ts, timezone = 'GMT') => {
+  return parseInt(moment.tz(ts, timezone).format('YYYYMMDDHHmmss'))
+}
+
 const previousDay = (day) => {
   if (day === CT.START_OF_DAYS) return day
   else {
@@ -46,6 +54,8 @@ const nextTime = (time) => {
 }
 
 module.exports = {
+  now: now,
+  tsToTime: tsToTime,
   previousDay: previousDay,
   previousTime: previousTime,
   nextDay: nextDay,
