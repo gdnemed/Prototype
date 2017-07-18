@@ -12,6 +12,7 @@ const equal = require('deep-equal')
 const logger = require.main.require('./utils/log').getLogger('files')
 
 let ONE_DAY = 86400000
+let DELETE_MARK = '{{DEL}}'
 
 let remoteDir
 let workDir
@@ -39,30 +40,32 @@ Watches over an import file
 */
 const watch = (importType, fJson, pathGet, pathPost, pathDelete) => {
   chokidar.watch(remoteDir + '/' + importType + '.DWN', {ignored: /(^|[/\\])\../})
-    .on('add', path => moveImportFile(path, importType, fJson, pathGet, pathPost, pathDelete))
+    .on('add', path => moveImportFile(path, importType, fJson, pathGet, pathPost, pathDelete, false))
+  chokidar.watch(remoteDir + '/' + importType + '_INC.DWN', {ignored: /(^|[/\\])\../})
+    .on('add', path => moveImportFile(path, importType, fJson, pathGet, pathPost, pathDelete, true))
 }
 
 /*
 Renames the original file to DWT, brings it to working directory,
 deletes the original file, and begins import process.
 */
-const moveImportFile = (path, importType, fJson, pathGet, pathPost, pathDelete) => {
+const moveImportFile = (path, importType, fJson, pathGet, pathPost, pathDelete, partial) => {
   logger.debug(path)
   if (fs.existsSync(path)) {
     let newPath = path.substring(0, path.length - 1) + 'T'
     fs.rename(path, newPath, (err) => {
       if (err) logger.error(err)
       else {
-        let endPath = workDir + '/' + 'pending' + '/' + importType + '.DWT'
+        let endPath = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC.DWT' : '.DWT')
         try {
           fs.writeFileSync(endPath, fs.readFileSync(newPath))
           fs.unlink(newPath, (err) => { if (err) logger.error(err) })
           let now = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDDHHmmss')
           if (createOutput) {
-            let logPath = workDir + '/' + 'pending' + '/' + importType + '_' + now + '.LOG'
+            let logPath = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC_' : '_') + now + '.LOG'
             let output = fs.createWriteStream(logPath)
-            output.once('open', () => importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, output, now))
-          } else importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, null, now)
+            output.once('open', () => importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, output, now, partial))
+          } else importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, null, now, partial)
         } catch (err) { logger.error(err) }
       }
     })
@@ -77,33 +80,36 @@ const outPut = (stream, message) => {
 /*
 Gets information from server, to manage total import.
 */
-const importPrepare = (path, importType, fJson, pathGet, pathPost, pathDelete, output, now) => {
+const importPrepare = (path, importType, fJson, pathGet, pathPost, pathDelete, output, now, partial) => {
   logger.info('Start of ' + importType + ' import')
   if (output) outPut(output, 'Start')
-  let errMsg
-  call('GET', pathGet, null, (err, response, bodyResponse) => {
-    if (err) {
-      logger.error(err)
-      errMsg = err.message
-    } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
-      errMsg = 'Error ' + response.statusCode + ' : ' + bodyResponse
-      logger.error(errMsg)
-    } else {
-      // Create Map from server response
-      let elemsToDelete = {}
-      let d = JSON.parse(bodyResponse)
-      for (let i = 0; i < d.length; i++) {
-        if (importType === 'TTYPES') elemsToDelete['ID' + d[i].code] = d[i]
-        else elemsToDelete['ID' + d[i].id] = d[i]
+  if (partial) importProcess(null, path, importType, fJson, pathPost, pathDelete, output, now, partial)
+  else {
+    let errMsg
+    call('GET', pathGet, null, (err, response, bodyResponse) => {
+      if (err) {
+        logger.error(err)
+        errMsg = err.message
+      } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
+        errMsg = 'Error ' + response.statusCode + ' : ' + bodyResponse
+        logger.error(errMsg)
+      } else {
+        // Create Map from server response
+        let elemsToDelete = {}
+        let d = JSON.parse(bodyResponse)
+        for (let i = 0; i < d.length; i++) {
+          if (importType === 'TTYPES') elemsToDelete['ID' + d[i].code] = d[i]
+          else elemsToDelete['ID' + d[i].id] = d[i]
+        }
+        importProcess(elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now, partial)
       }
-      importProcess(elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now)
-    }
 
-    if (errMsg) {
-      if (output) outPut(output, errMsg)
-      endImport(path, importType, output, now, false)
-    }
-  })
+      if (errMsg) {
+        if (output) outPut(output, errMsg)
+        endImport(path, importType, output, now, false)
+      }
+    })
+  }
 }
 
 /*
@@ -112,21 +118,26 @@ and calls fJson() for each json.
 Then calls
 to import it.
 */
-const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now) => {
-  let elems = {}
+const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now, partial) => {
+  let elems
+  if (partial) {
+    elems = []
+    elemsToDelete = []
+
+  } else elems = {}
   let yesterday = moment.tz(new Date().getTime() - ONE_DAY, timeZone).format('YYYYMMDD')
   csvtojson().fromFile(path)
-  .on('json', (jsonObj) => fJson(jsonObj, yesterday, elems))
+  .on('json', (jsonObj) => fJson(jsonObj, yesterday, elems, partial, elemsToDelete))
   .on('done', (err) => {
     if (err) {
       logger.error(err)
-      endImport(path, importType, output, now, false)
+      endImport(path, importType, output, now, false, partial)
     } else {
-      cleanMap(elemsToDelete, elems)
-      sendOrders(pathPost, elems, elemsToDelete, output, (nObjects, nErrors) => {
+      if (partial) cleanMap(elemsToDelete, elems)
+      sendOrders(pathPost, elems, elemsToDelete, output, partial, (nObjects, nErrors) => {
         if (output) outPut(output, nObjects + ' lines processed. ' + nErrors + ' errors.')
-        deleteOrders(pathDelete, elemsToDelete, output,
-          () => endImport(path, importType, output, now, true))
+        deleteOrders(pathDelete, elemsToDelete, output, partial,
+          () => endImport(path, importType, output, now, true, partial))
       })
     }
   })
@@ -173,17 +184,17 @@ const orderArrays = (o) => {
 /*
 Moves records to "done" directories.
 */
-const endImport = (path, importType, output, now, ok) => {
+const endImport = (path, importType, output, now, ok, partial) => {
   if (fs.existsSync(path)) {
     let newPath = workDir + '/' + (ok ? 'done' : 'error') + '/' +
-      importType + '_' + now + '.DWN'
+      importType + (partial ? '_INC_' : '_') + now + '.DWN'
     fs.rename(path, newPath, (err) => { if (err) logger.error(err) })
   }
   if (output) {
     output.on('finish', () => {
       try {
         let endPath = remoteDir + '/' + importType + '_' + now + '.LOG'
-        let local = workDir + '/' + 'pending' + '/' + importType + '_' + now + '.LOG'
+        let local = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC_' : '_') + now + '.LOG'
         fs.writeFileSync(endPath, fs.readFileSync(local))
         fs.unlink(local, (err) => { if (err) logger.error(err) })
       } catch (exc) { logger.error(exc) }
@@ -198,13 +209,21 @@ const endImport = (path, importType, output, now, ok) => {
 Puts record r information in the map, respecting
 historic data.
 */
-const processRecord = (r, yesterday, records) => {
+const processRecord = (r, yesterday, records, partial, elemsToDelete) => {
   // Avoid past records
   if (r.END !== '' && r.END < yesterday) return
   let record = {id: r.ID}
-  if (r.CODE && r.CODE !== '') record.code = r.CODE
-  if (r.NAME && r.NAME !== '') record.name = r.NAME
-  if (r.LANGUAGE && r.LANGUAGE !== '') record.language = r.LANGUAGE
+  if (r.CODE) {
+    if (r.CODE === DELETE_MARK) record.code = ''
+    else if (r.CODE !== '') record.code = r.CODE
+  }
+  if (r.NAME && r.NAME !== '') {
+    record.name = r.NAME
+  }
+  if (r.LANGUAGE) {
+    if (r.LANGUAGE === DELETE_MARK) record.language = ''
+    else record.language = r.LANGUAGE
+  }
   if ((r.START && r.START !== '') || (r.END && r.END !== '')) {
     record.validity = [{}]
     if (r.START && r.START !== '') record.validity[0].start = parseInt(r.START)
@@ -213,45 +232,83 @@ const processRecord = (r, yesterday, records) => {
     record.validity = [{}]
   }
   if (r.CARD) {
-    record.card = [{code: r.CARD}]
-    if (record.validity && record.validity[0].start) record.card[0].start = record.validity[0].start
-    if (record.validity && record.validity[0].end) record.card[0].end = record.validity[0].end
+    if (r.CARD !== '') {
+      record.card = [{code: r.CARD}]
+      if (record.validity && record.validity[0].start) record.card[0].start = record.validity[0].start
+      if (record.validity && record.validity[0].end) record.card[0].end = record.validity[0].end
+    }
   }
   if (r.TTGROUP) {
-    record.timetype_grp = [{code: r.TTGROUP}]
-    if (record.validity && record.validity[0].start) record.timetype_grp[0].start = record.validity[0].start
-    if (record.validity && record.validity[0].end) record.timetype_grp[0].end = record.validity[0].end
+    if (r.TTGROUP !== '') {
+      record.timetype_grp = [{code: r.TTGROUP}]
+      if (record.validity && record.validity[0].start) record.timetype_grp[0].start = record.validity[0].start
+      if (record.validity && record.validity[0].end) record.timetype_grp[0].end = record.validity[0].end
+    }
   }
 
-  let id = 'ID' + r.ID
-  if (records[id]) {
-    let first = records[id]
-    if (record.validity) {
-      if (first.validity) first.validity.push(record.validity[0])
-      else first.validity = record.validity
+  if (partial) {
+    if (r.OPERATION) {
+      record.operation = r.OPERATION
+      switch (record.operation) {
+        case 'P':records.push(record)
+          break
+        case 'D':elemsToDelete.push(r.ID)
+          break
+      }
     }
-    if (record.card) {
-      if (first.card) first.card.push(record.card[0])
-      else first.card = record.card
-    }
-    if (record.timetype_grp) {
-      if (first.timetype_grp) first.timetype_grp.push(record.timetype_grp[0])
-      else first.timetype_grp = record.timetype_grp
-    }
-  } else records[id] = record
+  } else {
+    let id = 'ID' + r.ID
+    if (records[id]) {
+      let first = records[id]
+      if (record.validity) {
+        if (first.validity) first.validity.push(record.validity[0])
+        else first.validity = record.validity
+      }
+      if (record.card) {
+        if (first.card) first.card.push(record.card[0])
+        else first.card = record.card
+      }
+      if (record.timetype_grp) {
+        if (first.timetype_grp) first.timetype_grp.push(record.timetype_grp[0])
+        else first.timetype_grp = record.timetype_grp
+      }
+    } else records[id] = record
+  }
 }
 
-const processTtype = (r, yesterday, ttypes) => {
-  let ttype = ttypes[r.CODE]
-  if (!ttype) {
+const processTtype = (r, yesterday, ttypes, partial, elemsToDelete) => {
+  let ttype
+  if (partial) {
     ttype = {code: r.CODE, text: {}}
-    ttypes[r.CODE] = ttype
+    if (r.OPERATION) {
+      ttype.operation = r.OPERATION
+      switch (ttype.operation) {
+        case 'P':
+          let found = false
+          for (let i = 0; i < ttypes.length; i++) {
+            if (ttypes[i].code === ttype.code) {
+              found = true
+              ttype = ttypes[i]
+            }
+          }
+          if (!found) ttypes.push(ttype)
+          break
+        case 'D':elemsToDelete.push(r.CODE)
+          break
+      }
+    }
+  } else {
+    ttype = ttypes[r.CODE]
+    if (!ttype) {
+      ttype = {code: r.CODE, text: {}}
+      ttypes[r.CODE] = ttype
+    }
   }
   if (r.LANGUAGE && r.LANGUAGE !== '') ttype.text[r.LANGUAGE] = r.TEXT
   if (r.TTGROUP && r.TTGROUP !== '') ttype.ttgroup = r.TTGROUP // For the moment, only 1 group
 }
 
-const processInfo = (r, yesterday, infos) => {
+const processInfo = (r, yesterday, infos, partial, elemsToDelete) => {
   // ID,INFO,HEADER,TEXT,DATE
   let info = {id: r.ID}
   if (r.INFO && r.INFO !== '') info.name = r.INFO
@@ -269,12 +326,15 @@ const processInfo = (r, yesterday, infos) => {
 /*
 Iterates over records to send them sequenced
 */
-const sendOrders = (apiPath, elems, elemsToDelete, output, callback) => {
-  let l = []
-  for (let property in elems) {
-    if (elems.hasOwnProperty(property)) l.push(elems[property])
+const sendOrders = (apiPath, elems, elemsToDelete, output, partial, callback) => {
+  if (partial) sendOrder(elems, 0, apiPath, elemsToDelete, output, 0, 0, callback)
+  else {
+    let l = []
+    for (let property in elems) {
+      if (elems.hasOwnProperty(property)) l.push(elems[property])
+    }
+    sendOrder(l, 0, apiPath, elemsToDelete, output, 0, 0, callback)
   }
-  sendOrder(l, 0, apiPath, elemsToDelete, output, 0, 0, callback)
 }
 
 /*
@@ -331,15 +391,21 @@ const call = (method, path, content, callback) => {
 /*
 Iterates over recordsToDelete to send deletes
 */
-const deleteOrders = (apiPath, elemsToDelete, output, callback) => {
-  let l = []
-  for (let property in elemsToDelete) {
-    if (elemsToDelete.hasOwnProperty(property)) {
-      // It has de form IDnumber
-      l.push(property.substring(2))
+const deleteOrders = (apiPath, elemsToDelete, output, partial, callback) => {
+  if (elemsToDelete == null) callback()
+  else {
+    let l = []
+    if (partial) l = elemsToDelete
+    else {
+      for (let property in elemsToDelete) {
+        if (elemsToDelete.hasOwnProperty(property)) {
+          // It has de form IDnumber
+          l.push(property.substring(2))
+        }
+      }
     }
+    deleteOrder(l, 0, apiPath, output, callback)
   }
-  deleteOrder(l, 0, apiPath, output, callback)
 }
 
 /*
@@ -348,7 +414,7 @@ Sends a delete order
 const deleteOrder = (l, i, apiPath, output, callback) => {
   if (i >= l.length) callback()
   else {
-    logger.debug('delete record ' + l[i])
+    logger.debug('delete entity with code ' + l[i])
 
     // Add item id
     let pos = apiPath.indexOf('@')

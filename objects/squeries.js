@@ -782,9 +782,23 @@ the helper structure.
 */
 const addFilter = (statement, filter, helper) => {
   let v = filter.variable ? 0 : filter.value
-  if (filter.condition === '=' || !filter.condition) {
-    statement.where(filter.field, v)
-  } else statement.where(filter.field, filter.condition, v)
+  switch (filter.field) {
+    case 'id':case 'document':
+      if (filter.condition === '=' || !filter.condition) {
+        statement.where(filter.field, v)
+      } else statement.where(filter.field, filter.condition, v)
+      break
+    default:// Condition over property
+      let pt = MODEL.PROPERTIES[filter.field]
+      if (pt) {
+        statement.join('property_' + pt.type + '_1 as pf', (sq) => {
+          sq.on('entity', 'id').on('property', filter.field)
+          if (filter.condition === '=' || !filter.condition) sq.on('value', v)
+          else sq.on('value', filter.condition, v)
+          filterTime(sq, pt.time, {isArray: false}, helper.variablesMapping, true)
+        })
+      }
+  }
 }
 
 /*
@@ -886,20 +900,34 @@ const joins = (db, str, e, f, type) => {
   }
 }
 
-const filterTime = (join, withtime, elem, variablesMapping) => {
+const filterTime = (join, withtime, elem, variablesMapping, beginning) => {
   if (!elem.isArray) {
     join.onBetween('t1', [withtime ? CT.START_OF_TIME : CT.START_OF_DAYS, 0])
-      .onBetween('t2', [0, withtime ? CT.END_OF_TIME : CT.END_OF_DAYS])
+        .onBetween('t2', [0, withtime ? CT.END_OF_TIME : CT.END_OF_DAYS])
     if (withtime) {
-      variablesMapping.push(null)
-      variablesMapping.push('now')
-      variablesMapping.push('now')
-      variablesMapping.push(null)
+      if (beginning) {
+        variablesMapping.unshift(null)
+        variablesMapping.unshift('now')
+        variablesMapping.unshift('now')
+        variablesMapping.unshift(null)
+      } else {
+        variablesMapping.push(null)
+        variablesMapping.push('now')
+        variablesMapping.push('now')
+        variablesMapping.push(null)
+      }
     } else {
-      variablesMapping.push(null)
-      variablesMapping.push('today')
-      variablesMapping.push('today')
-      variablesMapping.push(null)
+      if (beginning) {
+        variablesMapping.unshift(null)
+        variablesMapping.unshift('today')
+        variablesMapping.unshift('today')
+        variablesMapping.unshift(null)
+      } else {
+        variablesMapping.push(null)
+        variablesMapping.push('today')
+        variablesMapping.push('today')
+        variablesMapping.push(null)
+      }
     }
   }
 }

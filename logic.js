@@ -14,6 +14,7 @@ let stateService, comsService, main
 
 let prepGetRecords = {
   _entity_: '[record]',
+  _filter_: {field: 'drop', value: 0},
   name: 'name',
   id: 'document',
   code: 'code',
@@ -311,12 +312,17 @@ const nextVersion = (session, obj, type) => {
     })
 }
 
+/*
+Uploads into the terminal, every information with higher revision.
+*/
 const initTerminal = (serial, customer) => {
   let session = createSession(customer)
   squeries.get(session, {},
     {
       _entity_: '[record]',
+      _filter_: {field: 'revision', condition: '>', value: 0},
       code: 'code',
+      drop: {_property_: 'drop'},
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
     }, (err, ret) => {
       if (err) logger.error(err)
