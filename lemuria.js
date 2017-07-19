@@ -28,9 +28,9 @@ const init = () => {
     initConfiguration()
     migrations.init('sqlite', 'SPEC', '2017').then((knexRefs) => {
       debugTestKnexRefs(knexRefs)
-        .then(initApiServer())
-        .then(initServices())
-        .then(initProcess())
+        .then(initApiServer)
+        .then(initServices)
+        .then(initProcess)
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: ${err}`)
         })
@@ -74,22 +74,23 @@ const debugTestKnexRefs = (knexRefs) => {
 
     customers['SPEC'].dbs = knexRefs
 
-    // testing knex ojbect that holds 'state' db
     kState.select().table('settings')
-      .then((collection) => logM.debug('settings len  = ' + collection.length))
-      .catch((err) => logM.error('ERROR: in GET settings : ' + err))
-
-    // testing knex ojbect that holds 'objects' db
-    kObjects.select().table('entity_1')
-      .then((collection) => logM.debug('entity_1 len  = ' + collection.length))
-      .catch((err) => logM.error('ERROR: in GET entity_1 : ' + err))
-
-    // testing knex ojbect that holds 'inputs' db
-    kInputs.select().table('input_1_201707')
-      .then((collection) => logM.debug('input_1_201707 len  = ' + collection.length))
-      .catch((err) => logM.error('ERROR: in GET input_1_201707 : ' + err))
-
-    resolve()
+      .then((collection) => {
+        logM.debug('settings len  = ' + collection.length)
+        return kObjects.select().table('entity_1')
+      })
+      .then((collection) => {
+        logM.debug('entity_1 len  = ' + collection.length)
+        return kInputs.select().table('input_1_201707')
+      })
+      .then((collection) => {
+        logM.debug('input_1_201707 len  = ' + collection.length)
+        resolve()
+      })
+      .catch((err) => {
+        console.log('ERROR: ' + err)
+        reject(err)
+      })
   })
 }
 
