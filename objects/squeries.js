@@ -113,50 +113,24 @@ const del = (session, variables, str, data, extraFunction, callback) => {
   if (e) {
     let db = session.dbs['objects']
     db('property_num_' + nodeId).where('entity', id).delete()
+      .then(() => db('property_str_' + nodeId).where('entity', id).delete())
+      .then(() => db('property_bin_' + nodeId).where('entity', id).delete())
+      .then(() => db('relation_' + nodeId).where('id1', id).orWhere('id2', id).delete())
+      .then(() => db('entity_' + nodeId).where('id', id).delete())
       .then((count) => {
-        db('property_str_' + nodeId).where('entity', id).delete()
-          .then((count) => {
-            db('property_bin_' + nodeId).where('entity', id).delete()
-              .then((count) => {
-                db('relation_' + nodeId).where('id1', id).orWhere('id2', id).delete()
-                  .then((count) => {
-                    db('entity_' + nodeId).where('id', id).delete()
-                      .then((count) => {
-                        if (extraFunction) extraFunction(session, id, false, true, callback)
-                        else callback(null, count)
-                      })
-                      .catch((err) => callback(err))
-                  })
-                  .catch((err) => callback(err))
-              })
-              .catch((err) => callback(err))
-          })
-          .catch((err) => callback(err))
+        if (extraFunction) extraFunction(session, id, false, true, callback)
+        else callback(null, count)
       })
       .catch((err) => callback(err))
   } else if (str._input_) {
     let db = session.dbs['inputs']
     let period = variables.period
     db(`input_data_num_${nodeId}_${period}`).where('entity', id).delete()
-      .then((count) => {
-        db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete()
-          .then((count) => {
-            db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete()
-              .then((count) => {
-                db(`input_rel_${nodeId}_${period}`).where('id1', id).orWhere('id2', id).delete()
-                  .then((count) => {
-                    db(`input_${nodeId}_${period}`).where('id', id).delete()
-                      .then((count) => {
-                        callback(count)
-                      })
-                      .catch((err) => callback(err))
-                  })
-                  .catch((err) => callback(err))
-              })
-              .catch((err) => callback(err))
-          })
-          .catch((err) => callback(err))
-      })
+      .then(() => db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete())
+      .then(() => db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete())
+      .then(() => db(`input_rel_${nodeId}_${period}`).where('id1', id).orWhere('id2', id).delete())
+      .then(() => db(`input_${nodeId}_${period}`).where('id', id).delete())
+      .then((count) => callback(count))
       .catch((err) => callback(err))
   }
 }
@@ -275,9 +249,8 @@ Loads entities from a key, and puts them in a map.
 - i: Index of current key
 - result: Map id -> data where objects will be put
 */
-const loadKeyEntities = (db, keysData, i, result, callback) => {
-  if (i >= keysData.length) callback()
-  else {
+/* const loadKeyEntities = (db, keyData, result) => {
+  return new Promise((resolve, reject) => {
     db.select().from('entity_' + nodeId).where()
       .then((rows) => {
         for (let j = 0; j < rows.length; j++) {
@@ -286,11 +259,11 @@ const loadKeyEntities = (db, keysData, i, result, callback) => {
           else {
           }
         }
-        loadKeyEntities(db, keysData, i + 1, result, callback)
+        resolve()
       })
-      .catch((err) => callback(err))
-  }
-}
+      .catch((err) => reject(err))
+  })
+} */
 
 const executeInsert = (params) => {
   if (params.entity) {
@@ -404,22 +377,22 @@ const subPuts = (params) => {
       params.data.hasOwnProperty(p) &&
       (params.str[p]._property_ || params.str[p]._relation_)) l.push(p)
   }
-  subput(l, 0, params)
+  Promise.all(l.map((x) => subput(x, params)))
+    .then(() => params.callback())
+    .catch((err) => params.callback(err))
 }
 
 /*
 Iterates over the list of properties and entities to put, and calls proper function.
 */
-const subput = (l, i, params) => {
-  if (i >= l.length) {
-    params.callback()
-  } else {
-    if (params.str[l[i]]._property_) {
-      putProperty(params.str[l[i]]._property_, l[i], params, l, i)
-    } else if (params.str[l[i]]._relation_) {
-      putRelation(params.str[l[i]]._relation_, l[i], params, l, i)
+const subput = (item, params) => {
+  return new Promise((resolve, reject) => {
+    if (params.str[item]._property_) {
+      putProperty(params.str[item]._property_, item, params, resolve, reject)
+    } else if (params.str[item]._relation_) {
+      putRelation(params.str[item]._relation_, item, params, resolve, reject)
     }
-  }
+  })
 }
 
 /*
@@ -427,7 +400,7 @@ Inserts or updates a property for an entity
 - i: Index in the property list.
 - f: Callback function
  */
-const putProperty = (property, entry, params, l, i) => {
+const putProperty = (property, entry, params, resolve, reject) => {
   let isArray = false
   if (property.charAt(0) === '[') {
     isArray = true
@@ -435,19 +408,19 @@ const putProperty = (property, entry, params, l, i) => {
   }
   let modelProperty = MODEL.PROPERTIES[property]
   if (!modelProperty) {
-    params.callback(`${property} property does not exist`)
+    reject(new Error(`${property} property does not exist`))
     return
   }
   let propObj = params.str[entry]
   let propDataList = isArray ? params.data[entry] : [params.data[entry]]
   if (propObj._total_) prepareTotalHistoric(propDataList, modelProperty.time)
-  putElemProperty(property, modelProperty, propObj, propDataList, 0, l, i, params)
+  Promise.all(propDataList.map((x) => putElemProperty(property, modelProperty, propObj, x, params)))
+    .then(resolve)
+    .catch(reject)
 }
 
-const putElemProperty = (property, modelProperty, propObj, propDataList, n, l, i, params) => {
-  if (n >= propDataList.length) subput(l, i + 1, params)
-  else {
-    let elem = propDataList[n]
+const putElemProperty = (property, modelProperty, propObj, elem, params) => {
+  return new Promise((resolve, reject) => {
     let r = {property: property}
     for (let p in propObj) {
       if (propObj.hasOwnProperty(p)) {
@@ -477,25 +450,25 @@ const putElemProperty = (property, modelProperty, propObj, propDataList, n, l, i
     s.then((rows) => {
       if (params.entity) {
         historicModifier(rows, r, table, db, (err) => {
-          if (err) params.callback(err)
-          else putElemProperty(property, modelProperty, propObj, propDataList, n + 1, l, i, params)
+          if (err) reject(err)
+          else resolve()
         })
       } else {
         // Inputs properties
         if (rows.length === 0) {
           db(table).insert(r)
-            .then((count) => putElemProperty(property, modelProperty, propObj, propDataList, n + 1, l, i, params))
-            .catch((err) => params.callback(err))
+            .then(resolve)
+            .catch(reject)
         } else {
           db(table)
             .where('id', params.id).where('property', property).update(r)
-            .then((count) => putElemProperty(property, modelProperty, propObj, propDataList, n + 1, l, i, params))
-            .catch((err) => params.callback(err))
+            .then(resolve)
+            .catch(reject)
         }
       }
     })
-      .catch((err) => params.callback(err))
-  }
+      .catch(reject)
+  })
 }
 
 /*
@@ -532,7 +505,7 @@ const prepareTotalHistoric = (l, withtime) => {
  - i: Index in the property list.
  - f: Callback function
  */
-const putRelation = (relationDef, entry, params, l, i) => {
+const putRelation = (relationDef, entry, params, resolve, reject) => {
   let isArray = false
   if (relationDef.charAt(0) === '[') {
     isArray = true
@@ -545,7 +518,7 @@ const putRelation = (relationDef, entry, params, l, i) => {
     arrow = relationDef.indexOf('<-')
     if (arrow >= 0) forward = false
     else {
-      params.callback(new Error(`Relation syntax error: ${relationDef}`))
+      reject(new Error(`Relation syntax error: ${relationDef}`))
       return
     }
   }
@@ -554,23 +527,23 @@ const putRelation = (relationDef, entry, params, l, i) => {
   entity = relationDef.substring(arrow + 2)
   let modelRelation = MODEL.RELATIONS[relation]
   if (!modelRelation) {
-    params.callback(`${relation} relation does not exist`)
+    reject(new Error(`${relation} relation does not exist`))
     return
   }
   let newStr = {_entity_: entity}
   let relObj = params.str[entry]
   let relDataList = isArray ? params.data[entry] : [params.data[entry]]
   if (relObj._total_) prepareTotalHistoric(relDataList, modelRelation.time)
-  putElemRelation(newStr, relObj, relation, modelRelation, relDataList, forward, 0, l, i, params)
+  Promise.all(relDataList.map((x) => putElemRelation(newStr, relObj, relation, modelRelation, x, forward, params)))
+    .then(() => resolve(null))
+    .catch((err) => reject(err))
 }
 
 /*
 Treats every single element related with the main entity to put
 */
-const putElemRelation = (newStr, relObj, relation, modelRelation, relDataList, forward, n, l, i, params) => {
-  if (n >= relDataList.length) subput(l, i + 1, params) // Next relation/property
-  else {
-    let relData = relDataList[n]
+const putElemRelation = (newStr, relObj, relation, modelRelation, relData, forward, params) => {
+  return new Promise((resolve, reject) => {
     let t1, t2
     for (let p in relObj) {
       if (relObj.hasOwnProperty(p)) {
@@ -627,17 +600,17 @@ const putElemRelation = (newStr, relObj, relation, modelRelation, relDataList, f
           s.then((rows) => {
             if (params.entity) {
               historicModifier(rows, r, table, db, (err) => {
-                if (err) params.callback(err)
-                else putElemRelation(newStr, relObj, relation, modelRelation, relDataList, forward, n + 1, l, i, params)
+                if (err) reject(err)
+                else resolve()
               })
             } else {
               // TODO: Inputs relations
             }
           })
-            .catch((err) => params.callback(err))
+            .catch((err) => reject(err))
         }
       })
-  }
+  })
 }
 
 const getProperFields = (str, entity, data) => {
@@ -904,30 +877,17 @@ const filterTime = (join, withtime, elem, variablesMapping, beginning) => {
   if (!elem.isArray) {
     join.onBetween('t1', [withtime ? CT.START_OF_TIME : CT.START_OF_DAYS, 0])
         .onBetween('t2', [0, withtime ? CT.END_OF_TIME : CT.END_OF_DAYS])
-    if (withtime) {
-      if (beginning) {
-        variablesMapping.unshift(null)
-        variablesMapping.unshift('now')
-        variablesMapping.unshift('now')
-        variablesMapping.unshift(null)
-      } else {
-        variablesMapping.push(null)
-        variablesMapping.push('now')
-        variablesMapping.push('now')
-        variablesMapping.push(null)
-      }
+    let timeVar = withtime ? 'now' : 'today'
+    if (beginning) {
+      variablesMapping.unshift(null)
+      variablesMapping.unshift(timeVar)
+      variablesMapping.unshift(timeVar)
+      variablesMapping.unshift(null)
     } else {
-      if (beginning) {
-        variablesMapping.unshift(null)
-        variablesMapping.unshift('today')
-        variablesMapping.unshift('today')
-        variablesMapping.unshift(null)
-      } else {
-        variablesMapping.push(null)
-        variablesMapping.push('today')
-        variablesMapping.push('today')
-        variablesMapping.push(null)
-      }
+      variablesMapping.push(null)
+      variablesMapping.push(timeVar)
+      variablesMapping.push(timeVar)
+      variablesMapping.push(null)
     }
   }
 }
@@ -1179,95 +1139,78 @@ const executeSelect = (str, variables, session, callback) => {
     }
   }
   // logger.debug(str._guide_.statement.toSQL())
+  let result
   str._guide_.statement
-    .then((rows) => processRow(str, rows, 0, session, variables, callback))
+    .then((rows) => {
+      result = rows
+      return Promise.all(rows.map((row) => processRow(str, row, session, variables)))
+    })
+    .then(() => {
+      if (str._related_) {
+        result = result[0]._related_
+        if (str._related_._relation_.charAt(0) !== '[') result = result[0]
+      } else {
+        if (!str._guide_.isArray) result = result[0]
+      }
+      callback(null, result)
+    })
     .catch((err) => callback(err))
 }
 
 /*
-For every row of the main query, does a select,
-because there are related entities or historic properties.
+For every row of the main query, does a select (if needed),
+when there are related entities or historic properties.
 */
-const processRow = (str, rows, i, session, variables, callback) => {
-  let execution = {change: false}
-  if (i >= rows.length) {
-    let result = rows
-    if (str._related_) {
-      result = rows[0]._related_
-      if (str._related_._relation_.charAt(0) !== '[') result = result[0]
-    } else {
-      if (!str._guide_.isArray) result = rows[0]
-    }
-    callback(null, result)
-  } else {
-    while (!execution.change && i < rows.length) {
-      // Subqueries for properties
-      executePropertySq(str, 'num', rows, i, execution, (err) => {
-        if (err) callback(err)
-        else {
-          executePropertySq(str, 'str', rows, i, execution, (err) => {
-            if (err) callback(err)
-            else {
-              executePropertySq(str, 'bin', rows, i, execution, (err) => {
-                if (err) callback(err)
-                else {
-                  executeInputOwner(str, rows, i, execution, session, (err) => {
-                    if (err) callback(err)
-                    else {
-                      executeRelation(str, true, rows, i, execution, session, variables, (err) => {
-                        if (err) callback(err)
-                        else {
-                          executeRelation(str, false, rows, i, execution, session, variables, (err) => {
-                            if (err) callback(err)
-                            else {
-                              // Every related data which must be in an object, shoud be moved
-                              let dr = str._guide_.direct_relations
-                              if (dr) treatRelatedObject(dr, rows[i])
-                              let r = str._guide_.fields_to_remove
-                              for (let j = 0; j < r.length; j++) {
-                                // We remove the hidden field _id_ and every extreme date
-                                if (r[j] === '_id_') delete rows[i]._id_
-                                else if (rows[i][r[j]] === CT.END_OF_TIME ||
-                                  rows[i][r[j]] === CT.START_OF_TIME ||
-                                  rows[i][r[j]] === CT.START_OF_DAYS ||
-                                  rows[i][r[j]] === CT.END_OF_DAYS) delete rows[i][r[j]]
-                              }
-                              r = str._guide_.fields_to_parse
-                              for (let j = 0; j < r.length; j++) {
-                                if (rows[i][r[j]] !== undefined && rows[i][r[j]] !== null) {
-                                  rows[i][r[j]] = JSON.parse(rows[i][r[j]])
-                                }
-                              }
-                              // Also nulls
-                              for (let p in rows[i]) {
-                                // Nested relation have fields changed to r<i>_<field>
-                                if (rows[i].hasOwnProperty(p)) {
-                                  if (rows[i][p] === undefined || rows[i][p] === null) delete rows[i][p]
-                                }
-                              }
-                              // Next row
-                              if (execution.change) processRow(str, rows, i + 1, session, variables, callback)
-                            }
-                          })
-                        }
-                      })
-                    }
-                  })
-                }
-              })
-            }
-          })
-        }
+const processRow = (str, row, session, variables) => {
+  return new Promise((resolve, reject) => {
+    // Subqueries for properties
+    executePropertySq(str, 'num', row)
+      .then(() => executePropertySq(str, 'str', row))
+      .then(() => executePropertySq(str, 'bin', row))
+      .then(() => executeInputOwner(str, row, session, variables))
+      .then(() => executeRelation(str, true, row, session, variables))
+      .then(() => executeRelation(str, false, row, session, variables))
+      .then(() => {
+        finalRowTreatment(str, row)
+        resolve()
       })
-      // No callback change, so iterate
-      if (!execution.change) i++
+      .catch((err) => reject(err))
+  })
+}
+
+const finalRowTreatment = (str, row, i) => {
+  // Every related data which must be in an object, should be moved
+  let dr = str._guide_.direct_relations
+  if (dr) treatRelatedObject(dr, row)
+  let r = str._guide_.fields_to_remove
+  for (let j = 0; j < r.length; j++) {
+    // We remove the hidden field _id_ and every extreme date
+    if (r[j] === '_id_') delete row._id_
+    else if (row[r[j]] === CT.END_OF_TIME ||
+      row[r[j]] === CT.START_OF_TIME ||
+      row[r[j]] === CT.START_OF_DAYS ||
+      row[r[j]] === CT.END_OF_DAYS) delete row[r[j]]
+  }
+  r = str._guide_.fields_to_parse
+  for (let j = 0; j < r.length; j++) {
+    if (row[r[j]] !== undefined && row[r[j]] !== null) {
+      row[r[j]] = JSON.parse(row[r[j]])
     }
-    if (!execution.change) callback(null, rows)
+  }
+  // Also nulls
+  for (let p in row) {
+    // Nested relation have fields changed to r<i>_<field>
+    if (row.hasOwnProperty(p)) {
+      if (row[p] === undefined || row[p] === null) delete row[p]
+    }
   }
 }
 
 /*
-Puts information in a related object
+Puts information in a related object,
+because now it is contained in
+'row' array using prefixes and
+should be mapped to proper fields
  */
 const treatRelatedObject = (dr, row) => {
   for (let i = 0; i < dr.length; i++) {
@@ -1295,17 +1238,22 @@ const treatRelatedObject = (dr, row) => {
 /*
 Links input with owner entity
 */
-const executeInputOwner = (str, rows, i, execution, session, callback) => {
-  let ow = str._guide_.relation_owner
-  if (ow) {
-    getNextEntity(ow, true, rows[i], null, execution, session, callback)
-  } else callback()
+const executeInputOwner = (str, row, session, variables) => {
+  return new Promise((resolve, reject) => {
+    let ow = str._guide_.relation_owner
+    if (ow) {
+      getNextEntity(ow, true, row, null, session, variables, (err) => {
+        if (err) reject(err)
+        else resolve()
+      })
+    } else resolve()
+  })
 }
 
 /*
 Calls get() for related entity
 */
-const getNextEntity = (info, forward, parentRow, thisRow, execution, session, variables, callback) => {
+const getNextEntity = (info, forward, parentRow, thisRow, session, variables, callback) => {
   // Already prepared, just substitute id (it's always the last condition)
   let s = info.nextEntity._guide_.statement
   let id = thisRow ? (forward ? thisRow.id2 : thisRow.id1) : parentRow._owner_
@@ -1315,28 +1263,31 @@ const getNextEntity = (info, forward, parentRow, thisRow, execution, session, va
     get(session, variables, info.nextEntity, (err, r) => {
       if (err) callback(err)
       else {
-        if (r.length > 0) completeRelation(r[0], parentRow, info, thisRow, forward)
+        if (Array.isArray(r) && r.length > 0) completeRelation(r[0], parentRow, info, thisRow, forward)
         callback()
       }
     })
-    execution.change = true
   } else callback()
 }
 
 /*
 For every row of the entity query, searches for related objects.
 */
-const executeRelation = (str, forward, rows, i, execution, session, variables, callback) => {
-  let sq = forward ? str._guide_.relations_forward : str._guide_.relations_backward
-  if (sq) {
-    // Modify query 'where' with current id
-    let ss = sq._statement_._statements
-    ss[ss.length - 1].value = rows[i]._id_
-    sq._statement_
-      .then((h) => processRelationRow(rows, i, forward, sq, h, 0, session, variables, callback))
-      .catch((err) => callback(err))
-    execution.change = true
-  } else callback()
+const executeRelation = (str, forward, row, session, variables) => {
+  return new Promise((resolve, reject) => {
+    let sq = forward ? str._guide_.relations_forward : str._guide_.relations_backward
+    if (sq) {
+      // Modify query 'where' with current id
+      let ss = sq._statement_._statements
+      ss[ss.length - 1].value = row._id_
+      sq._statement_
+        .then((h) => processRelationRow(row, forward, sq, h, 0, session, variables, (err) => {
+          if (err) reject(err)
+          else resolve()
+        }))
+        .catch((err) => reject(err))
+    } else resolve()
+  })
 }
 
 /*
@@ -1344,33 +1295,32 @@ Process every row (h[k]) of the relation table, over an entity row (rows[i]).
 - sq is the relations descriptor, which maps relation type to information about it.
 - forward indicates the direction of the relation.
 */
-const processRelationRow = (rows, i, forward, sq, h, k, session, variables, callback) => {
-  let execution = {change: false}
+const processRelationRow = (row, forward, sq, h, k, session, variables, callback) => {
   if (k >= h.length) callback()
   else {
     let info = sq[h[k].relation]
     if (info) {
       // Create a list or object for every relation
-      if (!rows[i][info.entry]) {
-        if (info.isArray) rows[i][info.entry] = []
+      if (!row[info.entry]) {
+        if (info.isArray) row[info.entry] = []
       }
       if (info.fields) {
         if (info.nextEntity) {
-          getNextEntity(info, forward, rows[i], h[k], execution, session, variables, (err) => {
+          getNextEntity(info, forward, row, h[k], session, variables, (err) => {
             if (err) callback(err)
-            else processRelationRow(rows, i, forward, sq, h, k + 1, session, variables, callback)
+            else processRelationRow(row, forward, sq, h, k + 1, session, variables, callback)
           })
           // No entity needed, so just the relation fields
         } else {
-          completeRelation({}, rows[i], info, h[k], forward)
-          processRelationRow(rows, i, forward, sq, h, k + 1, session, variables, callback)
+          completeRelation({}, row, info, h[k], forward)
+          processRelationRow(row, forward, sq, h, k + 1, session, variables, callback)
         }
         // No fields specified, we put just the id in a simple list
       } else {
         let d = forward ? h[k].id2 : h[k].id1
-        if (info.isArray) rows[i][info.entry].push(d)
-        else rows[i][info.entry] = d
-        processRelationRow(rows, i, forward, sq, h, k + 1, session, variables, callback)
+        if (info.isArray) row[info.entry].push(d)
+        else row[info.entry] = d
+        processRelationRow(row, forward, sq, h, k + 1, session, variables, callback)
       }
     }
   }
@@ -1401,36 +1351,37 @@ Executes a query for an historical property (which should generate an array)
 over the entity row rows[i].
 Returns true if execution changes to callback
 */
-const executePropertySq = (str, type, rows, i, execution, callback) => {
-  let sq = str._guide_.property_subqueries
-  if (sq[type]) {
-    let s = sq[type]._statement_
-    let ss = s._statements
-    ss[ss.length - 1].value = rows[i]._id_
-    s.then((h) => {
-      for (let k = 0; k < h.length; k++) {
-        let info = sq[type][h[k].property]
-        if (info) {
-          // Create a list for every historic value
-          if (!rows[i][info.entry]) rows[i][info.entry] = []
-          if (info.fields) {
-            let o = {}
-            if (info.fields.value && h[k].value) o[info.fields.value] = h[k].value
-            if (info.fields.t1 && h[k].t1 &&
-              h[k].t1 !== CT.START_OF_TIME &&
-              h[k].t1 !== CT.START_OF_DAYS) o[info.fields.t1] = h[k].t1
-            if (info.fields.t2 && h[k].t2 &&
-              h[k].t2 !== CT.END_OF_TIME &&
-              h[k].t2 !== CT.END_OF_DAYS) o[info.fields.t2] = h[k].t2
-            rows[i][info.entry].push(o)
-          } else rows[i][info.entry].push(h[k].value)
+const executePropertySq = (str, type, row) => {
+  return new Promise((resolve, reject) => {
+    let sq = str._guide_.property_subqueries
+    if (sq[type]) {
+      let s = sq[type]._statement_
+      let ss = s._statements
+      ss[ss.length - 1].value = row._id_
+      s.then((h) => {
+        for (let k = 0; k < h.length; k++) {
+          let info = sq[type][h[k].property]
+          if (info) {
+            // Create a list for every historic value
+            if (!row[info.entry]) row[info.entry] = []
+            if (info.fields) {
+              let o = {}
+              if (info.fields.value && h[k].value) o[info.fields.value] = h[k].value
+              if (info.fields.t1 && h[k].t1 &&
+                h[k].t1 !== CT.START_OF_TIME &&
+                h[k].t1 !== CT.START_OF_DAYS) o[info.fields.t1] = h[k].t1
+              if (info.fields.t2 && h[k].t2 &&
+                h[k].t2 !== CT.END_OF_TIME &&
+                h[k].t2 !== CT.END_OF_DAYS) o[info.fields.t2] = h[k].t2
+              row[info.entry].push(o)
+            } else row[info.entry].push(h[k].value)
+          }
         }
-      }
-      callback()
-    })
-    .catch((err) => callback(err))
-    execution.change = true
-  } else callback()
+        resolve()
+      })
+      .catch((err) => reject(err))
+    } else resolve()
+  })
 }
 
 /*
