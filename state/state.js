@@ -1,5 +1,18 @@
-var sequences = {}
-var inputSequences = {}
+// -------------------------------------------------------------------------------------------
+// State module.
+// -Implements API calls over global settings.
+// -Generates id's for primary keys.
+// -Blocks types to avoid concurrent actions over keys.
+// -------------------------------------------------------------------------------------------
+
+const logger = require.main.require('./utils/log').getLogger('state')
+
+// Numeric sequences for id's (entities and inputs)
+let sequences = {}
+let inputSequences = {}
+
+// Map for entity types blocking (for key preservation)
+let typesBlocks = {}
 
 const newId = (session, callback) => {
   if (sequences[session.name]) callback(null, sequences[session.name]++)
@@ -92,7 +105,16 @@ Blocks entity type, to preserve keys.
  - type: Entity type
 */
 const blockType = (session, type, callback) => {
-  callback()
+  if (typesBlocks[type]) callback(new Error(type + ' blocked'))
+  else {
+    typesBlocks[type] = {session: session, timeout: setTimeout(timeoutBlock, 5000, type)}
+    callback()
+  }
+}
+
+const timeoutBlock = (type) => {
+  logger.error(`Timeout exceeded blocking ${type} type`)
+  delete typesBlocks[type]
 }
 
 /*
@@ -100,7 +122,12 @@ const blockType = (session, type, callback) => {
  - session: API session
  - type: Entity type
  */
-const releaseType = (session, entity, callback) => {
+const releaseType = (session, type, callback) => {
+  let b = typesBlocks[type]
+  if (b) {
+    clearTimeout(b.timeout)
+    delete typesBlocks[type]
+  }
   callback()
 }
 
