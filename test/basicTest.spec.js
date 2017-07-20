@@ -1,15 +1,8 @@
 /* global process, require, describe, beforeEach, it, afterEach */
-process.env.NODE_ENV = 'test'
 
-const chai = require('chai')
-const chaiHttp = require('chai-http')
-chai.use(chaiHttp)
-const expect = chai.expect
-const lemuria = require('../lemuria.js')
-
-let knexRefs, environment
-let lemuriaAPI
-let data1 = {
+const TestMgr = require('./TestMgr.js')
+let t // Reference to data obtained from TestMgr().get
+let data_1 = {
   'id': 'FROMTEST_1',
   'name': 'FROMTEST_Alba Maria Estany',
   'code': '0455',
@@ -19,32 +12,34 @@ let data1 = {
   'card': [{'code': 'FROMTEST_12826', 'start': 20170105, 'end': 20170622}]
 }
 
+let data_2 = {
+  'id': 'FT_2',
+  'name': 'FT_2 Josep Pérez',
+  'code': '0323',
+  'language': 'es',
+  'validity': [{'start': 20170105, 'end': 20170622}],
+  'timetype_grp': [{'code': 'FT_2'}],
+  'card': [{'code': 'FT_2826', 'start': 20170105, 'end': 20170622}]
+}
+
 describe('API Routes', () => {
-  //TODO!!!!  To be executed before eachTest!
   beforeEach((done) => {
-    lemuria.init()
-      .then((knexObj) => {
-        // getting refences to knex objects
-        knexRefs = knexObj
-        console.log('Migrations.init() invoked from test')
-         // getting environment to know Ports, Urls, etc
-        environment = lemuria.getEnvironment()
-        let port = environment.api_listen.port
-        expect(parseInt(port, 10)).to.be.greaterThan(1000)
-        lemuriaAPI = `localhost:${port}`
-        console.log(`lemuriaAPI for testing is: ${lemuriaAPI}`)
-        done()
-      })
+    TestMgr.get().then((_testdata) => {
+      t = _testdata
+      done()
+    })
   })
 
-  it('------TEST API --------', (done) => {
-    console.log('------TEST API --------')
-    chai.request(lemuriaAPI).post('/api/coms/records').send(data1)
+  it('Basic-test-1', (done) => {
+    console.log('Basic-test-1')
+    t.chai.request(t.lemuriaAPI).post('/api/coms/records').send(data_1)
       .then((res) => {
-        let kObjects = knexRefs['objects']
+        // TODO: res.body can be checked, also res.statusCde, etc
+        t.expect(res.status).to.equal(200)
+        let kObjects = t.knexRefs['objects']
         kObjects.select().table('entity_1')
           .then((collection) => {
-            expect(collection.length).to.equal(2)
+            t.expect(collection.length).to.equal(2)
             done()
           })
       })
@@ -53,11 +48,44 @@ describe('API Routes', () => {
       })
   })
 
-  afterEach((done) => {
-    let kObjects = knexRefs['objects']
-    // kObjects.migrate.rollback().then(() => done())
-    done()
+  it('Basic-test-2', (done) => {
+    console.log('Basic-test-2')
+    t.chai.request(t.lemuriaAPI).post('/api/coms/records').send(data_2)
+      .then((res) => {
+        t.expect(res.status).to.equal(200)
+        let kObjects = t.knexRefs['objects']
+        kObjects.select().table('entity_1')
+          .then((collection) => {
+            t.expect(collection.length).to.equal(2)
+            done()
+          })
+      })
+      .catch((err) => {
+        console.log(err)
+      })
   })
+
+  // -------------------------------------------------------------------------------------------
+  // afterEach(): OPTION 1) Destroys and recreates BD from it() to other it()'s
+  // -------------------------------------------------------------------------------------------
+  afterEach((done) => {
+    let kObjects = t.knexRefs['objects']
+    kObjects.migrate.rollback().then(() => {
+      kObjects.migrate.latest().then(() => done())
+    })
+  })
+  // -------------------------------------------------------------------------------------------
+  // afterEach(): OPTION 2) (NOT Prefereable) Does nothing, tables are not restored from it() to other it()'s
+  // -------------------------------------------------------------------------------------------
+  /*
+   afterEach((done) => {
+   done()
+   })
+   */
+
+
+
+
 
 /* //TODO: veure com podem posar dins de migrations la creació i rollback....
   beforeEach((done) => {
