@@ -1,5 +1,18 @@
-var sequences = {}
-var inputSequences = {}
+// -------------------------------------------------------------------------------------------
+// State module.
+// -Implements API calls over global settings.
+// -Generates id's for primary keys.
+// -Blocks types to avoid concurrent actions over keys.
+// -------------------------------------------------------------------------------------------
+
+const logger = require.main.require('./utils/log').getLogger('state')
+
+// Numeric sequences for id's (entities and inputs)
+let sequences = {}
+let inputSequences = {}
+
+// Map for entity types blocking (for key preservation)
+let typesBlocks = {}
 
 const newId = (session, callback) => {
   if (sequences[session.name]) callback(null, sequences[session.name]++)
@@ -60,15 +73,15 @@ const updateSettings = (db, settings, callback) => {
   for (var property in settings) {
     if (settings.hasOwnProperty(property)) { l.push({setting: property, value: settings[property]}) }
   }
-  putSettingItem(db, l, 0, callback)
+  Promise.all(l.map((x) => putSettingItem(db, x, callback)))
+    .then(callback).catch(callback)
 }
 
-function putSettingItem (db, l, i, callback) {
-  if (i >= l.length) callback()
-  else {
-    var setting = l[i].setting
-    var value = l[i].value
-    db.select('value').from('settings').where('setting',setting)
+function putSettingItem (db, elem, callback) {
+  return new Promise((resolve, reject) => {
+    var setting = elem.setting
+    var value = elem.value
+    db.select('value').from('settings').where('setting', setting)
       .then((rows) => {
         if (rows == null || rows.length === 0) {
           let o = {
@@ -76,16 +89,14 @@ function putSettingItem (db, l, i, callback) {
             value: value
           }
           db.insert(o).into('settings')
-            .then((rowid) => putSettingItem(db, l, i + 1, callback))
-            .catch((err) => callback(err))
+            .then(resolve).catch(reject)
         } else {
           db('settings').update({value: value}).where('setting', setting)
-            .then((count) => putSettingItem(db, l, i + 1, callback))
-            .catch((err) => callback(err))
+            .then(resolve).catch(reject)
         }
       })
-      .catch((err) => callback(err))
-  }
+      .catch(reject)
+  })
 }
 
 /*
@@ -94,7 +105,16 @@ Blocks entity type, to preserve keys.
  - type: Entity type
 */
 const blockType = (session, type, callback) => {
-  callback()
+  if (typesBlocks[type]) callback(new Error(type + ' blocked'))
+  else {
+    typesBlocks[type] = {session: session, timeout: setTimeout(timeoutBlock, 5000, type)}
+    callback()
+  }
+}
+
+const timeoutBlock = (type) => {
+  logger.error(`Timeout exceeded blocking ${type} type`)
+  delete typesBlocks[type]
 }
 
 /*
@@ -102,7 +122,12 @@ const blockType = (session, type, callback) => {
  - session: API session
  - type: Entity type
  */
-const releaseType = (session, entity, callback) => {
+const releaseType = (session, type, callback) => {
+  let b = typesBlocks[type]
+  if (b) {
+    clearTimeout(b.timeout)
+    delete typesBlocks[type]
+  }
   callback()
 }
 

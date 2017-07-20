@@ -389,8 +389,10 @@ const subput = (item, params) => {
   return new Promise((resolve, reject) => {
     if (params.str[item]._property_) {
       putProperty(params.str[item]._property_, item, params, resolve, reject)
+        .then(resolve).catch(reject)
     } else if (params.str[item]._relation_) {
       putRelation(params.str[item]._relation_, item, params, resolve, reject)
+        .then(resolve).catch(reject)
     }
   })
 }
@@ -400,23 +402,25 @@ Inserts or updates a property for an entity
 - i: Index in the property list.
 - f: Callback function
  */
-const putProperty = (property, entry, params, resolve, reject) => {
-  let isArray = false
-  if (property.charAt(0) === '[') {
-    isArray = true
-    property = property.substring(1, property.length - 1)
-  }
-  let modelProperty = MODEL.PROPERTIES[property]
-  if (!modelProperty) {
-    reject(new Error(`${property} property does not exist`))
-    return
-  }
-  let propObj = params.str[entry]
-  let propDataList = isArray ? params.data[entry] : [params.data[entry]]
-  if (propObj._total_) prepareTotalHistoric(propDataList, modelProperty.time)
-  Promise.all(propDataList.map((x) => putElemProperty(property, modelProperty, propObj, x, params)))
-    .then(resolve)
-    .catch(reject)
+const putProperty = (property, entry, params) => {
+  return new Promise((resolve, reject) => {
+    let isArray = false
+    if (property.charAt(0) === '[') {
+      isArray = true
+      property = property.substring(1, property.length - 1)
+    }
+    let modelProperty = MODEL.PROPERTIES[property]
+    if (!modelProperty) {
+      reject(new Error(`${property} property does not exist`))
+      return
+    }
+    let propObj = params.str[entry]
+    let propDataList = isArray ? params.data[entry] : [params.data[entry]]
+    if (propObj._total_) prepareTotalHistoric(propDataList, modelProperty.time)
+    Promise.all(propDataList.map((x) => putElemProperty(property, modelProperty, propObj, x, params)))
+      .then(resolve)
+      .catch(reject)
+  })
 }
 
 const putElemProperty = (property, modelProperty, propObj, elem, params) => {
@@ -460,8 +464,8 @@ const putElemProperty = (property, modelProperty, propObj, elem, params) => {
             .then(resolve)
             .catch(reject)
         } else {
-          db(table)
-            .where('id', params.id).where('property', property).update(r)
+          db(table).where('id', params.id).where('property', property)
+            .update(r)
             .then(resolve)
             .catch(reject)
         }
@@ -505,38 +509,40 @@ const prepareTotalHistoric = (l, withtime) => {
  - i: Index in the property list.
  - f: Callback function
  */
-const putRelation = (relationDef, entry, params, resolve, reject) => {
-  let isArray = false
-  if (relationDef.charAt(0) === '[') {
-    isArray = true
-    relationDef = relationDef.substring(1, relationDef.length - 1)
-  }
-  let arrow = relationDef.indexOf('->')
-  let forward
-  if (arrow >= 0) forward = true
-  else {
-    arrow = relationDef.indexOf('<-')
-    if (arrow >= 0) forward = false
+const putRelation = (relationDef, entry, params) => {
+  return new Promise((resolve, reject) => {
+    let isArray = false
+    if (relationDef.charAt(0) === '[') {
+      isArray = true
+      relationDef = relationDef.substring(1, relationDef.length - 1)
+    }
+    let arrow = relationDef.indexOf('->')
+    let forward
+    if (arrow >= 0) forward = true
     else {
-      reject(new Error(`Relation syntax error: ${relationDef}`))
+      arrow = relationDef.indexOf('<-')
+      if (arrow >= 0) forward = false
+      else {
+        reject(new Error(`Relation syntax error: ${relationDef}`))
+        return
+      }
+    }
+    let relation, entity
+    relation = relationDef.substring(0, arrow)
+    entity = relationDef.substring(arrow + 2)
+    let modelRelation = MODEL.RELATIONS[relation]
+    if (!modelRelation) {
+      reject(new Error(`${relation} relation does not exist`))
       return
     }
-  }
-  let relation, entity
-  relation = relationDef.substring(0, arrow)
-  entity = relationDef.substring(arrow + 2)
-  let modelRelation = MODEL.RELATIONS[relation]
-  if (!modelRelation) {
-    reject(new Error(`${relation} relation does not exist`))
-    return
-  }
-  let newStr = {_entity_: entity}
-  let relObj = params.str[entry]
-  let relDataList = isArray ? params.data[entry] : [params.data[entry]]
-  if (relObj._total_) prepareTotalHistoric(relDataList, modelRelation.time)
-  Promise.all(relDataList.map((x) => putElemRelation(newStr, relObj, relation, modelRelation, x, forward, params)))
-    .then(() => resolve(null))
-    .catch((err) => reject(err))
+    let newStr = {_entity_: entity}
+    let relObj = params.str[entry]
+    let relDataList = isArray ? params.data[entry] : [params.data[entry]]
+    if (relObj._total_) prepareTotalHistoric(relDataList, modelRelation.time)
+    Promise.all(relDataList.map((x) => putElemRelation(newStr, relObj, relation, modelRelation, x, forward, params)))
+      .then(() => resolve(null))
+      .catch((err) => reject(err))
+  })
 }
 
 /*
