@@ -5,10 +5,10 @@
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
-const logger = require.main.require('./utils/log').getLogger('coms')
-const squeries = require.main.require('./objects/squeries')
-const CT = require.main.require('./CT')
-const utils = require.main.require('./utils/utils')
+const logger = require('./utils/log').getLogger('coms')
+const squeries = require('./objects/squeries')
+const CT = require('./CT')
+const utils = require('./utils/utils')
 
 let stateService, comsService, main
 
@@ -171,7 +171,7 @@ let prepPutClocking = {
 const init = (state, coms) => {
   stateService = state
   comsService = coms
-  if (!main) main = require.main.require('./lemuria')
+  if (!main) main = require('./lemuria')
 }
 
 const get = (req, res, session, str) => {
@@ -216,7 +216,7 @@ const apiCall = (op, param1, param2) => {
 }
 
 const initAPI = (api) => {
-  if (!main) main = require.main.require('./lemuria')
+  if (!main) main = require('./lemuria')
   api.get('/api/coms/records', apiCall(get, prepGetRecords))
   api.get('/api/coms/records/:id', apiCall(get, prepGetRecord))
   api.post('/api/coms/records', apiCall(put, prepPutRecords))

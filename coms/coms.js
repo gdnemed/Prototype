@@ -10,7 +10,7 @@
 const net = require('net')
 const msgpack = require('msgpack-lite')
 
-const logger = require.main.require('./utils/log').getLogger('coms')
+const logger = require('../utils/log').getLogger('coms')
 
 var clients = {}
 var tablesVersions = {records: 0, cards: 0, time_types: 0}
