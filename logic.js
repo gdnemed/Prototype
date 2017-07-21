@@ -10,7 +10,7 @@ const squeries = require.main.require('./objects/squeries')
 const CT = require.main.require('./CT')
 const utils = require.main.require('./utils/utils')
 
-let stateService, comsService, main
+let sessionService, stateService, comsService
 
 let prepGetRecords = {
   _entity_: '[record]',
@@ -168,10 +168,10 @@ let prepPutClocking = {
   record: {_property_: 'record'}
 }
 
-const init = (state, coms) => {
+const init = (sessions, state, coms) => {
+  sessionService = sessions
   stateService = state
   comsService = coms
-  if (!main) main = require.main.require('./lemuria')
 }
 
 const get = (req, res, session, str) => {
@@ -211,12 +211,11 @@ const del = (req, res, session, filter, entity) => {
 }
 
 const apiCall = (op, param1, param2) => {
-  return (req, res) => main.manageSession(req, res,
+  return (req, res) => sessionService.manageSession(req, res,
     (req, res, session) => op(req, res, session, param1, param2))
 }
 
 const initAPI = (api) => {
-  if (!main) main = require.main.require('./lemuria')
   api.get('/api/coms/records', apiCall(get, prepGetRecords))
   api.get('/api/coms/records/:id', apiCall(get, prepGetRecord))
   api.post('/api/coms/records', apiCall(put, prepPutRecords))
@@ -316,62 +315,58 @@ const nextVersion = (session, obj, type) => {
 Uploads into the terminal, every information with higher revision.
 */
 const initTerminal = (serial, customer) => {
-  let session = createSession(customer)
-  squeries.get(session, {},
-    {
-      _entity_: '[record]',
-      _filter_: {field: 'revision', condition: '>', value: 0},
-      code: 'code',
-      drop: {_property_: 'drop'},
-      card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
-    }, (err, ret) => {
-      if (err) logger.error(err)
-      else {
-        for (let i = 0; i < ret.length; i++) {
-          if (ret[i].code && ret[i].code !== null) {
-            let r = {id: parseInt(ret[i].code)}
-            comsService.send(serial, 'record_insert', {records: [r]})
-            let card = ret[i].card
-            if (card) {
-              for (let j = 0; j < card.length; j++) {
-                let e = {card: card[j].code, id: parseInt(ret[i].code)}
-                comsService.send(serial, 'card_insert', {cards: [e]})
+  sessionService.getSession(null, (err, session) => {
+    if (err) logger.error(err)
+    else {
+      squeries.get(session, {},
+        {
+          _entity_: '[record]',
+          _filter_: {field: 'revision', condition: '>', value: 0},
+          code: 'code',
+          drop: {_property_: 'drop'},
+          card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
+        }, (err, ret) => {
+          if (err) logger.error(err)
+          else {
+            for (let i = 0; i < ret.length; i++) {
+              if (ret[i].code && ret[i].code !== null) {
+                let r = {id: parseInt(ret[i].code)}
+                comsService.send(serial, 'record_insert', {records: [r]})
+                let card = ret[i].card
+                if (card) {
+                  for (let j = 0; j < card.length; j++) {
+                    let e = {card: card[j].code, id: parseInt(ret[i].code)}
+                    comsService.send(serial, 'card_insert', {cards: [e]})
+                  }
+                }
               }
             }
           }
-        }
-      }
-    })
+        })
+    }
+  })
 }
 
 const createClocking = (clocking, customer, callback) => {
-  let session = createSession(customer)
-  // Find the owner
-  squeries.get(session, {record: clocking.record},
-    {
-      _entity_: 'record',
-      id: 'id',
-      _filter_: {field: 'code', variable: 'record'}
-    }, (err, record) => {
-      if (err) callback(err)
-      else {
-        if (record && record.length > 0) clocking.owner = record[0].id
-        squeries.put(session, stateService, {}, prepPutClocking, clocking, callback)
-        // inputsService.createClocking(clocking, customer, callback)
-      }
-    })
-}
-
-const createSession = (customer) => {
-  let ts = new Date().getTime()
-  let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
-  let session = {
-    name: customer,
-    dbs: main.getDatabases(customer),
-    now: parseInt(now),
-    today: parseInt(now.substring(0, 8))
-  }
-  return session
+  sessionService.getSession(null, (err, session) => {
+    if (err) callback(err)
+    else {
+      // Find the owner
+      squeries.get(session, {record: clocking.record},
+        {
+          _entity_: 'record',
+          id: 'id',
+          _filter_: {field: 'code', variable: 'record'}
+        }, (err, record) => {
+          if (err) callback(err)
+          else {
+            if (record && record.length > 0) clocking.owner = record[0].id
+            squeries.put(session, stateService, {}, prepPutClocking, clocking, callback)
+            // inputsService.createClocking(clocking, customer, callback)
+          }
+        })
+    }
+  })
 }
 
 /*

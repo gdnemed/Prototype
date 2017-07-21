@@ -8,7 +8,6 @@
 const fs = require('fs')
 const express = require('express')
 const bodyParser = require('body-parser')
-const moment = require('moment-timezone')
 
 const state = require('./state/state')
 const coms = require('./coms/coms')
@@ -16,7 +15,8 @@ const files = require('./exchange/files')
 const logic = require('./logic')
 const logger = require('./utils/log')
 const migrations = require('./migrations')
-const squeries = require.main.require('./objects/squeries')
+const squeries = require('./objects/squeries')
+const sessions = require('./session/sessions')
 
 let home, environment, customers, api, httpServer, logM, log
 
@@ -100,10 +100,10 @@ function initApiServer () {
     api = express()
     api.use(bodyParser.json())
     // API functions
-    api.post('/api/state/settings', (req, res) => manageSession(req, res, state.postSettings))
-    api.get('/api/state/settings', (req, res) => manageSession(req, res, state.getSettings))
+    api.post('/api/state/settings', (req, res) => sessions.manageSession(req, res, state.postSettings))
+    api.get('/api/state/settings', (req, res) => sessions.manageSession(req, res, state.getSettings))
     // For testing
-    api.post('/api/objects/query', (req, res) => manageSession(req, res, query))
+    api.post('/api/objects/query', (req, res) => sessions.manageSession(req, res, query))
     logic.initAPI(api)
     // Run http server
     httpServer = api.listen(environment.api_listen.port, (err) => {
@@ -124,21 +124,6 @@ const query = (req, res, session) => {
   })
 }
 
-/*
-Initialize session object for this API call, an executes f
-*/
-const manageSession = (req, res, f) => {
-  let customer = 'SPEC'
-  let ts = new Date().getTime()
-  let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
-  let session = {
-    name: customer,
-    dbs: customers[customer].dbs,
-    now: parseInt(now),
-    today: parseInt(now.substring(0, 8))}
-  f(req, res, session)
-}
-
 const getDatabases = (customer) => {
   return customers[customer].dbs
 }
@@ -147,7 +132,8 @@ const initServices = () => {
   return new Promise((resolve, reject) => {
     try {
       log.info('initServices')
-      logic.init(state, coms)
+      sessions.init(customers)
+      logic.init(sessions, state, coms)
       coms.init(environment.coms_listen, logic)
       resolve()
     } catch (error) {
@@ -192,8 +178,7 @@ function serviceFunctions (args) {
 }
 
 module.exports = {
-  getDatabases: getDatabases,
-  manageSession: manageSession
+  getDatabases: getDatabases
 }
 
 // Start Lemuria
