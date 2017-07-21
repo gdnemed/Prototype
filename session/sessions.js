@@ -39,7 +39,7 @@ const manageSession = (req, res, f) => {
 }
 
 module.exports = {
-  init: init,
-  getSession: getSession,
-  manageSession: manageSession
+  init,
+  getSession,
+  manageSession
 }
