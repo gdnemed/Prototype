@@ -9,7 +9,7 @@ const chokidar = require('chokidar')
 const csvtojson = require('csvtojson')
 const request = require('request')
 const equal = require('deep-equal')
-const logger = require.main.require('./utils/log').getLogger('files')
+const logger = require('../utils/log').getLogger('files')
 
 let ONE_DAY = 86400000
 let DELETE_MARK = '{{DEL}}'

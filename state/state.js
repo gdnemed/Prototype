@@ -5,7 +5,7 @@
 // -Blocks types to avoid concurrent actions over keys.
 // -------------------------------------------------------------------------------------------
 
-const logger = require.main.require('./utils/log').getLogger('state')
+const logger = require('../utils/log').getLogger('state')
 
 // Numeric sequences for id's (entities and inputs)
 let sequences = {}

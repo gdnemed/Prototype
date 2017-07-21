@@ -21,21 +21,31 @@ const sessions = require('./session/sessions')
 let home, environment, customers, api, httpServer, logM, log
 
 const init = () => {
-  // Install/uninstall as a service
-  if (process.argv.length > 2) serviceFunctions(process.argv)
-  else {
-    // Run it as a program
-    initConfiguration()
-    migrations.init('sqlite', 'SPEC', '2017').then((knexRefs) => {
-      debugTestKnexRefs(knexRefs)
-        .then(initApiServer)
-        .then(initServices)
-        .then(initProcess)
-        .catch((err) => {
-          log.error(`ERROR: cannot start Lemuria: ${err}`)
-        })
-    }).catch((err) => logM.error(`ERROR: Migration failed: ${err}`))
-  }
+  return new Promise((resolve, reject) => {
+    if (process.argv.length <= 2 || process.env.NODE_ENV === 'test') {
+      console.log('Starting lemuria as application')
+      // Run it as a program
+      initConfiguration()
+      migrations.init('sqlite', 'SPEC', '2017').then((knexRefs) => {
+        debugTestKnexRefs(knexRefs)
+          .then(initApiServer)
+          .then(initServices)
+          .then(initProcess)
+          .then(() => resolve(knexRefs))
+          .catch((err) => {
+            log.error(`ERROR: cannot start Lemuria: ${err}`)
+            reject(err)
+          })
+      }).catch((err) => {
+        logM.error(`ERROR: Migration failed: ${err}`)
+        reject(err)
+      })
+    } else {
+      console.log('Starting lemuria as a service: ' + process.argv.length)
+      // Install/uninstall as a service
+      serviceFunctions(process.argv).then(resolve)
+    }
+  })
 }
 
 const initConfiguration = () => {
@@ -44,7 +54,9 @@ const initConfiguration = () => {
   logM = logger.getLogger('migration')
   log = logger.getLogger('Main')
   try {
-    environment = JSON.parse(fs.readFileSync(home + '/config.json', 'utf8'))
+    let routeCfg = process.env.NODE_ENV === 'test' ? `${home}\\test` : home
+    log.debug(`Using config file ${routeCfg}`)
+    environment = JSON.parse(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
   } catch (err) {
     log.info('config.json not found, using default configuration.')
     environment = {
@@ -94,7 +106,7 @@ const debugTestKnexRefs = (knexRefs) => {
   })
 }
 
-function initApiServer () {
+const initApiServer = () => {
   return new Promise((resolve, reject) => {
     log.info('initApiServer')
     api = express()
@@ -157,29 +169,45 @@ const initProcess = () => {
 Installs/unistalls Lemuria as a Windows service.
 args: Command line parameters. args[2] contains i/u for installing/uninstalling.
 */
-function serviceFunctions (args) {
+const serviceFunctions = (args) => {
   let Service = require('node-windows').Service
-  // Create a new service object
-  let svc = new Service({
-    name: 'Lemuria',
-    description: 'SPEC coms module.',
-    script: process.cwd() + '\\lemuria.js'
+  return new Promise((resolve, reject) => {
+    // Create a new service object
+    let svc = new Service({
+      name: 'Lemuria',
+      description: 'SPEC coms module.',
+      script: process.cwd() + '\\lemuria.js'
+    })
+    // Listen for the "install" events
+    svc.on('install', () => {
+      console.log('Service installed')
+      resolve()
+    })
+    svc.on('uninstall', () => {
+      console.log('Service uninstalled')
+      resolve()
+    })
+    // Execute command
+    switch (args[2]) {
+      case 'i':
+        svc.install()
+        break
+      case 'u':
+        svc.uninstall()
+        break
+    }
   })
-
-  // Listen for the "install" events
-  svc.on('install', function () { console.log('Service installed') })
-  svc.on('uninstall', function () { console.log('Service uninstalled') })
-
-  // Execute command
-  switch (args[2]) {
-    case 'i':svc.install(); break
-    case 'u':svc.uninstall(); break
-  }
 }
+
+const getEnvironment = () => environment
 
 module.exports = {
-  getDatabases: getDatabases
+  getDatabases,
+  getEnvironment,
+  init
 }
 
-// Start Lemuria
-init()
+// Start Lemuria when not testing (tests start Lemuria by themselves)
+if (process.env.NODE_ENV !== 'test') {
+  init()
+}

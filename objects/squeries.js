@@ -3,9 +3,9 @@
 // -------------------------------------------------------------------------------------------
 
 const MODEL = require('./model')
-const CT = require.main.require('./CT')
-const utils = require.main.require('./utils/utils')
-const logger = require.main.require('./utils/log').getLogger('db')
+const CT = require('../CT')
+const utils = require('../utils/utils')
+const logger = require('../utils/log').getLogger('db')
 
 let nodeId = 1
 

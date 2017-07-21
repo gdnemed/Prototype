@@ -4,8 +4,8 @@
 
 const msgpack = require('msgpack-lite')
 
-const logger = require.main.require('./utils/log').getLogger('coms')
-const utils = require.main.require('./utils/utils')
+const logger = require('../utils/log').getLogger('coms')
+const utils = require('../utils/utils')
 
 /*
 Places information in the queue to be sent to terminal.

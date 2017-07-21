@@ -5,10 +5,10 @@
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
-const logger = require.main.require('./utils/log').getLogger('coms')
-const squeries = require.main.require('./objects/squeries')
-const CT = require.main.require('./CT')
-const utils = require.main.require('./utils/utils')
+const logger = require('./utils/log').getLogger('coms')
+const squeries = require('./objects/squeries')
+const CT = require('./CT')
+const utils = require('./utils/utils')
 
 let sessionService, stateService, comsService
 

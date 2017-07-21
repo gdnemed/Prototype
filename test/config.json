@@ -1,0 +1,13 @@
+{
+		"api_listen":{"host":"","port":4041},
+		"coms_listen":{"host":"","port":4042},
+		"node_id":1,
+		"exchange":{
+			"files":{
+				"dir":"c:\\CURRENT\\PANGEA\\LEMURIA\\Pruebas\\remote",
+				"workdir": "c:\\CURRENT\\PANGEA\\LEMURIA\\Pruebas",
+				"server":{"host":"172.18.4.176","port":4041},
+				"output": true
+			}
+		}
+}
