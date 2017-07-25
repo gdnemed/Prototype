@@ -315,7 +315,7 @@ const nextVersion = (session, obj, type) => {
 Uploads into the terminal, every information with higher revision.
 */
 const initTerminal = (serial, customer) => {
-  sessionService.getSession(null, (err, session) => {
+  sessionService.getSession(customer, (err, session) => {
     if (err) logger.error(err)
     else {
       squeries.get(session, {},
@@ -348,7 +348,7 @@ const initTerminal = (serial, customer) => {
 }
 
 const createClocking = (clocking, customer, callback) => {
-  sessionService.getSession(null, (err, session) => {
+  sessionService.getSession(customer, (err, session) => {
     if (err) callback(err)
     else {
       // Find the owner
