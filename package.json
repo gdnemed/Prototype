@@ -26,6 +26,7 @@
     "chai": "latest",
     "chai-http": "latest",
     "istanbul": "^0.4.5",
+    "mocha": "^3.4.2",
     "standard": "^10.0.2"
   }
 }
