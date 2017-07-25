@@ -65,9 +65,8 @@ describe('basicTest.spec.js', () => {
           })
           done()
         })
-      })
-      .catch((err) => {
-        console.log(err)
+      }).catch(({response}) => {
+        console.log('ERROR: ' + response.status + ' ' + response.text)
       })
   })
 
@@ -96,13 +95,13 @@ describe('basicTest.spec.js', () => {
         }) */
         done()
       })
-    }).catch((err) => {
-      console.log(err)
+    }).catch(({response}) => {
+      console.log('ERROR: ' + response.status + ' ' + response.text)
     })
   })
 
   it('POST to /records/  a "record" without any "card" (oneUserZeroCards) results =>  only a record and no card', (done) => {
-    t.chai.request(t.lemuriaAPI).post('/api/coms/records').send(oneUserZeroCards)
+    t.sendPOST('/api/coms/records', oneUserZeroCards)
       .then((res) => {
         t.expect(res.status).to.equal(200)
         t.getCollection('objects', 'entity_1').then((collection) => {
@@ -116,9 +115,8 @@ describe('basicTest.spec.js', () => {
           })
           done()
         })
-      })
-      .catch((err) => {
-        console.log(err)
+      }).catch(({response}) => {
+        console.log('ERROR: ' + response.status + ' ' + response.text)
       })
   })
 

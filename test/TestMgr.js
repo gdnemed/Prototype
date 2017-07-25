@@ -84,9 +84,9 @@ const expectProps = (realObj, expectedObj) => {
 }
 
 // Sends 'data' via http POST query to 'route'
-const sendGET = (route) => chai.request(t.lemuriaAPI).get(route)
+const sendGET = (route) => chai.request(t.lemuriaAPI).get(route).set('Authorization', 'APIKEY 123')
 // Sends 'data' via http POST query to 'route'
-const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).send(data)
+const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
 // Gets the DB related to 'section' &  'tableName'
 const getCollection = (section, tableName) => t.knexRefs[section].select().table(tableName)
 

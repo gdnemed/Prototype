@@ -43,9 +43,8 @@ describe('records.spec.js', () => {
           t.expectProps(rec0.validity[0], oneUserOneCard.validity[0])
           done()
         })
-      })
-      .catch((err) => {
-        console.log(err)
+      }).catch(({response}) => {
+        console.log('ERROR: ' + response.status + ' ' + response.text)
       })
   })
 

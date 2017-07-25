@@ -30,7 +30,9 @@ const init = () => {
         .then(initApiServer)
         .then(initServices)
         .then(initProcess)
-        .then(() => resolve(customers['SPEC'].dbs)) // For test, return 1 database
+        .then(() => {
+          resolve(customers['SPEC'].dbs)
+        }) // For test, return 1 database
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: ${err}`)
           reject(err)
@@ -50,6 +52,7 @@ const initializeCustomer = (customersList, i) => {
       migrations.init('sqlite', customersList[i].name, '2017')
         .then((knexRefs) => debugTestKnexRefs(knexRefs))
         .then(() => initializeCustomer(customersList, i + 1))
+        .then(() => resolve())
         .catch(reject)
     }
   })

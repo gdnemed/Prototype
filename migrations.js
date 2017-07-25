@@ -119,7 +119,7 @@ const migrateSection = (section) => {
 // Executes the migration for all sections and returns a promise with the  'knexRefs' object
 // If an error occurs in some process,
 const init = (type, customer, year) => {
-  logger.info('info: migrations.init()')
+  logger.info('info: migrations.init() : customer: ' + customer + ' year: ' + year + ' type: ' + type)
   dbType = type
   customerName = customer
   yearMigration = year

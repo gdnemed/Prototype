@@ -49,7 +49,7 @@ const manageSession = (req, res, f) => {
   // Simple api key
   let apiKey = req.header('Authorization')
   if (apiKey && apiKey.startsWith('APIKEY ')) {
-    let customer = global.customers['k' + apiKey.substr(8)]
+    let customer = global.customers['k' + apiKey.substr(7)]
     if (customer) {
       getSession(customer.name, (err, session) => {
         if (err) res.status(401).end(err.message)
