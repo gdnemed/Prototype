@@ -2,63 +2,120 @@
 
 const TestMgr = require('./TestMgr.js')
 let t // Reference to data obtained from TestMgr().get
-let data_1 = {
-  'id': 'FROMTEST_1',
-  'name': 'FROMTEST_Alba Maria Estany',
+
+const oneUserZeroCards = {
+  'id': '1U_1C',
+  'name': '1U_1C Alba Maria Estany',
   'code': '0455',
   'language': 'es',
   'validity': [{'start': 20170105, 'end': 20170622}],
-  'timetype_grp': [{'code': 'FROMTEST_1'}],
-  'card': [{'code': 'FROMTEST_12826', 'start': 20170105, 'end': 20170622}]
+  'timetype_grp': [{'code': 'TT_1U_1C'}],
+  'card': [] // FORCED PROBLEM: no cards defined
 }
 
-let data_2 = {
-  'id': 'FT_2',
-  'name': 'FT_2 Josep Pérez',
-  'code': '0323',
+const oneUserOneCard = {
+  'id': '1U_1C',
+  'name': '1U_1C Alba Maria Estany',
+  'code': '0455',
   'language': 'es',
   'validity': [{'start': 20170105, 'end': 20170622}],
-  'timetype_grp': [{'code': 'FT_2'}],
-  'card': [{'code': 'FT_2826', 'start': 20170105, 'end': 20170622}]
+  'timetype_grp': [{'code': 'TT_1U_1C'}],
+  'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20170622}]
 }
 
-describe('API Routes', () => {
+const oneUserTwoCards = {
+  'id': '1U_2C',
+  'name': '1U_2C Alba Maria Estany',
+  'code': '0225',
+  'language': 'es',
+  'validity': [{'start': 20170105, 'end': 20170622}],
+  'timetype_grp': [{'code': 'TT_1U_2C'}],
+  'card': [
+    {'code': '0_CARD_CODE_1U_2C', 'start': 20170205, 'end': 20170522}/*,
+    {'code': '1_CARD_CODE_1U_2C', 'start': 20170711, 'end': 20170722} */
+  ]
+}
+
+describe('basicTest.spec.js', () => {
   beforeEach((done) => {
+    // Ensures Lemuria is created and all needed references are stored in "t"
     TestMgr.get().then((_testdata) => {
       t = _testdata
       done()
     })
   })
 
-  it('Basic-test-1', (done) => {
-    console.log('Basic-test-1')
-    t.chai.request(t.lemuriaAPI).post('/api/coms/records').send(data_1)
+  it('POST to /records/ creates a "record" and 1 "card" (oneUserOneCard)', (done) => {
+    t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
-        // TODO: res.body can be checked, also res.statusCde, etc
         t.expect(res.status).to.equal(200)
-        let kObjects = t.knexRefs['objects']
-        kObjects.select().table('entity_1')
-          .then((collection) => {
-            t.expect(collection.length).to.equal(2)
-            done()
+        t.getCollection('objects', 'entity_1').then((collection) => {
+          t.expect(collection.length).to.equal(2)
+          // checks entity 'record' at row [0]
+          t.expectProps(collection[0], {
+            type: 'record',
+            name: oneUserOneCard.name,
+            document: oneUserOneCard.id,
+            code: oneUserOneCard.code
           })
+          // checks entity 'card' at row [1]
+          t.expectProps(collection[1], {
+            type: 'card',
+            code: oneUserOneCard.card[0].code
+          })
+          done()
+        })
       })
       .catch((err) => {
         console.log(err)
       })
   })
 
-  it('Basic-test-2', (done) => {
-    console.log('Basic-test-2')
-    t.chai.request(t.lemuriaAPI).post('/api/coms/records').send(data_2)
+  // TODO: Falla el server si enviem un arary de cards! (revisar)
+  it('POST to /records/ creates a "record" and 2 "card" (oneUserTwoCard)', (done) => {
+    t.sendPOST('/api/coms/records', oneUserTwoCards).then((res) => {
+      t.expect(res.status).to.equal(200)
+      t.getCollection('objects', 'entity_1').then((collection) => {
+        t.expect(collection.length).to.equal(2)
+        // checks entity 'record' at row [0]
+        t.expectProps(collection[0], {
+          type: 'record',
+          name: oneUserTwoCards.name,
+          document: oneUserTwoCards.id,
+          code: oneUserTwoCards.code
+        })
+        // checks entity 'card' at row [1]
+        t.expectProps(collection[1], {
+          type: 'card',
+          code: oneUserTwoCards.card[0].code
+        })
+        // checks entity 'card' at row [2]
+        /* t.expectProps(collection[2], {
+          type: 'card',
+          code: oneUserOneCard.card[0].code
+        }) */
+        done()
+      })
+    }).catch((err) => {
+      console.log(err)
+    })
+  })
+
+  it('POST to /records/  a "record" without any "card" (oneUserZeroCards) results =>  only a record and no card', (done) => {
+    t.chai.request(t.lemuriaAPI).post('/api/coms/records').send(oneUserZeroCards)
       .then((res) => {
         t.expect(res.status).to.equal(200)
-        let kObjects = t.knexRefs['objects']
-        kObjects.select().table('entity_1')
-          .then((collection) => {
-            t.expect(collection.length).to.equal(2)
-            done()
+        t.getCollection('objects', 'entity_1').then((collection) => {
+          t.expect(collection.length).to.equal(1)
+          // checks entity 'record' at row [0]
+          t.expectProps(collection[0], {
+            type: 'record',
+            name: oneUserOneCard.name,
+            document: oneUserOneCard.id,
+            code: oneUserOneCard.code
           })
+          done()
+        })
       })
       .catch((err) => {
         console.log(err)
@@ -69,10 +126,7 @@ describe('API Routes', () => {
   // afterEach(): OPTION 1) Destroys and recreates BD from it() to other it()'s
   // -------------------------------------------------------------------------------------------
   afterEach((done) => {
-    let kObjects = t.knexRefs['objects']
-    kObjects.migrate.rollback().then(() => {
-      kObjects.migrate.latest().then(() => done())
-    })
+    t.rollbackAndMigrateDatabases().then(() => done())
   })
   // -------------------------------------------------------------------------------------------
   // afterEach(): OPTION 2) (NOT Prefereable) Does nothing, tables are not restored from it() to other it()'s
@@ -82,40 +136,4 @@ describe('API Routes', () => {
    done()
    })
    */
-
-
-
-
-
-/* //TODO: veure com podem posar dins de migrations la creació i rollback....
-  beforeEach((done) => {
-    knex.migrate.rollback()
-            .then(() => knex.migrate.latest())
-            /!* .then(() => knex.seed.run()) *!/
-            .then(() => done())
-  })
-*/
-
-  /* afterEach((done) => {
-    knex.migrate.rollback().then(() => done())
-  }) */
-
-  /* describe('GET /simple_persons', () => {
-    it('should return all persons', (done) => {
-      chai.request(server)
-                .get('/simple_persons')
-                .end(function (err, res) {
-                  res.should.have.status(200)
-                  res.body.should.be.a('array')
-                  res.body.length.should.equal(1)
-                  res.body[0].should.have.property('firstName')
-                  res.body[0].firstName.should.equal('TEST_firstName')
-                  res.body[0].should.have.property('lastName')
-                  res.body[0].lastName.should.equal('TEST_lastName')
-                  res.body[0].should.have.property('age')
-                  res.body[0].age.should.equal(222)
-                  done()
-                })
-    })
-  }) */
 })

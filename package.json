@@ -25,6 +25,7 @@
   "devDependencies": {
     "chai": "latest",
     "chai-http": "latest",
+    "istanbul": "^0.4.5",
     "standard": "^10.0.2"
   }
 }
