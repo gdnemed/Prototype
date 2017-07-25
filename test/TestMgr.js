@@ -82,16 +82,21 @@ const expectProps = (realObj, expectedObj) => {
     }
   }
 }
+
+// Sends 'data' via http POST query to 'route'
+const sendGET = (route) => chai.request(t.lemuriaAPI).get(route)
+// Sends 'data' via http POST query to 'route'
 const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).send(data)
-const getCollection = (res, section, tableName) => t.knexRefs[section].select().table(tableName)
+// Gets the DB related to 'section' &  'tableName'
+const getCollection = (section, tableName) => t.knexRefs[section].select().table(tableName)
 
 // Holds references to everything that a 'spec' or 'test' file can need, i.e knexRefs, environment, lemuriaAPI, etc
 let t = {
   chai,
   chaiHttp,
   expect,
-  // Sends 'data' via http POST query to 'route'
   sendPOST,
+  sendGET,
   getCollection,
   expectProps,
   rollbackAndMigrateDatabases

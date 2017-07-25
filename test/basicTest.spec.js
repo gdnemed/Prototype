@@ -36,7 +36,7 @@ const oneUserTwoCards = {
   ]
 }
 
-describe('API Routes', () => {
+describe('basicTest.spec.js', () => {
   beforeEach((done) => {
     // Ensures Lemuria is created and all needed references are stored in "t"
     TestMgr.get().then((_testdata) => {
@@ -49,7 +49,7 @@ describe('API Routes', () => {
     t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
         t.expect(res.status).to.equal(200)
-        t.getCollection(res, 'objects', 'entity_1').then((collection) => {
+        t.getCollection('objects', 'entity_1').then((collection) => {
           t.expect(collection.length).to.equal(2)
           // checks entity 'record' at row [0]
           t.expectProps(collection[0], {
@@ -75,7 +75,7 @@ describe('API Routes', () => {
   it('POST to /records/ creates a "record" and 2 "card" (oneUserTwoCard)', (done) => {
     t.sendPOST('/api/coms/records', oneUserTwoCards).then((res) => {
       t.expect(res.status).to.equal(200)
-      t.getCollection(res, 'objects', 'entity_1').then((collection) => {
+      t.getCollection('objects', 'entity_1').then((collection) => {
         t.expect(collection.length).to.equal(2)
         // checks entity 'record' at row [0]
         t.expectProps(collection[0], {
@@ -105,7 +105,7 @@ describe('API Routes', () => {
     t.chai.request(t.lemuriaAPI).post('/api/coms/records').send(oneUserZeroCards)
       .then((res) => {
         t.expect(res.status).to.equal(200)
-        t.getCollection(res, 'objects', 'entity_1').then((collection) => {
+        t.getCollection('objects', 'entity_1').then((collection) => {
           t.expect(collection.length).to.equal(1)
           // checks entity 'record' at row [0]
           t.expectProps(collection[0], {
