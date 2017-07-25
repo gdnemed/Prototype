@@ -26,24 +26,31 @@ const init = () => {
       console.log('Starting lemuria as application')
       // Run it as a program
       initConfiguration()
-      migrations.init('sqlite', 'SPEC', '2017').then((knexRefs) => {
-        debugTestKnexRefs(knexRefs)
-          .then(initApiServer)
-          .then(initServices)
-          .then(initProcess)
-          .then(() => resolve(knexRefs))
-          .catch((err) => {
-            log.error(`ERROR: cannot start Lemuria: ${err}`)
-            reject(err)
-          })
-      }).catch((err) => {
-        logM.error(`ERROR: Migration failed: ${err}`)
-        reject(err)
-      })
+      initializeCustomer(sessions.getCustomers(), 0)
+        .then(initApiServer)
+        .then(initServices)
+        .then(initProcess)
+        .then(() => resolve(customers['SPEC'].dbs)) // For test, return 1 database
+        .catch((err) => {
+          log.error(`ERROR: cannot start Lemuria: ${err}`)
+          reject(err)
+        })
     } else {
       console.log('Starting lemuria as a service: ' + process.argv.length)
       // Install/uninstall as a service
       serviceFunctions(process.argv).then(resolve)
+    }
+  })
+}
+
+const initializeCustomer = (customersList, i) => {
+  return new Promise((resolve, reject) => {
+    if (i >= customersList.length) resolve()
+    else {
+      migrations.init('sqlite', customersList[i].name, '2017')
+        .then((knexRefs) => debugTestKnexRefs(knexRefs))
+        .then(() => initializeCustomer(customersList, i + 1))
+        .catch(reject)
     }
   })
 }
