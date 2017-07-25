@@ -3,17 +3,14 @@
 const TestMgr = require('./TestMgr.js')
 let t // Reference to data obtained from TestMgr().get
 
-const oneUserOneCard = {
-  'id': '1U_1C',
-  'name': '1U_1C Alba Maria Estany',
-  'code': '0455',
-  'language': 'es',
-  'validity': [{'start': 20170105, 'end': 20170622}],
-  'timetype_grp': [{'code': 'TT_1U_1C'}],
-  'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20170822}]
+const ttOne = {
+  'name': 'TT0',
+  'text': 'TT_1_Sin_incidencia',
+  'code': 'IC_00',
+  'timetype_grp': [{'code': 'TT_1U_1C'}]
 }
 
-describe('records.spec.js', () => {
+describe('timetypes.spec.js', () => {
   beforeEach((done) => {
     // Ensures Lemuria is created and all needed references are stored in "t"
     TestMgr.get().then((_testdata) => {
@@ -23,25 +20,31 @@ describe('records.spec.js', () => {
   })
 
   it('POST (oneUserOneCard) to /records/ and GET via /records/ returns the user and card', (done) => {
-    t.sendPOST('/api/coms/records', oneUserOneCard)
+    t.sendPOST('/api/coms/timetypes', ttOne)
       .then((res) => {
         t.expect(res.status).to.equal(200)
         // GET via api/records
-        t.sendGET('/api/coms/records').then((res) => {
+        t.sendGET('/api/coms/timetypes').then((res) => {
           t.expect(res.status).to.equal(200)
-          console.log(res.body)
           let rec0 = res.body[0]
-          t.expectProps(rec0, {
-            id: oneUserOneCard.id,
-            code: oneUserOneCard.code,
-            name: oneUserOneCard.name,
-            language: oneUserOneCard.language
-          })
-          // chcking tt_group => array [{'code': 'TT_1U_1C'}],
-          t.expectProps(rec0.timetype_grp[0], oneUserOneCard.timetype_grp[0])
-          // checking validity
-          t.expectProps(rec0.validity[0], oneUserOneCard.validity[0])
+          t.expectProps(rec0, {code: ttOne.code, text: ttOne.text})
+
+          // TODO: only returns => { code: 'IC_00', text: 'TT_1_Sin_incidencia' }
+          // TODO: no id ? com fem el 'update' i 'delete' ?
+          console.log(rec0)
+
           done()
+          // UPDATE (POST without id)
+          /*
+          t.sendPOST('/api/coms/timetypes', {
+            'code': 'IC_00',
+            'text': '_UPDATED_tt'
+          }).then((res) => {
+            t.expect(res.status).to.equal(201)
+            done()
+          })
+          */
+
         })
       })
       .catch((err) => {
