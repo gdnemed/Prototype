@@ -167,7 +167,7 @@ const initServices = () => {
       log.info('initServices')
       sessions.init(customers)
       logic.init(sessions, state, coms)
-      coms.init(environment.coms_listen, logic)
+      coms.init(environment.coms_listen, logic, sessions)
       resolve()
     } catch (error) {
       reject(new Error(`Error in services initialization: ${error}`))
