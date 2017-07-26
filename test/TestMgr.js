@@ -14,6 +14,8 @@ const chaiHttp = require('chai-http')
 chai.use(chaiHttp)
 const expect = chai.expect
 const fs = require('fs')
+const path = require('path')
+
 // -------------------------------------------------------------------------------------------
 // "Lemuria" services creation. "get()" procedure using '_t' as a cache
 // -------------------------------------------------------------------------------------------
@@ -64,8 +66,9 @@ const get = () => {
 // -------------------------------------------------------------------------------------------
 // Testing utility methods
 // -------------------------------------------------------------------------------------------
-// console.log(JSON.stringify(t.environment))
 
+// Returns a promise that resolves if a fileName located at /exchange_sources/ is copied to
+// a folder exchange_workdir/remote/ (the step required for 'files' module to start an import process)
 const prepareFileImport = (fieName) => {
   return new Promise((resolve, reject) => {
     try {
@@ -74,17 +77,72 @@ const prepareFileImport = (fieName) => {
       let tDest = envFiles.dir + '\\' + fieName
       let strm = fs.createReadStream(tSource).pipe(fs.createWriteStream(tDest))
       strm.on('error', (err) => {
-        console.log('error stream: ' + err)
+        console.log('prepareFileImport : error stream: ' + err)
         reject(err)
       })
       strm.on('close', () => {
-        console.log('close stream')
+        console.log('prepareFileImport : OK: close stream')
         resolve()
       })
     } catch (err) {
       console.log(err)
       reject(err)
     }
+  })
+}
+
+// Allows file import tests to occur
+// Given a 'fileName' that exists in /exchange_sources/ dir, copies it to .../remote/ dir
+// via 'prepareFileImport()'.
+// After the .DWN file is copied, the system starts an import procedure whose end needs to be
+// detected. This is done via the 'eventEmitter' instance listening to 'onEndImport'
+const handleFileImport = (fileName) => {
+  return new Promise((resolve, reject) => {
+    // when a 'onEndImport' event is received, the event needs to be removed (to not interfere
+    // other tests that also are listening to the event), and the promise can be resolved
+    const handler = (importResult) => {
+      t.eventEmitter.removeListener('onEndImport', handler)
+      resolve(importResult)
+    }
+    // starts listening 'onEndImport' events produced by 'files' module
+    t.eventEmitter.on('onEndImport', handler)
+    // copies the '*.DWN' file to /remote/ dir to trigger an import procedure
+    prepareFileImport(fileName).catch(({response}) => { // No 'then()' here: must wait until evt 'onEndImport' is emited
+      let err = 'ERROR: ' + response.status + ' ' + response.text
+      console.log(err)
+      reject(err)
+    })
+  })
+}
+
+// Removes all files inside 'path'
+const removeDirectorySync = (removePath) => {
+  console.log('TestMgr: removeDirectorySync : ' + removePath)
+  fs.readdir(removePath, (err, files) => {
+    if (err) return false
+    for (const file of files) {
+      let fileToRemove = path.join(removePath, file)
+      fs.unlink(fileToRemove, err => {
+        if (err) return false
+      })
+    }
+  })
+  return true
+}
+
+// After an 'import' process, a number of *.DWN and *.LOG files are created inside
+// exchange_workdir subdirectoris. Clears all this files and resolves a promise when done
+// A 10ms timeout is required in order to avoid untracked files due to filesystem latencies
+const cleanImportFiles = (fieName) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      let envFiles = t.environment.exchange.files
+      let remotePath = envFiles.dir // exchange_workdir/remote/  (after an import process contains .LOG files)
+      let donePath = envFiles.workdir + '\\done\\' // exchange_workdirdone/  (after an import process contains .DWN files)
+      if (!removeDirectorySync(remotePath)) reject(new Error())
+      if (!removeDirectorySync(donePath)) reject(new Error())
+      resolve()
+    }, 10)
   })
 }
 
@@ -128,7 +186,8 @@ let t = {
   getCollection,
   expectProps,
   rollbackAndMigrateDatabases,
-  prepareFileImport
+  handleFileImport,
+  cleanImportFiles
 }
 
 module.exports = {
