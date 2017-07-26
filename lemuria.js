@@ -8,6 +8,7 @@
 const fs = require('fs')
 const express = require('express')
 const bodyParser = require('body-parser')
+const events = require('events')
 
 const state = require('./state/state')
 const coms = require('./coms/coms')
@@ -25,13 +26,17 @@ const init = () => {
     if (process.argv.length <= 2 || process.env.NODE_ENV === 'test') {
       console.log('Starting lemuria as application')
       // Run it as a program
+      let eventEmitter = initEvents()
       initConfiguration()
       initializeCustomer(sessions.getCustomers(), 0)
         .then(initApiServer)
         .then(initServices)
-        .then(initProcess)
+        .then(() => initProcess(eventEmitter))
         .then(() => {
-          resolve(customers['SPEC'].dbs)
+          resolve({
+            dbs: customers['SPEC'].dbs,
+            eventEmitter: eventEmitter
+          })
         }) // For test, return 1 database
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: ${err}`)
@@ -45,12 +50,18 @@ const init = () => {
   })
 }
 
+// Creates an instance of 'EventEmitter' that allows emision and reception of events
+// via eventEmitter.emit(...) / eventEmitter.on(...)
+const initEvents = () => {
+  return new events.EventEmitter()
+}
+
 const initializeCustomer = (customersList, i) => {
   return new Promise((resolve, reject) => {
     if (i >= customersList.length) resolve()
     else {
       migrations.init('sqlite', customersList[i].name, '2017')
-        .then((knexRefs) => debugTestKnexRefs(knexRefs))
+        .then((dbs) => debugTestdbs(dbs))
         .then(() => initializeCustomer(customersList, i + 1))
         .then(() => resolve())
         .catch(reject)
@@ -87,14 +98,14 @@ const initConfiguration = () => {
 }
 
 // debug: verifies that each knex object for each db exists
-const debugTestKnexRefs = (knexRefs) => {
+const debugTestdbs = (dbs) => {
   return new Promise((resolve, reject) => {
     log.info('Verifying migration')
-    let kState = knexRefs['state']
-    let kObjects = knexRefs['objects']
-    let kInputs = knexRefs['inputs']
+    let kState = dbs['state']
+    let kObjects = dbs['objects']
+    let kInputs = dbs['inputs']
 
-    customers['SPEC'].dbs = knexRefs
+    customers['SPEC'].dbs = dbs
 
     kState.select().table('settings')
       .then((collection) => {
@@ -167,10 +178,10 @@ const initServices = () => {
 /*
 Starts processes, like importation of files, etc.
 */
-const initProcess = () => {
+const initProcess = (eventEmitter) => {
   return new Promise((resolve, reject) => {
     log.info('initProcess')
-    if (files.init(environment.exchange.files)) resolve()
+    if (files.init(environment.exchange.files, eventEmitter)) resolve()
     else reject(new Error('initProcess failed'))
   })
 }

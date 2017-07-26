@@ -19,16 +19,18 @@ let workDir
 let timeZone
 let remoteService
 let createOutput
+let eventEmitter
 
 /*
 Initialize variables and watching import files.
 */
-const init = (params) => {
+const init = (params, evtEmitter) => {
   remoteService = params.server
   timeZone = 'Europe/Madrid'
   remoteDir = params.dir
   workDir = params.workdir
   createOutput = params.output
+  eventEmitter = evtEmitter
   watch('RECORDS', processRecord, 'records', 'records', 'records')
   watch('TTYPES', processTtype, 'timetypes', 'timetypes', 'timetypes')
   watch('INFO', processInfo, 'infos', 'records/@/info', 'records/@/info')
@@ -123,7 +125,6 @@ const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDel
   if (partial) {
     elems = []
     elemsToDelete = []
-
   } else elems = {}
   let yesterday = moment.tz(new Date().getTime() - ONE_DAY, timeZone).format('YYYYMMDD')
   csvtojson().fromFile(path)
@@ -202,6 +203,7 @@ const endImport = (path, importType, output, now, ok, partial) => {
     output.end()
   }
   logger.info('End of ' + importType + ' import.')
+  notifyEndImport(path, importType, output, now, ok, partial)
   // TODO: Aprofitar el moment per esborrar fitxers antics
 }
 
@@ -381,6 +383,7 @@ const call = (method, path, content, callback) => {
   let url = 'http://' + remoteService.host + ':' + remoteService.port + '/api/coms/' + path
   let data = {method: method, url: url}
   // if (headers) data.headers = headers
+  data.headers = {'Authorization': 'APIKEY 123'}
   if (content != null) {
     data.json = true
     data.body = content
@@ -429,6 +432,11 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
       deleteOrder(l, i + 1, apiPath, output, callback)
     })
   }
+}
+
+const notifyEndImport = (path, importType, output, now, ok, partial) => {
+  logger.debug('notifyEndImport: ' + path + '  ' + importType + '  ' + ok)
+  eventEmitter.emit('onEndImport', {path, importType, ok})
 }
 
 module.exports = {

@@ -4,8 +4,9 @@
 		"node_id":1,
 		"exchange":{
 			"files":{
-				"dir":"c:\\CURRENT\\PANGEA\\LEMURIA\\Pruebas\\remote",
-				"workdir": "c:\\CURRENT\\PANGEA\\LEMURIA\\Pruebas",
+				"dir":"test\\exchange_workdir\\remote",
+				"workdir": "test\\exchange_workdir",
+				"sources":"test\\exchange_sources",
 				"server":{"host":"172.18.4.176","port":4041},
 				"output": true
 			}

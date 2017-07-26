@@ -23,7 +23,7 @@ let customerName
 let yearMigration
 
 // Object that holds a reference to every section knex object
-let knexRefs = {}
+let dbs = {}
 
 const getDirForSqliteDB = () => {
   let environment = process.env.NODE_ENV || 'development'
@@ -106,9 +106,9 @@ const migrateSection = (section) => {
       migrations: {directory: `./db/migrations/${section}`}
     })
     // let knex = Knex(cfg)
-    knexRefs[section] = Knex(cfg)
+    dbs[section] = Knex(cfg)
     logger.debug(`Invoking knex.migrate.latest() for ${section}`)
-    knexRefs[section].migrate.latest().then((result) => {
+    dbs[section].migrate.latest().then((result) => {
       logger.trace(`${section} migration done: ${result}`)
       resolve()
     })
@@ -116,7 +116,7 @@ const migrateSection = (section) => {
   })
 }
 
-// Executes the migration for all sections and returns a promise with the  'knexRefs' object
+// Executes the migration for all sections and returns a promise with the  'dbs' object
 // If an error occurs in some process,
 const init = (type, customer, year) => {
   logger.info('info: migrations.init() : customer: ' + customer + ' year: ' + year + ' type: ' + type)
@@ -124,14 +124,14 @@ const init = (type, customer, year) => {
   customerName = customer
   yearMigration = year
   // migrateSection() already returns a promise that refers to the result of "migrateSection()" invocation
-  // But we want "init()" to return a promise with another value (the "knexRefs" object holding the N knex references)
+  // But we want "init()" to return a promise with another value (the "dbs" object holding the N knex references)
   // A way to do this is creating a new Promise and resolve() or reject() it depending on the case
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
     migrateSection(SECTIONS.STATE)
       .then(() => migrateSection(SECTIONS.OBJECTS))
       .then(() => migrateSection(SECTIONS.INPUTS))
-      .then(() => resolve(knexRefs))
+      .then(() => resolve(dbs))
       .catch((err) => reject(err))
   })
 }

@@ -15,7 +15,6 @@ describe('----NAME----.spec.js', () => {
      done()
   })
 
-  // GET /api/coms/records or GET /api/coms/records/:id
   // -------------------------------------------------------------------------------------------
   // afterEach(): OPTION 1) Destroys and recreates BD from it() to other it()'s
   // -------------------------------------------------------------------------------------------

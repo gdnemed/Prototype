@@ -13,7 +13,7 @@ const chai = require('chai')
 const chaiHttp = require('chai-http')
 chai.use(chaiHttp)
 const expect = chai.expect
-
+const fs = require('fs')
 // -------------------------------------------------------------------------------------------
 // "Lemuria" services creation. "get()" procedure using '_t' as a cache
 // -------------------------------------------------------------------------------------------
@@ -24,9 +24,10 @@ let _lemuriaInitialized = false
 const startLemuria = () => {
   return new Promise((resolve, reject) => {
     lemuria.init()
-      .then((knexObj) => {
+      .then(({dbs, eventEmitter}) => {
         // stores refences to knex objects
-        t.knexRefs = knexObj
+        t.dbs = dbs
+        t.eventEmitter = eventEmitter
         console.log('TestMgr: lemuria.init() invoked OK')
         // getting environment to know Ports, Urls, etc
         t.environment = lemuria.getEnvironment()
@@ -38,7 +39,7 @@ const startLemuria = () => {
   })
 }
 
-// Returns a promise with Lemura services, knexRefs, environment, lemuriaAPI, etc
+// Returns a promise with Lemura services, dbs, environment, lemuriaAPI, etc
 // Initially, if Lemuria is not started, starts it. On every call, returns _t cached copy
 const get = () => {
   return new Promise((resolve, reject) => {
@@ -63,9 +64,36 @@ const get = () => {
 // -------------------------------------------------------------------------------------------
 // Testing utility methods
 // -------------------------------------------------------------------------------------------
+// console.log(JSON.stringify(t.environment))
+
+const prepareFileImport = (fieName) => {
+  return new Promise((resolve, reject) => {
+    try {
+      let envFiles = t.environment.exchange.files
+      let tSource = envFiles.sources + '\\' + fieName
+      let tDest = envFiles.dir + '\\' + fieName
+      let strm = fs.createReadStream(tSource).pipe(fs.createWriteStream(tDest))
+      strm.on('error', (err) => {
+        console.log('error stream: ' + err)
+        reject(err)
+      })
+      strm.on('close', () => {
+        console.log('close stream')
+        resolve()
+      })
+    } catch (err) {
+      console.log(err)
+      reject(err)
+    }
+  })
+}
+
+// -------------------------------------------------------------------------------------------
+// Testing utility methods
+// -------------------------------------------------------------------------------------------
 // For every section (objects, settings, etc), rollback() and migration() is invoked to grant cleaned tables
 const rollbackAndMigrateDatabases = () => {
-  let kObjects = t.knexRefs['objects'], kInputs = t.knexRefs['inputs'], kState = t.knexRefs['state']
+  let kObjects = t.dbs['objects'], kInputs = t.dbs['inputs'], kState = t.dbs['state']
   return kObjects.migrate.rollback()
     .then(() => kInputs.migrate.rollback())
     .then(() => kState.migrate.rollback())
@@ -88,9 +116,9 @@ const sendGET = (route) => chai.request(t.lemuriaAPI).get(route).set('Authorizat
 // Sends 'data' via http POST query to 'route'
 const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
 // Gets the DB related to 'section' &  'tableName'
-const getCollection = (section, tableName) => t.knexRefs[section].select().table(tableName)
+const getCollection = (section, tableName) => t.dbs[section].select().table(tableName)
 
-// Holds references to everything that a 'spec' or 'test' file can need, i.e knexRefs, environment, lemuriaAPI, etc
+// Holds references to everything that a 'spec' or 'test' file can need, i.e dbs, environment, lemuriaAPI, etc
 let t = {
   chai,
   chaiHttp,
@@ -99,7 +127,8 @@ let t = {
   sendGET,
   getCollection,
   expectProps,
-  rollbackAndMigrateDatabases
+  rollbackAndMigrateDatabases,
+  prepareFileImport
 }
 
 module.exports = {
