@@ -34,7 +34,7 @@ const getDirForSqliteDB = () => {
 }
 
 // Executes the migration for the section, returning the implicit Promise of knex.migrate()
-const migrateSection = (section) => {
+const migrateSection = (section, dbs) => {
   return new Promise((resolve, reject) => {
     // Base object for composing other specific objects via "object.assing"
     let baseMigration
@@ -128,9 +128,9 @@ const init = (type, customer, year) => {
   // A way to do this is creating a new Promise and resolve() or reject() it depending on the case
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
-    migrateSection(SECTIONS.STATE)
-      .then(() => migrateSection(SECTIONS.OBJECTS))
-      .then(() => migrateSection(SECTIONS.INPUTS))
+    migrateSection(SECTIONS.STATE, dbs)
+      .then(() => migrateSection(SECTIONS.OBJECTS, dbs))
+      .then(() => migrateSection(SECTIONS.INPUTS, dbs))
       .then(() => resolve(dbs))
       .catch((err) => reject(err))
   })

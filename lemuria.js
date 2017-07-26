@@ -19,7 +19,8 @@ const migrations = require('./migrations')
 const squeries = require('./objects/squeries')
 const sessions = require('./session/sessions')
 
-let home, environment, customers, api, httpServer, logM, log
+let home, environment, api, httpServer, logM, log
+let customers = {}
 
 const init = () => {
   return new Promise((resolve, reject) => {
@@ -60,8 +61,9 @@ const initializeCustomer = (customersList, i) => {
   return new Promise((resolve, reject) => {
     if (i >= customersList.length) resolve()
     else {
+      customers[customersList[i].name] = {}
       migrations.init('sqlite', customersList[i].name, '2017')
-        .then((dbs) => debugTestdbs(dbs))
+        .then((knexRefs) => debugTestdbs(knexRefs, customersList[i].name))
         .then(() => initializeCustomer(customersList, i + 1))
         .then(() => resolve())
         .catch(reject)
@@ -93,19 +95,17 @@ const initConfiguration = () => {
       }
     }
   }
-  // it will be: customers = {SPEC: {}}
-  customers = {SPEC: {}}
 }
 
 // debug: verifies that each knex object for each db exists
-const debugTestdbs = (dbs) => {
+const debugTestdbs = (dbs, customer) => {
   return new Promise((resolve, reject) => {
     log.info('Verifying migration')
     let kState = dbs['state']
     let kObjects = dbs['objects']
     let kInputs = dbs['inputs']
-
-    customers['SPEC'].dbs = dbs
+    customers[customer].dbs = dbs
+    logM.debug('DB ' + customer)
 
     kState.select().table('settings')
       .then((collection) => {

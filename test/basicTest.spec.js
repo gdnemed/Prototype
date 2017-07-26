@@ -31,8 +31,8 @@ const oneUserTwoCards = {
   'validity': [{'start': 20170105, 'end': 20170622}],
   'timetype_grp': [{'code': 'TT_1U_2C'}],
   'card': [
-    {'code': '0_CARD_CODE_1U_2C', 'start': 20170205, 'end': 20170522}/*,
-    {'code': '1_CARD_CODE_1U_2C', 'start': 20170711, 'end': 20170722} */
+    {'code': '0_CARD_CODE_1U_2C', 'start': 20170205, 'end': 20170522},
+    {'code': '1_CARD_CODE_1U_2C', 'start': 20170711, 'end': 20170722}
   ]
 }
 

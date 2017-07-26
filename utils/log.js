@@ -21,7 +21,11 @@ Returns logger associated to a target.
 target: User defined name to classify.
 return: Logger object.
 */
-const getLogger = (target) => { return log4js.getLogger(target) }
+const getLogger = (target) => {
+  let l = log4js.getLogger(target)
+  l.level = 'trace'
+  return l
+}
 
 /*
 Main function for logging.
