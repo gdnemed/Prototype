@@ -14,18 +14,20 @@ let inputSequences = {}
 // Map for entity types blocking (for key preservation)
 let typesBlocks = {}
 
-const newId = (session, callback) => {
-  if (sequences[session.name]) callback(null, sequences[session.name]++)
-  else {
-    let db = session.dbs['objects']
-    db('entity_1').max('id as m')
-      .then((rows) => {
-        if (rows.length === 0) sequences[session.name] = 1
-        else sequences[session.name] = rows[0].m + 1
-        callback(null, sequences[session.name]++)
-      })
-      .catch((err) => callback(err))
-  }
+const newId = (session) => {
+  return new Promise((resolve, reject) => {
+    if (sequences[session.name]) resolve(sequences[session.name]++)
+    else {
+      let db = session.dbs['objects']
+      db('entity_1').max('id as m')
+        .then((rows) => {
+          if (rows.length === 0) sequences[session.name] = 1
+          else sequences[session.name] = rows[0].m + 1
+          resolve(sequences[session.name]++)
+        })
+        .catch(reject)
+    }
+  })
 }
 
 const newInputId = (session, callback) => {

@@ -22,9 +22,6 @@ let customerName
 // Year of inputs migration
 let yearMigration
 
-// Object that holds a reference to every section knex object
-let knexRefs = {}
-
 const getDirForSqliteDB = () => {
   let environment = process.env.NODE_ENV || 'development'
   switch (environment) {
@@ -34,7 +31,7 @@ const getDirForSqliteDB = () => {
 }
 
 // Executes the migration for the section, returning the implicit Promise of knex.migrate()
-const migrateSection = (section) => {
+const migrateSection = (section, knexRefs) => {
   return new Promise((resolve, reject) => {
     // Base object for composing other specific objects via "object.assing"
     let baseMigration
@@ -128,9 +125,11 @@ const init = (type, customer, year) => {
   // A way to do this is creating a new Promise and resolve() or reject() it depending on the case
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
-    migrateSection(SECTIONS.STATE)
-      .then(() => migrateSection(SECTIONS.OBJECTS))
-      .then(() => migrateSection(SECTIONS.INPUTS))
+    // Object that holds a reference to every section knex object
+    let knexRefs = {}
+    migrateSection(SECTIONS.STATE, knexRefs)
+      .then(() => migrateSection(SECTIONS.OBJECTS, knexRefs))
+      .then(() => migrateSection(SECTIONS.INPUTS, knexRefs))
       .then(() => resolve(knexRefs))
       .catch((err) => reject(err))
   })

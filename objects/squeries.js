@@ -42,6 +42,16 @@ const get = (session, variables, str, callback) => {
 const put = (session, stateService, variables, str, data, extraFunction, callback) => {
   let e = str._entity_
   if (e) {
+    let params = {
+      session: session,
+      str: str,
+      entity: e,
+      data: data,
+      variables: variables,
+      stateService: stateService,
+      extraFunction: extraFunction,
+      callback: callback
+    }
     // Create keys structure, which maps fields to values
     let keysData = []
     let kDef = MODEL.ENTITIES[e].keys
@@ -49,33 +59,26 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
       keysData.push({fields: kDef[i], values: []})
     }
     if (keysData) {
-      searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data, (err, id) => {
-        if (err) release(session, e, stateService, callback, err)
-        else {
-          let params = {
-            session: session,
-            id: id,
-            str: str,
-            entity: e,
-            data: data,
-            variables: variables,
-            stateService: stateService,
-            extraFunction: extraFunction,
-            callback: (err, idPut) => release(session, e, stateService, callback, err, idPut)
-          }
-          if (id) executeUpdate(params)
-          else {
+      searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data)
+        .then((id) => {
+          if (id) {
+            params.id = id
+            executeUpdate(params)
+              .then((idPut) => callback(null, idPut))
+              .catch(callback)
+          } else {
             // On insert, we need to block key data to prevent parallel inserts over same key
-            stateService.newId(session, (err, id) => {
-              if (err) release(session, e, stateService, callback, err)
-              else {
+            stateService.newId(session)
+              .then((id) => {
                 params.id = id
                 executeInsert(params)
-              }
-            })
+                  .then((idPut) => callback(null, idPut))
+                  .catch(callback)
+              })
+              .catch((err) => release(session, e, stateService, callback, err))
           }
-        }
-      })
+        })
+        .catch((err) => release(session, e, stateService, callback, err))
     } else callback(new Error('Key not found'))
   } else if (str._inputs_) {
     // Inputs insert/update.
@@ -150,10 +153,12 @@ const getUserKey = (str, data) => {
   return uk
 }
 
-const release = (session, e, stateService, callback, err, data) => {
-  stateService.releaseType(session, e, (error) => {
-    if (error) logger.error(error)
-    callback(err, data)
+const release = (session, e, stateService) => {
+  return new Promise((resolve, reject) => {
+    stateService.releaseType(session, e, (error) => {
+      if (error) reject(error)
+      else resolve()
+    })
   })
 }
 
@@ -171,75 +176,77 @@ Once done, calls callback function passing:
 - conflict: List of other id's which have values
 for some of the keys which would be repeated if data is inserted.
 */
-const searchFromKey = (session, entity, keysData, userKey, stateService, str, data, callback) => {
-  let finalKey
-  if (userKey == null) {
-    // No key specified, we search the first with data
-    for (let i = 0; i < keysData.length; i++) {
-      let key = keysData[i].fields
-      let ok = true
-      let values = []
-      for (let j = 0; j < key.length; j++) {
-        let found = false
-        for (var p in str) {
-          if (str.hasOwnProperty(p)) {
-            if (str[p] === key[j] && data.hasOwnProperty(p)) {
-              values.push(data[p])
-              found = true
-              break
+const searchFromKey = (session, entity, keysData, userKey, stateService, str, data) => {
+  return new Promise((resolve, reject) => {
+    let finalKey
+    if (userKey == null) {
+      // No key specified, we search the first with data
+      for (let i = 0; i < keysData.length; i++) {
+        let key = keysData[i].fields
+        let ok = true
+        let values = []
+        for (let j = 0; j < key.length; j++) {
+          let found = false
+          for (var p in str) {
+            if (str.hasOwnProperty(p)) {
+              if (str[p] === key[j] && data.hasOwnProperty(p)) {
+                values.push(data[p])
+                found = true
+                break
+              }
             }
           }
+          if (!found) {
+            ok = false
+            break
+          }
         }
-        if (!found) {
-          ok = false
+        if (ok) {
+          finalKey = {fields: key, values: values}
           break
         }
       }
-      if (ok) {
-        finalKey = {fields: key, values: values}
-        break
+    } else {
+      finalKey = {fields: [], values: []}
+      for (let i = 0; i < userKey.fields.length; i++) {
+        finalKey.fields.push(str[userKey.fields[i]])
+        finalKey.values.push(userKey.values[i])
       }
     }
-  } else {
-    finalKey = {fields: [], values: []}
-    for (let i = 0; i < userKey.fields.length; i++) {
-      finalKey.fields.push(str[userKey.fields[i]])
-      finalKey.values.push(userKey.values[i])
+    if (!finalKey || finalKey == null) {
+      reject(new Error('No key values found'))
+      return
     }
-  }
-  if (!finalKey || finalKey == null) {
-    callback(new Error('No key values found'))
-    return
-  }
-  // Deny inserts or updates over this entity keys
-  stateService.blockType(session, entity, (err) => {
-    if (err) callback(err)
-    else {
-      // Now whe have the key. Do select
-      let db = session.dbs['objects']
-      let sentence = db.select('id').from('entity_' + nodeId)
-      for (let i = 0; i < finalKey.fields.length; i++) {
-        sentence.where(finalKey.fields[i], finalKey.values[i])
-      }
-      sentence.then((rows) => {
-        if (rows.length === 0) callback(null, null) // Insert
-        else if (rows.length > 1) callback(new Error('Ambiguous key: more than one entity found'))
-        else {
-          callback(null, rows[0].id)// Update
-          // Entity found. Now we must ensure every key is respected
-          /* loadKeyEntities(db, keysData, 0, {}, (err, ids) => {
-            if (err) callback(err)
-            else {
-              if (ids && ids.length > 0) {
-                if (ids.length > 1) callback(new Error('Key violated'))
-                else callback(null, ids[0])// Update
-              } else callback(null, null) // Insert
-            }
-          }) */
+    // Deny inserts or updates over this entity keys
+    stateService.blockType(session, entity, (err) => {
+      if (err) reject(err)
+      else {
+        // Now whe have the key. Do select
+        let db = session.dbs['objects']
+        let sentence = db.select('id').from('entity_' + nodeId)
+        for (let i = 0; i < finalKey.fields.length; i++) {
+          sentence.where(finalKey.fields[i], finalKey.values[i])
         }
-      })
-      .catch((err) => callback(err))
-    }
+        sentence.then((rows) => {
+          if (rows.length === 0) resolve(null, null) // Insert
+          else if (rows.length > 1) reject(new Error('Ambiguous key: more than one entity found'))
+          else {
+            resolve(rows[0].id)// Update
+            // Entity found. Now we must ensure every key is respected
+            /* loadKeyEntities(db, keysData, 0, {}, (err, ids) => {
+              if (err) callback(err)
+              else {
+                if (ids && ids.length > 0) {
+                  if (ids.length > 1) callback(new Error('Key violated'))
+                  else callback(null, ids[0])// Update
+                } else callback(null, null) // Insert
+              }
+            }) */
+          }
+        })
+          .catch(reject)
+      }
+    })
   })
 }
 
@@ -266,36 +273,42 @@ Loads entities from a key, and puts them in a map.
 } */
 
 const executeInsert = (params) => {
-  if (params.entity) {
-    // We pass every data to a new object d
-    let d = getProperFields(params.str, params.entity, params.data)
-    // Check required fields
-    let r = MODEL.ENTITIES[params.entity].required
-    if (r) {
-      for (let m = 0; m < r.length; m++) {
-        if (!d.hasOwnProperty(r[m])) {
-          params.callback(new Error(`${r[m]} required for ${params.entity}`))
-          return
+  return new Promise((resolve, reject) => {
+    if (params.entity) {
+      // We pass every data to a new object d
+      let d = getProperFields(params.str, params.entity, params.data)
+      // Check required fields
+      let r = MODEL.ENTITIES[params.entity].required
+      if (r) {
+        for (let m = 0; m < r.length; m++) {
+          if (!d.hasOwnProperty(r[m])) {
+            reject(new Error(`${r[m]} required for ${params.entity}`))
+            return
+          }
         }
       }
-    }
-    let db = params.session.dbs['objects']
-    // And we add id to insert
-    d.id = params.id
-    db.insert(d).into('entity_1').then((rowid) => {
-      let f = params.callback
-      params.callback = (err) => {
-        if (err) f(new Error(`${params.entity} inserted with id ${params.id}, but errors found: ${err}`))
-        else {
-          // If extra treatment, call function. If not, just callback
-          if (params.extraFunction) params.extraFunction(params.session, d.id, true, false, f)
-          else f(null, params.id)
-        }
-      }
-      subPuts(params)
-    })
-    .catch((err) => params.callback(err))
-  }
+      let db = params.session.dbs['objects']
+      // And we add id to insert
+      d.id = params.id
+      db.insert(d).into('entity_1')
+        .then((rowid) => {
+          release(params.session, params.entity, params.stateService)
+            .then(() => {
+              subPuts(params)
+                .then(() => {
+                  if (params.extraFunction) {
+                    params.extraFunction(params.session, params.id, true, false, () => resolve(params.id))
+                  } else resolve(params.id)
+                })
+                .catch((err) => {
+                  reject((new Error(`${d.id} ${params.entity} inserted, but errors found: ${err}`)))
+                })
+            })
+            .catch(reject)
+        })
+        .catch(reject)
+    } else reject(new Error('No entity'))
+  })
 }
 
 /*
@@ -303,34 +316,37 @@ const executeInsert = (params) => {
  session, id, str, entity, period, data, variables, callback
  */
 const executeUpdate = (params) => {
-  if (params.entity) {
-    let d = getProperFields(params.str, params.entity, params.data)
-    // Check required fields
-    let r = MODEL.ENTITIES[params.entity].required
-    if (r) {
-      for (let m = 0; m < r.length; m++) {
-        if (d.hasOwnProperty(r[m]) && d[r[m]] == null) {
-          params.callback(new Error(`${r[m]} required for ${params.entity}`))
-          return
+  return new Promise((resolve, reject) => {
+    if (params.entity) {
+      let d = getProperFields(params.str, params.entity, params.data)
+      // Check required fields
+      let r = MODEL.ENTITIES[params.entity].required
+      if (r) {
+        for (let m = 0; m < r.length; m++) {
+          if (d.hasOwnProperty(r[m]) && d[r[m]] == null) {
+            reject(new Error(`${r[m]} required for ${params.entity}`))
+            return
+          }
         }
       }
+      let db = params.session.dbs['objects']
+      db('entity_1').where('id', params.id).update(d)
+        .then((count) => {
+          release(params.session, params.entity, params.stateService)
+            .then(() => {
+              subPuts(params)
+                .then(() => {
+                  if (params.extraFunction) params.extraFunction(params.session, params.id, false, false, () => resolve())
+                  else resolve(params.id)
+                })
+                .catch((err) => {
+                  reject((new Error(`${count} ${params.entity} updated, but errors found: ${err}`)))
+                })
+            })
+        })
+        .catch(reject)
     }
-    let db = params.session.dbs['objects']
-    db('entity_1').where('id', params.id).update(d)
-    .then((count) => {
-      let f = params.callback
-      params.callback = (err) => {
-        if (err) f(new Error(`${count} ${params.entity} updated, but errors found: ${err}`))
-        else {
-          // If extra treatment, call function. If not, just callback
-          if (params.extraFunction) params.extraFunction(params.session, params.id, false, false, f)
-          else f(null, params.id)
-        }
-      }
-      subPuts(params)
-    })
-    .catch((err) => params.callback(err))
-  }
+  })
 }
 
 /*
@@ -360,9 +376,9 @@ const executeInsertInput = (params) => {
       if (err) f(new Error(`Input inserted with id ${params.id}, but errors found: ${err}`))
       else f(null, params.id)
     }
-    subPuts(params)
+    subPuts(params).then(params.callback)
   })
-  .catch((err) => params.callback(err))
+  .catch(params.callback)
 }
 
 /*
@@ -371,15 +387,16 @@ params is an object with these properties:
  session, id, str, entity, period, data, variables, callback
 */
 const subPuts = (params) => {
-  let l = []
-  for (var p in params.str) {
-    if (params.str.hasOwnProperty(p) &&
-      params.data.hasOwnProperty(p) &&
-      (params.str[p]._property_ || params.str[p]._relation_)) l.push(p)
-  }
-  Promise.all(l.map((x) => subput(x, params)))
-    .then(() => params.callback())
-    .catch((err) => params.callback(err))
+  return new Promise((resolve, reject) => {
+    let l = []
+    for (var p in params.str) {
+      if (params.str.hasOwnProperty(p) &&
+        params.data.hasOwnProperty(p) &&
+        (params.str[p]._property_ || params.str[p]._relation_)) l.push(p)
+    }
+    Promise.all(l.map((x) => subput(x, params)))
+      .then(resolve).catch(reject)
+  })
 }
 
 /*
@@ -539,9 +556,20 @@ const putRelation = (relationDef, entry, params) => {
     let relObj = params.str[entry]
     let relDataList = isArray ? params.data[entry] : [params.data[entry]]
     if (relObj._total_) prepareTotalHistoric(relDataList, modelRelation.time)
-    Promise.all(relDataList.map((x) => putElemRelation(newStr, relObj, relation, modelRelation, x, forward, params)))
-      .then(() => resolve(null))
-      .catch((err) => reject(err))
+    putRelationItem(relDataList, 0, newStr, relObj, relation, modelRelation, forward, params)
+      .then(resolve).catch(reject)
+  })
+}
+
+const putRelationItem = (relDataList, i, newStr, relObj, relation, modelRelation, forward, params) => {
+  return new Promise((resolve, reject) => {
+    if (i >= relDataList.length) resolve()
+    else {
+      putElemRelation(newStr, relObj, relation, modelRelation, relDataList[i], forward, params)
+        .then(() => putRelationItem(relDataList, i + 1, newStr, relObj, relation, modelRelation, forward, params))
+        .then(() => resolve())
+        .catch((err) => reject(err))
+    }
   })
 }
 
@@ -1144,6 +1172,7 @@ const executeSelect = (str, variables, session, callback) => {
       if (v[i] !== null) l[i] = variables[v[i]]
     }
   }
+
   // logger.debug(str._guide_.statement.toSQL())
   let result
   str._guide_.statement
@@ -1269,7 +1298,11 @@ const getNextEntity = (info, forward, parentRow, thisRow, session, variables, ca
     get(session, variables, info.nextEntity, (err, r) => {
       if (err) callback(err)
       else {
-        if (Array.isArray(r) && r.length > 0) completeRelation(r[0], parentRow, info, thisRow, forward)
+        let obj
+        if (Array.isArray(r)) {
+          if (r.length > 0) obj = r[0]
+        } else obj = r
+        completeRelation(obj, parentRow, info, thisRow, forward)
         callback()
       }
     })
