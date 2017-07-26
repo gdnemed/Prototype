@@ -15,16 +15,17 @@ const logger = require('../utils/log').getLogger('coms')
 var clients = {}
 var tablesVersions = {records: 0, cards: 0, time_types: 0}
 var idsense
-var logicService
+var logicService, sessionsService
 
 /*
 Communications initialization.
 -listen: Object containing address and port to listen.
 -logic: Logic module.
 */
-const init = (listen, logic) => {
+const init = (listen, logic, sessions) => {
   idsense = require('./idsense')
   logicService = logic
+  sessionsService = sessions
   net.createServer(listenFunction).listen(listen.port, listen.host)
   logger.info('coms listening at ' + listen.host + ':' + listen.port)
   setInterval(refreshClocks, 60000)
@@ -118,27 +119,34 @@ const receive = (dataBuffer, socket) => {
 Receive function when terminal type and serial are still unknown.
 */
 const genericReceive = (frame, socket) => {
-  var info = socket.specInfo
-  info.type = 'idSense'
-  info.serial = frame.serial
-  info.customer = 'SPEC'
-  info.protocol = frame.protocol
-  info.timezone = 'Europe/Madrid'
-  info.seq = 1
-  info.identified = true
-  info.tablesVersions = {records: 0, cards: 0, time_types: 0}
-  if (info.serial != null && frame.cmd === 1) {
-    // Change position in the map. Now we use id
-    clients['id' + info.serial] = socket
-    delete clients['tcp' + info.name]
-    switch (info.type) {
-      case 'idSense':idsense.ack(frame, socket)
-        break
-      default:
-    }
-    logicService.initTerminal(info.serial, info.customer)
+  sessionsService.checkSerial(frame.serial)
+    .then((customer) => {
+      var info = socket.specInfo
+      info.type = 'idSense'
+      info.serial = frame.serial
+      info.customer = customer
+      info.protocol = frame.protocol
+      info.timezone = 'Europe/Madrid'
+      info.seq = 1
+      info.identified = true
+      info.tablesVersions = {records: 0, cards: 0, time_types: 0}
+      if (info.serial != null && frame.cmd === 1) {
+        // Change position in the map. Now we use id
+        clients['id' + info.serial] = socket
+        delete clients['tcp' + info.name]
+        switch (info.type) {
+          case 'idSense':idsense.ack(frame, socket)
+            break
+          default:
+        }
+        logicService.initTerminal(info.serial, info.customer)
 // check_versions(info) <-with versions
-  }
+      }
+    })
+    .catch((err) => {
+      logger.error(err.message + ', serial: ' + frame.serial)
+      socket.end()
+    })
 }
 
 const globalSend = (command, data) => {

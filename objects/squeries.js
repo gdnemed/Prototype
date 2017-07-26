@@ -84,9 +84,8 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
     // Inputs insert/update.
     // For the moment, only insert
     // On insert, we need to block key data to prevent parallel inserts over same key
-    stateService.newInputId(session, (err, id) => {
-      if (err) callback(err)
-      else {
+    stateService.newInputId(session)
+      .then((id) => {
         let params = {
           session: session,
           id: id,
@@ -97,8 +96,10 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
           callback: callback
         }
         executeInsertInput(params)
-      }
-    })
+          .then(() => callback(null, id))
+          .catch(callback)
+      })
+      .catch(callback)
   } else callback(new Error('Type not found'))
 }
 
@@ -354,31 +355,31 @@ const executeUpdate = (params) => {
  session, id, str, entity, period, data, variables, callback
  */
 const executeInsertInput = (params) => {
-  // We pass every data to a new object d
-  let d = getProperFields(params.str, null, params.data)
-  // Check required fields
-  let r = MODEL.INPUTS.required
-  if (r) {
-    for (let m = 0; m < r.length; m++) {
-      if (!d.hasOwnProperty(r[m])) {
-        params.callback(new Error(`${r[m]} required for input`))
-        return
+  return new Promise((resolve, reject) => {
+    // We pass every data to a new object d
+    let d = getProperFields(params.str, null, params.data)
+    // Check required fields
+    let r = MODEL.INPUTS.required
+    if (r) {
+      for (let m = 0; m < r.length; m++) {
+        if (!d.hasOwnProperty(r[m])) {
+          reject(new Error(`${r[m]} required for input`))
+          return
+        }
       }
     }
-  }
-  let db = params.session.dbs['inputs']
-  let table = `input_${nodeId}_${params.period}`
-  // And we add id to insert
-  d.id = params.id
-  db.insert(d).into(table).then((rowid) => {
-    let f = params.callback
-    params.callback = (err) => {
-      if (err) f(new Error(`Input inserted with id ${params.id}, but errors found: ${err}`))
-      else f(null, params.id)
-    }
-    subPuts(params).then(params.callback)
+    let db = params.session.dbs['inputs']
+    let table = `input_${nodeId}_${params.period}`
+    // And we add id to insert
+    d.id = params.id
+    db.insert(d).into(table)
+      .then((rowid) => {
+        subPuts(params)
+          .then(resolve)
+          .catch((err) => reject(new Error(`Input inserted with id ${params.id}, but errors found: ${err}`)))
+      })
+      .catch(reject)
   })
-  .catch(params.callback)
 }
 
 /*

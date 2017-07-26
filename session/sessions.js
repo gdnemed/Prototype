@@ -1,6 +1,7 @@
 // -------------------------------------------------------------------------------------------
 // Sessions module.
-// -Keeps sessions.
+// -Validates API Keys and assigns customer to session
+// -Validates devices and assigns customer to serial
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
@@ -59,9 +60,21 @@ const manageSession = (req, res, f) => {
   } else res.status(401).end('Application key required')
 }
 
+/*
+Validates serial number of a device. Returns customer name.
+ */
+const checkSerial = (serial) => {
+  return new Promise((resolve, reject) => {
+    let d = global.devices['t' + serial]
+    if (d) resolve(d)
+    else reject(new Error('Invalid serial number'))
+  })
+}
+
 module.exports = {
   getCustomers,
   init,
   getSession,
-  manageSession
+  manageSession,
+  checkSerial
 }
