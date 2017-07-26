@@ -70,12 +70,11 @@ describe('basicTest.spec.js', () => {
       })
   })
 
-  // TODO: Falla el server si enviem un arary de cards! (revisar)
   it('POST to /records/ creates a "record" and 2 "card" (oneUserTwoCard)', (done) => {
     t.sendPOST('/api/coms/records', oneUserTwoCards).then((res) => {
       t.expect(res.status).to.equal(200)
       t.getCollection('objects', 'entity_1').then((collection) => {
-        t.expect(collection.length).to.equal(2)
+        t.expect(collection.length).to.equal(3)
         // checks entity 'record' at row [0]
         t.expectProps(collection[0], {
           type: 'record',
@@ -89,10 +88,10 @@ describe('basicTest.spec.js', () => {
           code: oneUserTwoCards.card[0].code
         })
         // checks entity 'card' at row [2]
-        /* t.expectProps(collection[2], {
+        t.expectProps(collection[2], {
           type: 'card',
-          code: oneUserOneCard.card[0].code
-        }) */
+          code: oneUserTwoCards.card[1].code
+        })
         done()
       })
     }).catch(({response}) => {
