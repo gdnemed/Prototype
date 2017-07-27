@@ -25,6 +25,7 @@ let yearMigration
 const getDirForSqliteDB = () => {
   let environment = process.env.NODE_ENV || 'development'
   switch (environment) {
+    case 'stress_test': return './db/stress_test/' + customerName + '/'
     case 'test': return './db/test/' + customerName + '/'
     default: return './db/' + customerName + '/'
   }

@@ -7,7 +7,7 @@
 const moment = require('moment-timezone')
 
 // Global database
-let global = process.env.NODE_ENV !== 'test'
+let global = process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test'
   ? {customers: {k123: {name: 'SPEC'}, k124: {name: 'OCTIME'}}, devices: {t123: 'SPEC'}}
 : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC'}}
 
