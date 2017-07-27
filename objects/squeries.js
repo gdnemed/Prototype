@@ -58,7 +58,11 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
     for (let i = 0; i < kDef.length; i++) {
       keysData.push({fields: kDef[i], values: []})
     }
-    if (keysData) {
+    if (str._subquery_) {
+      // Not direct put, but a filter to put properties or relations
+
+      //putMore(params, n, insert)
+    } else if (keysData) {
       searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data)
         .then((id) => {
           if (id) {
@@ -294,17 +298,8 @@ const executeInsert = (params) => {
       db.insert(d).into('entity_1')
         .then((rowid) => {
           release(params.session, params.entity, params.stateService)
-            .then(() => {
-              subPuts(params)
-                .then(() => {
-                  if (params.extraFunction) {
-                    params.extraFunction(params.session, params.id, true, false, () => resolve(params.id))
-                  } else resolve(params.id)
-                })
-                .catch((err) => {
-                  reject((new Error(`${d.id} ${params.entity} inserted, but errors found: ${err}`)))
-                })
-            })
+            .then(() => putMore(params, d.id, true))
+            .then(resolve)
             .catch(reject)
         })
         .catch(reject)
@@ -334,19 +329,26 @@ const executeUpdate = (params) => {
       db('entity_1').where('id', params.id).update(d)
         .then((count) => {
           release(params.session, params.entity, params.stateService)
-            .then(() => {
-              subPuts(params)
-                .then(() => {
-                  if (params.extraFunction) params.extraFunction(params.session, params.id, false, false, () => resolve())
-                  else resolve(params.id)
-                })
-                .catch((err) => {
-                  reject((new Error(`${count} ${params.entity} updated, but errors found: ${err}`)))
-                })
-            })
+            .then(() => putMore(params, count, false))
+            .then(resolve)
+            .catch(reject)
         })
         .catch(reject)
     }
+  })
+}
+
+const putMore = (params, n, insert) => {
+  return new Promise((resolve, reject) => {
+    subPuts(params)
+      .then(() => {
+        if (params.extraFunction) params.extraFunction(params.session, params.id, insert, false, () => resolve())
+        else resolve(params.id)
+      })
+      .catch((err) => {
+        let op = insert ? 'inserted' : 'updated'
+        reject((new Error(`${n} ${params.entity} ${op}, but errors found: ${err}`)))
+      })
   })
 }
 
