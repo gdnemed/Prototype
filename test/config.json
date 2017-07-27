@@ -7,7 +7,7 @@
 				"dir":"test\\exchange_workdir\\remote",
 				"workdir": "test\\exchange_workdir",
 				"sources":"test\\exchange_sources",
-				"server":{"host":"172.18.4.176","port":4041},
+				"server":{"host":"localhost","port":4041},
 				"output": true
 			}
 		}

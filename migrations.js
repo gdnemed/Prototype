@@ -22,9 +22,6 @@ let customerName
 // Year of inputs migration
 let yearMigration
 
-// Object that holds a reference to every section knex object
-let dbs = {}
-
 const getDirForSqliteDB = () => {
   let environment = process.env.NODE_ENV || 'development'
   switch (environment) {
@@ -123,6 +120,8 @@ const init = (type, customer, year) => {
   dbType = type
   customerName = customer
   yearMigration = year
+  // Object that holds a reference to every section knex object
+  let dbs = {}
   // migrateSection() already returns a promise that refers to the result of "migrateSection()" invocation
   // But we want "init()" to return a promise with another value (the "dbs" object holding the N knex references)
   // A way to do this is creating a new Promise and resolve() or reject() it depending on the case

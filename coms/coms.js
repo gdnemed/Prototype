@@ -198,7 +198,6 @@ const checkVersions = (specInfo) => {
 }
 
 const refreshClocks = () => {
-  console.log('refreshClocks')
   for (var k in clients) {
     if (clients.hasOwnProperty(k)) {
       switch (clients[k].specInfo.type) {

@@ -79,7 +79,7 @@ let prepGetTimeTypes = {
   name: 'name',
   code: 'code',
   text: 'intname',
-  timetype_grp: {_property_: '[ttgroup]', code: 'value'}
+  timetype_grp: {_property_: '[ttgroup]', _field_: 'value'}
 }
 
 let prepGetTimeType = {
@@ -94,7 +94,7 @@ let prepPutTtype = {
   _entity_: 'timetype',
   code: 'code',
   text: 'intname',
-  ttgroup: {_property_: 'ttgroup', _op_: 'multiple'}
+  ttgroup: {_property_: '[ttgroup]', _mixed_: true}
 }
 
 let prepPutEnroll = {

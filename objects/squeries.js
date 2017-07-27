@@ -469,6 +469,7 @@ const putElemProperty = (property, modelProperty, propObj, elem, params) => {
       : `input_data_${modelProperty.type}_${nodeId}_${params.period}`
     let s = db.from(table)
       .where(params.entity ? 'entity' : 'id', params.id).where('property', property)
+    if (propObj._mixed_) s.where('value', r.value)
     s.then((rows) => {
       if (params.entity) {
         historicModifier(rows, r, table, db, (err) => {
@@ -1179,7 +1180,7 @@ const executeSelect = (str, variables, session, callback) => {
   str._guide_.statement
     .then((rows) => {
       result = rows
-      return Promise.all(rows.map((row) => processRow(str, row, session, variables)))
+      return processRow(str, rows, 0, session, variables)
     })
     .then(() => {
       if (str._related_) {
@@ -1197,20 +1198,25 @@ const executeSelect = (str, variables, session, callback) => {
 For every row of the main query, does a select (if needed),
 when there are related entities or historic properties.
 */
-const processRow = (str, row, session, variables) => {
+const processRow = (str, rows, i, session, variables) => {
   return new Promise((resolve, reject) => {
-    // Subqueries for properties
-    executePropertySq(str, 'num', row)
-      .then(() => executePropertySq(str, 'str', row))
-      .then(() => executePropertySq(str, 'bin', row))
-      .then(() => executeInputOwner(str, row, session, variables))
-      .then(() => executeRelation(str, true, row, session, variables))
-      .then(() => executeRelation(str, false, row, session, variables))
-      .then(() => {
-        finalRowTreatment(str, row)
-        resolve()
-      })
-      .catch((err) => reject(err))
+    if (i >= rows.length) resolve()
+    else {
+      let row = rows[i]
+      // Subqueries for properties
+      executePropertySq(str, 'num', row)
+        .then(() => executePropertySq(str, 'str', row))
+        .then(() => executePropertySq(str, 'bin', row))
+        .then(() => executeInputOwner(str, row, session, variables))
+        .then(() => executeRelation(str, true, row, session, variables))
+        .then(() => executeRelation(str, false, row, session, variables))
+        .then(() => processRow(str, rows, i + 1, session, variables))
+        .then(() => {
+          finalRowTreatment(str, row)
+          resolve()
+        })
+        .catch(reject)
+    }
   })
 }
 
@@ -1398,6 +1404,7 @@ const executePropertySq = (str, type, row) => {
       let s = sq[type]._statement_
       let ss = s._statements
       ss[ss.length - 1].value = row._id_
+      logger.debug(s.toSQL())
       s.then((h) => {
         for (let k = 0; k < h.length; k++) {
           let info = sq[type][h[k].property]
@@ -1419,7 +1426,7 @@ const executePropertySq = (str, type, row) => {
         }
         resolve()
       })
-      .catch((err) => reject(err))
+      .catch(reject)
     } else resolve()
   })
 }
@@ -1427,6 +1434,11 @@ const executePropertySq = (str, type, row) => {
 /*
 Modifies historical lists of a relation (rows), inserting the new element r.
  params.id contains the id of the entity to modify.
+ - rows: Rows for this history in DB
+ - r: Element to insert
+ - table: Table in DB
+ - db: Database
+ - def: Definition from API
  */
 const historicModifier = (rows, r, table, db, callback) => {
   // Elements to modify list
@@ -1471,6 +1483,9 @@ const historicModifier = (rows, r, table, db, callback) => {
   }
 }
 
+/*
+Modifies a point in history of a property or relation.
+*/
 const modifyHistoricEntry = (db, table, mods, i, inserted, callback) => {
   if (i >= mods.length) callback()
   else {

@@ -78,14 +78,15 @@ describe('import.spec.js', () => {
         t.expectProps(rec0, {code: '8'})
         t.expectProps(rec0.text, {en: 'Holidays', es: 'Vacaciones'})
         console.log('record code 8 => ttgrp is ' + JSON.stringify(rec0.timetype_grp[0]))
-        // TODO: hi ha un error en el codi, doncs el valor real és 'OF2' (i hauria de ser 'HL01')
-        t.expectProps(rec0.timetype_grp[0], {code: 'HL01'})
+        t.expect(rec0.timetype_grp).to.deep.include('HL01')
+        t.expect(rec0.timetype_grp).to.deep.include('OF2')
         // ROW 1 check
         let rec1 = res.body[1]
         t.expectProps(rec1, {code: '9'})
         t.expectProps(rec1.text, {en: 'Business travel', es: 'Viaje de negocios'})
         console.log(rec1.timetype_grp[0])
         console.log('record code 9 => ttgrp is ' + JSON.stringify(rec1.timetype_grp[0]))
+        t.expect(rec0.timetype_grp).to.deep.include('HL01')
         done()
       })
     })
