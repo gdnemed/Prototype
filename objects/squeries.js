@@ -58,10 +58,22 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
     for (let i = 0; i < kDef.length; i++) {
       keysData.push({fields: kDef[i], values: []})
     }
-    if (str._subquery_) {
+    if (str._subput_) {
+      let search = {
+        _entity_: str._entity_,
+        _filter: str._filter,
+        idEntity: 'id'
+      }
       // Not direct put, but a filter to put properties or relations
-
-      //putMore(params, n, insert)
+      get(session, variables, search, (err, rows) => {
+        if (err) callback(err)
+        else {
+          if (!Array.isArray(rows)) rows = [rows]
+          putRelated(rows, 0, params)
+            .then(() => callback(null, rows))
+            .catch((err) => callback(err))
+        }
+      })
     } else if (keysData) {
       searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data)
         .then((id) => {
@@ -105,6 +117,23 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
       })
       .catch(callback)
   } else callback(new Error('Type not found'))
+}
+
+/*
+Updates properties or relations after a search.
+*/
+const putRelated = (rows, i, params) => {
+  return new Promise((resolve, reject) => {
+    if (i >= rows.length) resolve()
+    else {
+      params.id = rows[i].idEntity
+      params.entity = params.str._entity_
+      // params.str = params.str._subquery_
+      putMore(params, 1, false)
+        .then(() => putRelated(rows, i + 1, params))
+        .then(resolve).catch(reject)
+    }
+  })
 }
 
 /*
@@ -394,7 +423,7 @@ const subPuts = (params) => {
     let l = []
     for (var p in params.str) {
       if (params.str.hasOwnProperty(p) &&
-        params.data.hasOwnProperty(p) &&
+        (p === '_subput_' || params.data.hasOwnProperty(p)) &&
         (params.str[p]._property_ || params.str[p]._relation_)) l.push(p)
     }
     Promise.all(l.map((x) => subput(x, params)))
@@ -435,7 +464,9 @@ const putProperty = (property, entry, params) => {
       return
     }
     let propObj = params.str[entry]
-    let propDataList = isArray ? params.data[entry] : [params.data[entry]]
+    let dat = params.data[entry]
+    if (params.str._subput_) dat = params.data
+    let propDataList = isArray ? dat : [dat]
     if (propObj._total_) prepareTotalHistoric(propDataList, modelProperty.time)
     Promise.all(propDataList.map((x) => putElemProperty(property, modelProperty, propObj, x, params)))
       .then(resolve)
@@ -1626,37 +1657,8 @@ const modifyHistoricEntry = (db, table, mods, i, inserted, callback) => {
 }
 
 module.exports = {
-
-  get: get,
-  put: put,
-  del: del,
-  prepareGet: prepareGet
-
+  get,
+  put,
+  del,
+  prepareGet
 }
-/*
-const insert = (i) => {
-  if (i >= 10000) return
-  let a = {id: i, name: 'persona' + i, document: 'doc' + i, code: 'code' + i}
-  knexObjects.insert(a).into('entity_1').then((id) => {
-    logger.debug('insert ' + i)
-    let b = {entity: i, property: 'language', t1: CT.START_OF_DAYS, t2: CT.END_OF_DAYS, value: 'es'}
-    knexObjects.insert(b).into('property_str_1').then((id) => {
-      let j = 10000 + i
-      let c = {id: j, code: '' + j}
-      knexObjects.insert(c).into('entity_1').then((id) => {
-        let r = {id1: j, id2: i, relation: 'identifies', t1: CT.START_OF_DAYS, t2: CT.END_OF_DAYS, node: 1}
-        knexObjects.insert(r).into('relation_1').then((id) => {
-          let d = {entity: i, property: 'ttgroup', t1: CT.START_OF_DAYS, t2: CT.END_OF_DAYS, value: 'A01'}
-          knexObjects.insert(d).into('property_str_1').then((id) => {
-            let e = {entity: i, property: 'validity', t1: 20170401, t2: 20170805}
-            knexObjects.insert(e).into('property_num_1').then((id) => {
-              insert(i + 1)
-            })
-          })
-        })
-      })
-    })
-  })
-}
-
-insert(1) */

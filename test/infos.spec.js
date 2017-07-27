@@ -20,22 +20,20 @@ describe('infos.spec.js', () => {
 
   it('POST (simpleInfo) to /records/ and GET via /records/ returns the user and card', (done) => {
     sc.createSc1(t).then(() => {
-      done()
+      t.sendPOST('/api/coms/records/1U_1C/info', info1)
+        .then((res) => {
+          t.expect(res.status).to.equal(200)
+          // GET via api/records
+          t.sendGET('/api/coms/records/1U_1C/info')
+            .then((res) => {
+              t.expect(res.status).to.equal(200)
+              console.log(res.body)
+              done()
+            })
+            .catch(({response}) => console.log('ERROR: ' + response.status + ' ' + response.text))
+        })
+        .catch(({response}) => console.log('ERROR: ' + response.status + ' ' + response.text))
     })
-   /* t.sendPOST('/api/coms/records/1U_1C/info', info1)
-      .then((res) => {
-        t.expect(res.status).to.equal(200)
-        // GET via api/records
-        t.sendGET('/api/coms/records/1U_1C/info')
-          .then((res) => {
-            t.expect(res.status).to.equal(200)
-            console.log(res.body)
-            done()
-          })
-          .catch(({response}) => console.log('ERROR: ' + response.status + ' ' + response.text))
-      })
-      .catch(({response}) => console.log('ERROR: ' + response.status + ' ' + response.text))
-      */
   })
 
   // -------------------------------------------------------------------------------------------
