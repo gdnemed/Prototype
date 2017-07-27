@@ -106,7 +106,6 @@ let prepPutEnroll = {
 let prepGetInfo = {
   _entity_: 'record',
   _filter_: {field: 'document', variable: 'id'},
-  id: 'document',
   info: {
     _property_: 'info',
     value: 'value',
@@ -127,7 +126,7 @@ let prepGetInfos = {
 let prepPutInfo = {
   _entity_: 'record',
   _filter_: {field: 'document', variable: 'id'},
-  _subquery_: {
+  _subput_: {
     _property_: 'info',
     value: 'value',
     date: 't1'
@@ -188,8 +187,9 @@ const put = (req, res, session, str) => {
     str, req.body, extraTreatment, (err, ret) => {
       if (err) res.status(500).end(err.message)
       else {
-        res.status(200).jsonp([ret])
-        nextVersion(session, [ret], str._entity_)// Notify communications
+        if (!Array.isArray(ret)) ret = [ret]
+        res.status(200).jsonp(ret)
+        nextVersion(session, ret, str._entity_)// Notify communications
       }
     })
 }
@@ -290,7 +290,7 @@ const nextVersion = (session, obj, type) => {
     },
     (err, ret) => {
       if (err) logger.error(err)
-      else {
+      else if (ret) {
         let code = parseInt(ret.code)
         let cardList
         if (ret) {

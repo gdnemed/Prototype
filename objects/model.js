@@ -12,7 +12,7 @@ const ENTITIES = {
 
 const PROPERTIES = {
   'language': {type: 'str', time: false},
-  'info': {type: 'str', time: true},
+  'info': {type: 'str', time: false},
   'enroll': {type: 'num', time: true},
   'validity': {type: 'num', time: false},
   'ttgroup': {type: 'str', time: false},
