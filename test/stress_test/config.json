@@ -1,0 +1,14 @@
+{
+		"api_listen":{"host":"","port":6041},
+		"coms_listen":{"host":"","port":6042},
+		"node_id":1,
+		"exchange":{
+			"files":{
+				"dir":"test\\stress_test\\exchange_workdir\\remote",
+				"workdir": "test\\stress_test\\exchange_workdir",
+				"sources":"test\\stress_test\\exchange_sources",
+				"server":{"host":"localhost","port":6041},
+				"output": true
+			}
+		}
+}

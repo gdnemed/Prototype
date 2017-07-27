@@ -24,7 +24,7 @@ let customers = {}
 
 const init = () => {
   return new Promise((resolve, reject) => {
-    if (process.argv.length <= 2 || process.env.NODE_ENV === 'test') {
+    if (process.argv.length <= 2 || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
       // Run it as a program
       let eventEmitter = initEvents()
@@ -77,7 +77,11 @@ const initConfiguration = () => {
   logM = logger.getLogger('migration')
   log = logger.getLogger('Main')
   try {
-    let routeCfg = process.env.NODE_ENV === 'test' ? `${home}\\test` : home
+    let routeCfg = home
+    switch (process.env.NODE_ENV) {
+      case 'test': routeCfg = `${home}\\test`; break
+      case 'stress_test': routeCfg = `${home}\\test\\stress_test`; break
+    }
     log.debug(`Using config file ${routeCfg}`)
     environment = JSON.parse(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
   } catch (err) {
@@ -229,6 +233,6 @@ module.exports = {
 }
 
 // Start Lemuria when not testing (tests start Lemuria by themselves)
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test') {
   init()
 }

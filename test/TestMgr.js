@@ -19,8 +19,7 @@ const path = require('path')
 // -------------------------------------------------------------------------------------------
 // "Lemuria" services creation. "get()" procedure using '_t' as a cache
 // -------------------------------------------------------------------------------------------
-process.env.NODE_ENV = 'test'
-const lemuria = require('../lemuria.js')
+let lemuria
 let _lemuriaInitialized = false
 
 const startLemuria = () => {
@@ -43,7 +42,10 @@ const startLemuria = () => {
 
 // Returns a promise with Lemura services, dbs, environment, lemuriaAPI, etc
 // Initially, if Lemuria is not started, starts it. On every call, returns _t cached copy
-const get = () => {
+const get = (env = 'test') => {
+  process.env.NODE_ENV = env
+  lemuria = require('../lemuria.js') // IMPORTANT: require lemuria after setting 'NODE_ENV'!
+  console.log('>> TestMgr: environment = ' + env)
   return new Promise((resolve, reject) => {
     if (!_lemuriaInitialized) {
       // At first, lemuria infrastructure needs to be created
