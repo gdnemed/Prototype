@@ -15,6 +15,7 @@ chai.use(chaiHttp)
 const expect = chai.expect
 const fs = require('fs')
 const path = require('path')
+const g = require('../global')
 
 // -------------------------------------------------------------------------------------------
 // "Lemuria" services creation. "get()" procedure using '_t' as a cache
@@ -25,10 +26,10 @@ let _lemuriaInitialized = false
 const startLemuria = () => {
   return new Promise((resolve, reject) => {
     lemuria.init()
-      .then(({dbs, eventEmitter}) => {
+      .then(({dbs}) => {
         // stores refences to knex objects
         t.dbs = dbs
-        t.eventEmitter = eventEmitter
+        t.eventEmitter = g.getEventEmitter()
         console.log('TestMgr: lemuria.init() invoked OK')
         // getting environment to know Ports, Urls, etc
         t.environment = lemuria.getEnvironment()

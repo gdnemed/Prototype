@@ -10,6 +10,7 @@ const csvtojson = require('csvtojson')
 const request = require('request')
 const equal = require('deep-equal')
 const logger = require('../utils/log').getLogger('files')
+const g = require('../global')
 
 let ONE_DAY = 86400000
 let DELETE_MARK = '{{DEL}}'
@@ -19,7 +20,6 @@ let workDir
 let timeZone
 let remoteService
 let createOutput
-let eventEmitter
 
 /*
 Initialize variables and watching import files.
@@ -30,7 +30,6 @@ const init = (params, evtEmitter) => {
   remoteDir = params.dir
   workDir = params.workdir
   createOutput = params.output
-  eventEmitter = evtEmitter
   watch('RECORDS', processRecord, 'records', 'records', 'records')
   watch('TTYPES', processTtype, 'timetypes', 'timetypes', 'timetypes')
   watch('INFO', processInfo, 'infos', 'records/@/info', 'records/@/info')
@@ -438,7 +437,7 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
 
 const notifyEndImport = (path, importType, output, now, ok, partial) => {
   logger.debug('notifyEndImport: ' + path + '  ' + importType + '  ' + ok)
-  eventEmitter.emit('onEndImport', {path, importType, ok})
+  g.getEventEmitter().emit('onEndImport', {path, importType, ok})
 }
 
 module.exports = {

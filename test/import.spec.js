@@ -1,13 +1,6 @@
 /* global process, require, describe, beforeEach, it, afterEach */
 const TestMgr = require('./TestMgr.js')
-const events = require('events')
 let t // Reference to data obtained from TestMgr().get
-
-let evm = new events.EventEmitter()
-evm.on('onEndImport', ({path, importType}) => {
-  console.log('#### EUREKA! onEndImport event received')
-  // done()
-})
 
 describe('import.spec.js', () => {
   beforeEach((done) => {

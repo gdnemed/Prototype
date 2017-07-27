@@ -8,8 +8,8 @@
 const fs = require('fs')
 const express = require('express')
 const bodyParser = require('body-parser')
-const events = require('events')
 
+const g = require('./global')
 const state = require('./state/state')
 const coms = require('./coms/coms')
 const files = require('./exchange/files')
@@ -23,20 +23,20 @@ let home, environment, api, httpServer, logM, log
 let customers = {}
 
 const init = () => {
+  // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
+  g.init()
   return new Promise((resolve, reject) => {
     if (process.argv.length <= 2 || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
       // Run it as a program
-      let eventEmitter = initEvents()
       initConfiguration()
       initializeCustomer(sessions.getCustomers(), 0)
         .then(initApiServer)
         .then(initServices)
-        .then(() => initProcess(eventEmitter))
+        .then(initProcess)
         .then(() => {
           resolve({
-            dbs: customers['SPEC'].dbs,
-            eventEmitter: eventEmitter
+            dbs: customers['SPEC'].dbs
           })
         }) // For test, return 1 database
         .catch((err) => {
@@ -49,12 +49,6 @@ const init = () => {
       serviceFunctions(process.argv).then(resolve)
     }
   })
-}
-
-// Creates an instance of 'EventEmitter' that allows emision and reception of events
-// via eventEmitter.emit(...) / eventEmitter.on(...)
-const initEvents = () => {
-  return new events.EventEmitter()
 }
 
 const initializeCustomer = (customersList, i) => {
@@ -182,10 +176,10 @@ const initServices = () => {
 /*
 Starts processes, like importation of files, etc.
 */
-const initProcess = (eventEmitter) => {
+const initProcess = () => {
   return new Promise((resolve, reject) => {
     log.info('initProcess')
-    if (files.init(environment.exchange.files, eventEmitter)) resolve()
+    if (files.init(environment.exchange.files)) resolve()
     else reject(new Error('initProcess failed'))
   })
 }
