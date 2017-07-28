@@ -31,9 +31,9 @@ const startLemuria = () => {
         t.dbs = dbs
         t.eventEmitter = g.getEventEmitter()
         console.log('TestMgr: lemuria.init() invoked OK')
-        // getting environment to know Ports, Urls, etc
-        t.environment = lemuria.getEnvironment()
-        let port = t.environment.api_listen.port
+        // getting config to know Ports, Urls, etc
+        t.config = g.getConfig()
+        let port = t.config.api_listen.port
         t.lemuriaAPI = `localhost:${port}`
         console.log(`TestMgr: lemuriaAPI for testing is: ${t.lemuriaAPI}`)
         resolve()
@@ -41,12 +41,12 @@ const startLemuria = () => {
   })
 }
 
-// Returns a promise with Lemura services, dbs, environment, lemuriaAPI, etc
+// Returns a promise with Lemura services, dbs, config, lemuriaAPI, etc
 // Initially, if Lemuria is not started, starts it. On every call, returns _t cached copy
 const get = (env = 'test') => {
   process.env.NODE_ENV = env
   lemuria = require('../lemuria.js') // IMPORTANT: require lemuria after setting 'NODE_ENV'!
-  console.log('>> TestMgr: environment = ' + env)
+  console.log('>> TestMgr: config = ' + env)
   return new Promise((resolve, reject) => {
     if (!_lemuriaInitialized) {
       // At first, lemuria infrastructure needs to be created
@@ -75,7 +75,7 @@ const get = (env = 'test') => {
 const prepareFileImport = (fieName) => {
   return new Promise((resolve, reject) => {
     try {
-      let envFiles = t.environment.exchange.files
+      let envFiles = t.config.exchange.files
       let tSource = envFiles.sources + '\\' + fieName
       let tDest = envFiles.dir + '\\' + fieName
       let strm = fs.createReadStream(tSource).pipe(fs.createWriteStream(tDest))
@@ -104,11 +104,11 @@ const handleFileImport = (fileName) => {
     // when a 'onEndImport' event is received, the event needs to be removed (to not interfere
     // other tests that also are listening to the event), and the promise can be resolved
     const handler = (importResult) => {
-      t.eventEmitter.removeListener('onEndImport', handler)
+      t.eventEmitter.removeListener(g.EVT.onEndImport, handler)
       resolve(importResult)
     }
     // starts listening 'onEndImport' events produced by 'files' module
-    t.eventEmitter.on('onEndImport', handler)
+    t.eventEmitter.on(g.EVT.onEndImport, handler)
     // copies the '*.DWN' file to /remote/ dir to trigger an import procedure
     prepareFileImport(fileName).catch(({response}) => { // No 'then()' here: must wait until evt 'onEndImport' is emited
       let err = 'ERROR: ' + response.status + ' ' + response.text
@@ -139,7 +139,7 @@ const removeDirectorySync = (removePath) => {
 const cleanImportFiles = (fieName) => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      let envFiles = t.environment.exchange.files
+      let envFiles = t.config.exchange.files
       let remotePath = envFiles.dir // exchange_workdir/remote/  (after an import process contains .LOG files)
       let donePath = envFiles.workdir + '\\done\\' // exchange_workdirdone/  (after an import process contains .DWN files)
       if (!removeDirectorySync(remotePath)) reject(new Error())
@@ -179,7 +179,7 @@ const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Au
 // Gets the DB related to 'section' &  'tableName'
 const getCollection = (section, tableName) => t.dbs[section].select().table(tableName)
 
-// Holds references to everything that a 'spec' or 'test' file can need, i.e dbs, environment, lemuriaAPI, etc
+// Holds references to everything that a 'spec' or 'test' file can need, i.e dbs, config, lemuriaAPI, etc
 let t = {
   chai,
   chaiHttp,

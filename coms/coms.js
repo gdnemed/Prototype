@@ -9,20 +9,22 @@
 
 const net = require('net')
 const msgpack = require('msgpack-lite')
+const g = require('../global')
 
 const logger = require('../utils/log').getLogger('coms')
 
-var clients = {}
-var tablesVersions = {records: 0, cards: 0, time_types: 0}
-var idsense
-var logicService, sessionsService
+let clients = {}
+let tablesVersions = {records: 0, cards: 0, time_types: 0}
+let idsense
+let logicService, sessionsService
 
 /*
 Communications initialization.
 -listen: Object containing address and port to listen.
 -logic: Logic module.
 */
-const init = (listen, logic, sessions) => {
+const init = (logic, sessions) => {
+  let listen = g.getConfig().coms_listen
   idsense = require('./idsense')
   logicService = logic
   sessionsService = sessions
@@ -32,7 +34,7 @@ const init = (listen, logic, sessions) => {
 }
 
 const listenFunction = (socket) => {
-  var info = {
+  let info = {
     name: socket.remoteAddress + ':' + socket.remotePort,
     queue: [],
     ackCount: 0
@@ -100,7 +102,7 @@ const receive = (dataBuffer, socket) => {
     } else delete info.buffer
     dataBuffer = null
 
-    var data = msgpack.decode(b)
+    let data = msgpack.decode(b)
     data.seq = s
     logger.trace('<- socket ' + info.name)
     logger.trace(data)
@@ -121,7 +123,7 @@ Receive function when terminal type and serial are still unknown.
 const genericReceive = (frame, socket) => {
   sessionsService.checkSerial(frame.serial)
     .then((customer) => {
-      var info = socket.specInfo
+      let info = socket.specInfo
       info.type = 'idSense'
       info.serial = frame.serial
       info.customer = customer
@@ -150,16 +152,16 @@ const genericReceive = (frame, socket) => {
 }
 
 const globalSend = (command, data) => {
-  for (var property in clients) {
+  for (let property in clients) {
     if (clients.hasOwnProperty(property)) {
-      var socket = clients[property]
+      let socket = clients[property]
       if (socket.specInfo.identified) sendData(socket, command, data)
     }
   }
 }
 
 const send = (serial, command, data) => {
-  var socket = clients['id' + serial]
+  let socket = clients['id' + serial]
   if (socket) {
     sendData(socket, command, data)
   } else return new Error('Serial ' + serial + ' not found')
@@ -185,10 +187,10 @@ If the table of the terminal it out of date, starts an upload process.
 -specInfo: Information associated to connection.
 */
 const checkVersions = (specInfo) => {
-  for (var tab in tablesVersions) {
+  for (let tab in tablesVersions) {
     if (tablesVersions.hasOwnProperty(tab)) {
-      var sv = tablesVersions[tab]
-      var tv = specInfo.tablesVersions[tab]
+      let sv = tablesVersions[tab]
+      let tv = specInfo.tablesVersions[tab]
       if (tv < sv) {
         // We put node_id=1 at the moment, should be revised
         logicService.get_pending_registers(tab, tv, specInfo.customer, 1, specInfo.serial)
@@ -198,7 +200,7 @@ const checkVersions = (specInfo) => {
 }
 
 const refreshClocks = () => {
-  for (var k in clients) {
+  for (let k in clients) {
     if (clients.hasOwnProperty(k)) {
       switch (clients[k].specInfo.type) {
         case 'idSense': idsense.send(clients[k], 'clock', {time: Math.floor(new Date().getTime() / 1000)})

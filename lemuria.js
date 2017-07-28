@@ -5,7 +5,7 @@
 // -Initialize Lemuria services
 // -Starts http server for API calls
 // -------------------------------------------------------------------------------------------
-const fs = require('fs')
+
 const express = require('express')
 const bodyParser = require('body-parser')
 
@@ -19,17 +19,21 @@ const migrations = require('./migrations')
 const squeries = require('./objects/squeries')
 const sessions = require('./session/sessions')
 
-let home, environment, api, httpServer, logM, log
+let api, httpServer, logM, log
 let customers = {}
 
 const init = () => {
+  // logger initialization
+  let home = process.cwd()
+  logger.configure(home)
+  logM = logger.getLogger('migration')
+  log = logger.getLogger('Main')
   // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
   g.init()
   return new Promise((resolve, reject) => {
     if (process.argv.length <= 2 || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
       // Run it as a program
-      initConfiguration()
       initializeCustomer(sessions.getCustomers(), 0)
         .then(initApiServer)
         .then(initServices)
@@ -63,36 +67,6 @@ const initializeCustomer = (customersList, i) => {
         .catch(reject)
     }
   })
-}
-
-const initConfiguration = () => {
-  home = process.cwd()
-  logger.configure(home)
-  logM = logger.getLogger('migration')
-  log = logger.getLogger('Main')
-  try {
-    let routeCfg = home
-    switch (process.env.NODE_ENV) {
-      case 'test': routeCfg = `${home}\\test`; break
-      case 'stress_test': routeCfg = `${home}\\test\\stress_test`; break
-    }
-    log.debug(`Using config file ${routeCfg}`)
-    environment = JSON.parse(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
-  } catch (err) {
-    log.info('config.json not found, using default configuration.')
-    environment = {
-      'api_listen': {'host': '', 'port': 8081},
-      'coms_listen': {'host': '', 'port': 8092},
-      'node_id': 1,
-      'exchange': {
-        'files': {
-          'dir': '.',
-          'workdir': '.',
-          'server': {'host': '', 'port': 8081}
-        }
-      }
-    }
-  }
 }
 
 // debug: verifies that each knex object for each db exists
@@ -137,7 +111,7 @@ const initApiServer = () => {
     api.post('/api/objects/query', (req, res) => sessions.manageSession(req, res, query))
     logic.initAPI(api)
     // Run http server
-    httpServer = api.listen(environment.api_listen.port, (err) => {
+    httpServer = api.listen(g.getConfig().api_listen.port, (err) => {
       if (err) reject(err)
       else {
         let address = httpServer.address()
@@ -165,7 +139,7 @@ const initServices = () => {
       log.info('initServices')
       sessions.init(customers)
       logic.init(sessions, state, coms)
-      coms.init(environment.coms_listen, logic, sessions)
+      coms.init(logic, sessions)
       resolve()
     } catch (error) {
       reject(new Error(`Error in services initialization: ${error}`))
@@ -179,7 +153,7 @@ Starts processes, like importation of files, etc.
 const initProcess = () => {
   return new Promise((resolve, reject) => {
     log.info('initProcess')
-    if (files.init(environment.exchange.files)) resolve()
+    if (files.init()) resolve()
     else reject(new Error('initProcess failed'))
   })
 }
@@ -218,11 +192,8 @@ const serviceFunctions = (args) => {
   })
 }
 
-const getEnvironment = () => environment
-
 module.exports = {
   getDatabases,
-  getEnvironment,
   init
 }
 

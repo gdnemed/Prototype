@@ -24,7 +24,8 @@ let createOutput
 /*
 Initialize variables and watching import files.
 */
-const init = (params, evtEmitter) => {
+const init = () => {
+  let params = g.getConfig().exchange.files
   remoteService = params.server
   timeZone = 'Europe/Madrid'
   remoteDir = params.dir
@@ -437,7 +438,7 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
 
 const notifyEndImport = (path, importType, output, now, ok, partial) => {
   logger.debug('notifyEndImport: ' + path + '  ' + importType + '  ' + ok)
-  g.getEventEmitter().emit('onEndImport', {path, importType, ok})
+  g.getEventEmitter().emit(g.EVT.onEndImport, {path, importType, ok})
 }
 
 module.exports = {
