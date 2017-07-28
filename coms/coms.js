@@ -11,12 +11,13 @@ const net = require('net')
 const msgpack = require('msgpack-lite')
 const g = require('../global')
 
-const logger = require('../utils/log').getLogger('coms')
+const logger = require('../utils/log')
 
 let clients = {}
 let tablesVersions = {records: 0, cards: 0, time_types: 0}
 let idsense
 let logicService, sessionsService
+let log
 
 /*
 Communications initialization.
@@ -24,13 +25,16 @@ Communications initialization.
 -logic: Logic module.
 */
 const init = (logic, sessions) => {
+  log = logger.getLogger('coms')
+  log.debug('>> coms.init()')
   let listen = g.getConfig().coms_listen
   idsense = require('./idsense')
   logicService = logic
   sessionsService = sessions
   net.createServer(listenFunction).listen(listen.port, listen.host)
-  logger.info('coms listening at ' + listen.host + ':' + listen.port)
+  log.info('coms listening at ' + listen.host + ':' + listen.port)
   setInterval(refreshClocks, 60000)
+  return Promise.resolve()
 }
 
 const listenFunction = (socket) => {
@@ -39,7 +43,7 @@ const listenFunction = (socket) => {
     queue: [],
     ackCount: 0
   }
-  logger.debug('connection from ' + info.name)
+  log.debug('connection from ' + info.name)
   socket.specInfo = info
 
   // We still don't know its name, so we put it in the map using tcp address
@@ -51,7 +55,7 @@ const listenFunction = (socket) => {
 }
 
 const onError = (err, socket) => {
-  logger.error(socket.specInfo.name + ':' + err.message)
+  log.error(socket.specInfo.name + ':' + err.message)
 }
 
 const onClose = (err, socket) => {
@@ -60,9 +64,9 @@ const onClose = (err, socket) => {
     // remove socket from the map. If initialized, use id, otherwise, name
     if (socket.specInfo.serial) delete clients['id' + socket.specInfo.serial]
     else delete clients['tcp' + socket.specInfo.name]
-    logger.info(socket.specInfo.name + ' closed')
+    log.info(socket.specInfo.name + ' closed')
   } catch (e) {
-    logger.error(e.message)
+    log.error(e.message)
   }
 }
 
@@ -104,8 +108,8 @@ const receive = (dataBuffer, socket) => {
 
     let data = msgpack.decode(b)
     data.seq = s
-    logger.trace('<- socket ' + info.name)
-    logger.trace(data)
+    log.trace('<- socket ' + info.name)
+    log.trace(data)
     // each type of terminal, needs its own processing
     switch (info.type) {
       case 'idSense':
@@ -146,7 +150,7 @@ const genericReceive = (frame, socket) => {
       }
     })
     .catch((err) => {
-      logger.error(err.message + ', serial: ' + frame.serial)
+      log.error(err.message + ', serial: ' + frame.serial)
       socket.end()
     })
 }

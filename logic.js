@@ -1,3 +1,4 @@
+/* global require, process */
 // -------------------------------------------------------------------------------------------
 // Lemuria logic.
 // -Implements API calls.
@@ -5,12 +6,13 @@
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
-const logger = require('./utils/log').getLogger('coms')
+const logger = require('./utils/log')
 const squeries = require('./objects/squeries')
 const CT = require('./CT')
 const utils = require('./utils/utils')
+const httpServer = require('./httpServer')
 
-let sessionService, stateService, comsService
+let sessionService, stateService, comsService, log
 
 let prepGetRecords = {
   _entity_: '[record]',
@@ -168,9 +170,13 @@ let prepPutClocking = {
 }
 
 const init = (sessions, state, coms) => {
+  log = logger.getLogger('logic')
+  log.debug('>> logic.init()')
   sessionService = sessions
   stateService = state
   comsService = coms
+  initAPI()
+  return Promise.resolve()
 }
 
 const get = (req, res, session, str) => {
@@ -215,7 +221,8 @@ const apiCall = (op, param1, param2) => {
     (req, res, session) => op(req, res, session, param1, param2))
 }
 
-const initAPI = (api) => {
+const initAPI = () => {
+  let api = httpServer.getApi()
   api.get('/api/coms/records', apiCall(get, prepGetRecords))
   api.get('/api/coms/records/:id', apiCall(get, prepGetRecord))
   api.post('/api/coms/records', apiCall(put, prepPutRecords))
@@ -275,8 +282,8 @@ const extraTreatment = (session, id, isInsert, isDelete, callback) => {
 Indicates something has changed, so the terminals should be updated
 */
 const nextVersion = (session, obj, type) => {
-  // logger.debug('nextVersion')
-  // logger.debug(obj)
+  // log.debug('nextVersion')
+  // log.debug(obj)
   if (type !== 'record') return
   // Get current object state in database
   squeries.get(session, {id: obj[0]},
@@ -289,12 +296,12 @@ const nextVersion = (session, obj, type) => {
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
     },
     (err, ret) => {
-      if (err) logger.error(err)
+      if (err) log.error(err)
       else if (ret) {
         let code = parseInt(ret.code)
         let cardList
         if (ret) {
-          logger.debug(ret)
+          log.debug(ret)
           cardList = ret.card
           if (cardList && ret.drop === 0) {
             for (let i = 0; i < cardList.length; i++) {
@@ -316,7 +323,7 @@ Uploads into the terminal, every information with higher revision.
 */
 const initTerminal = (serial, customer) => {
   sessionService.getSession(customer, (err, session) => {
-    if (err) logger.error(err)
+    if (err) log.error(err)
     else {
       squeries.get(session, {},
         {
@@ -326,7 +333,7 @@ const initTerminal = (serial, customer) => {
           drop: {_property_: 'drop'},
           card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
         }, (err, ret) => {
-          if (err) logger.error(err)
+          if (err) log.error(err)
           else {
             for (let i = 0; i < ret.length; i++) {
               if (ret[i].code && ret[i].code !== null) {

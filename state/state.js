@@ -1,3 +1,4 @@
+/* global require, process */
 // -------------------------------------------------------------------------------------------
 // State module.
 // -Implements API calls over global settings.
@@ -5,11 +6,14 @@
 // -Blocks types to avoid concurrent actions over keys.
 // -------------------------------------------------------------------------------------------
 
-const logger = require('../utils/log').getLogger('state')
+const logger = require('../utils/log')
+const httpServer = require('../httpServer')
+const sessions = require('../session/sessions')
 
 // Numeric sequences for id's (entities and inputs)
 let sequences = {}
 let inputSequences = {}
+let log
 
 // Map for entity types blocking (for key preservation)
 let typesBlocks = {}
@@ -133,13 +137,20 @@ const releaseType = (session, type, callback) => {
   callback()
 }
 
+const init = () => {
+  log = logger.getLogger('state')
+  log.debug('>> state init()')
+  httpServer.getApi().post('/api/state/settings', (req, res) => sessions.manageSession(req, res, postSettings))
+  httpServer.getApi().get('/api/state/settings', (req, res) => sessions.manageSession(req, res, getSettings))
+  return Promise.resolve()
+}
+
 module.exports = {
-
-  post_settings: postSettings,
-  getSettings: getSettings,
-  newId: newId,
-  newInputId: newInputId,
-  blockType: blockType,
-  releaseType: releaseType
-
+  init,
+  postSettings,
+  getSettings,
+  newId,
+  newInputId,
+  blockType,
+  releaseType
 }

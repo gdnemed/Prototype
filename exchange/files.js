@@ -1,3 +1,4 @@
+/* global require, process */
 // -------------------------------------------------------------------------------------------
 // Service for files exchange. Allows an external application
 // to send and receive data in files, instead of calling API.
@@ -9,12 +10,12 @@ const chokidar = require('chokidar')
 const csvtojson = require('csvtojson')
 const request = require('request')
 const equal = require('deep-equal')
-const logger = require('../utils/log').getLogger('files')
+const logger = require('../utils/log')
 const g = require('../global')
 
 let ONE_DAY = 86400000
 let DELETE_MARK = '{{DEL}}'
-
+let log
 let remoteDir
 let workDir
 let timeZone
@@ -25,6 +26,8 @@ let createOutput
 Initialize variables and watching import files.
 */
 const init = () => {
+  log = logger.getLogger('files')
+  log.debug('>> files.init()')
   let params = g.getConfig().exchange.files
   remoteService = params.server
   timeZone = 'Europe/Madrid'
@@ -52,23 +55,23 @@ Renames the original file to DWT, brings it to working directory,
 deletes the original file, and begins import process.
 */
 const moveImportFile = (path, importType, fJson, pathGet, pathPost, pathDelete, partial) => {
-  logger.debug(path)
+  log.debug(path)
   if (fs.existsSync(path)) {
     let newPath = path.substring(0, path.length - 1) + 'T'
     fs.rename(path, newPath, (err) => {
-      if (err) logger.error(err)
+      if (err) log.error(err)
       else {
         let endPath = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC.DWT' : '.DWT')
         try {
           fs.writeFileSync(endPath, fs.readFileSync(newPath))
-          fs.unlink(newPath, (err) => { if (err) logger.error(err) })
+          fs.unlink(newPath, (err) => { if (err) log.error(err) })
           let now = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDDHHmmss')
           if (createOutput) {
             let logPath = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC_' : '_') + now + '.LOG'
             let output = fs.createWriteStream(logPath)
             output.once('open', () => importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, output, now, partial))
           } else importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, null, now, partial)
-        } catch (err) { logger.error(err) }
+        } catch (err) { log.error(err) }
       }
     })
   }
@@ -83,18 +86,18 @@ const outPut = (stream, message) => {
 Gets information from server, to manage total import.
 */
 const importPrepare = (path, importType, fJson, pathGet, pathPost, pathDelete, output, now, partial) => {
-  logger.info('Start of ' + importType + ' import')
+  log.info('Start of ' + importType + ' import')
   if (output) outPut(output, 'Start')
   if (partial) importProcess(null, path, importType, fJson, pathPost, pathDelete, output, now, partial)
   else {
     let errMsg
     call('GET', pathGet, null, (err, response, bodyResponse) => {
       if (err) {
-        logger.error(err)
+        log.error(err)
         errMsg = err.message
       } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
         errMsg = 'Error ' + response.statusCode + ' : ' + bodyResponse
-        logger.error(errMsg)
+        log.error(errMsg)
       } else {
         // Create Map from server response
         let elemsToDelete = {}
@@ -131,7 +134,7 @@ const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDel
   .on('json', (jsonObj) => fJson(jsonObj, yesterday, elems, partial, elemsToDelete))
   .on('done', (err) => {
     if (err) {
-      logger.error(err)
+      log.error(err)
       endImport(path, importType, output, now, false, partial)
     } else {
       if (partial) cleanMap(elemsToDelete, elems)
@@ -189,7 +192,7 @@ const endImport = (path, importType, output, now, ok, partial) => {
   if (fs.existsSync(path)) {
     let newPath = workDir + '/' + (ok ? 'done' : 'error') + '/' +
       importType + (partial ? '_INC_' : '_') + now + '.DWN'
-    fs.rename(path, newPath, (err) => { if (err) logger.error(err) })
+    fs.rename(path, newPath, (err) => { if (err) log.error(err) })
   }
   if (output) {
     output.on('finish', () => {
@@ -197,12 +200,12 @@ const endImport = (path, importType, output, now, ok, partial) => {
         let endPath = remoteDir + '/' + importType + '_' + now + '.LOG'
         let local = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC_' : '_') + now + '.LOG'
         fs.writeFileSync(endPath, fs.readFileSync(local))
-        fs.unlink(local, (err) => { if (err) logger.error(err) })
-      } catch (exc) { logger.error(exc) }
+        fs.unlink(local, (err) => { if (err) log.error(err) })
+      } catch (exc) { log.error(exc) }
     })
     output.end()
   }
-  logger.info('End of ' + importType + ' import.')
+  log.info('End of ' + importType + ' import.')
   notifyEndImport(path, importType, output, now, ok, partial)
   // TODO: Aprofitar el moment per esborrar fitxers antics
 }
@@ -356,16 +359,16 @@ const sendOrder = (l, i, apiPath, elemsToDelete, output, nObjects, nErrors, call
     let pos = apiPath.indexOf('@')
     let url = pos < 0 ? apiPath // + '/' + id More general to put id in body
     : apiPath.substring(0, pos) + l[i].id + apiPath.substr(pos + 1)
-    logger.debug('call ' + url)
+    log.debug('call ' + url)
     nObjects++
     call('POST', url, r, (err, response, bodyResponse) => {
       if (err) {
         nErrors++
-        logger.error(err)
+        log.error(err)
         if (output) outPut(output, err.message)
       } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
         let msg = 'Error ' + response.statusCode + ' : ' + bodyResponse
-        logger.error(msg)
+        log.error(msg)
         if (output) {
           outPut(output, msg)
           outPut(output, url)
@@ -419,7 +422,7 @@ Sends a delete order
 const deleteOrder = (l, i, apiPath, output, callback) => {
   if (i >= l.length) callback()
   else {
-    logger.debug('delete entity with code ' + l[i])
+    log.debug('delete entity with code ' + l[i])
 
     // Add item id
     let pos = apiPath.indexOf('@')
@@ -428,7 +431,7 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
 
     call('DELETE', url, null, (err) => {
       if (err) {
-        logger.error(err)
+        log.error(err)
         if (output) outPut(output, err)
       }
       deleteOrder(l, i + 1, apiPath, output, callback)
@@ -437,7 +440,7 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
 }
 
 const notifyEndImport = (path, importType, output, now, ok, partial) => {
-  logger.debug('notifyEndImport: ' + path + '  ' + importType + '  ' + ok)
+  log.debug('notifyEndImport: ' + path + '  ' + importType + '  ' + ok)
   g.getEventEmitter().emit(g.EVT.onEndImport, {path, importType, ok})
 }
 

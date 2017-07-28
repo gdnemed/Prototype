@@ -6,20 +6,16 @@
 // -Starts http server for API calls
 // -------------------------------------------------------------------------------------------
 
-const express = require('express')
-const bodyParser = require('body-parser')
 const logger = require('./utils/log')
-
 const g = require('./global')
+const httpServer = require('./httpServer')
 const state = require('./state/state')
 const coms = require('./coms/coms')
 const files = require('./exchange/files')
 const logic = require('./logic')
-
-const squeries = require('./objects/squeries')
 const sessions = require('./session/sessions')
 
-let api, httpServer, log
+let log
 
 const init = () => {
   // logger initialization
@@ -33,10 +29,12 @@ const init = () => {
       console.log('Starting lemuria as application')
       // Run it as a program
       sessions.init()
-        .then(initApiServer)
+        .then(httpServer.init)
         .then(initServices)
-        .then(initProcess)
-        .then(resolve)
+        .then(() => {
+          log.info('>> Services started. Application ready...')
+          resolve()
+        })
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: ${err}`)
           reject(err)
@@ -49,60 +47,20 @@ const init = () => {
   })
 }
 
-const initApiServer = () => {
-  return new Promise((resolve, reject) => {
-    log.info('initApiServer')
-    api = express()
-    api.use(bodyParser.json())
-    // API functions
-    api.post('/api/state/settings', (req, res) => sessions.manageSession(req, res, state.postSettings))
-    api.get('/api/state/settings', (req, res) => sessions.manageSession(req, res, state.getSettings))
-    // For testing
-    api.post('/api/objects/query', (req, res) => sessions.manageSession(req, res, query))
-    logic.initAPI(api)
-    // Run http server
-    httpServer = api.listen(g.getConfig().api_listen.port, (err) => {
-      if (err) reject(err)
-      else {
-        let address = httpServer.address()
-        log.info('API listening at port ' + address.port)
-        resolve()
-      }
-    })
-  })
-}
-
-const query = (req, res, session) => {
-  squeries.get(session, req.params, req.body, (err, ret) => {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(ret)
-  })
-}
-
-
 const initServices = () => {
   return new Promise((resolve, reject) => {
-    try {
-      log.info('initServices')
-      logic.init(sessions, state, coms)
-      coms.init(logic, sessions)
-      resolve()
-    } catch (error) {
-      reject(new Error(`Error in services initialization: ${error}`))
-    }
+    log.info('initServices')
+    logic.init(sessions, state, coms)
+      .then(() => coms.init(logic, sessions))
+      .then(state.init)
+      .then(files.init)
+      .then(resolve)
+      .catch((error) => {
+        reject(new Error(`Error in services initialization: ${error.message}`))
+      })
   })
 }
 
-/*
-Starts processes, like importation of files, etc.
-*/
-const initProcess = () => {
-  return new Promise((resolve, reject) => {
-    log.info('initProcess')
-    if (files.init()) resolve()
-    else reject(new Error('initProcess failed'))
-  })
-}
 
 /*
 Installs/unistalls Lemuria as a Windows service.
