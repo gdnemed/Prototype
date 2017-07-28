@@ -8,25 +8,23 @@
 
 const express = require('express')
 const bodyParser = require('body-parser')
+const logger = require('./utils/log')
 
 const g = require('./global')
 const state = require('./state/state')
 const coms = require('./coms/coms')
 const files = require('./exchange/files')
 const logic = require('./logic')
-const logger = require('./utils/log')
-const migrations = require('./migrations')
+
 const squeries = require('./objects/squeries')
 const sessions = require('./session/sessions')
 
-let api, httpServer, logM, log
-let customers = {}
+let api, httpServer, log
 
 const init = () => {
   // logger initialization
   let home = process.cwd()
   logger.configure(home)
-  logM = logger.getLogger('migration')
   log = logger.getLogger('Main')
   // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
   g.init()
@@ -34,15 +32,11 @@ const init = () => {
     if (process.argv.length <= 2 || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
       // Run it as a program
-      initializeCustomer(sessions.getCustomers(), 0)
+      sessions.init()
         .then(initApiServer)
         .then(initServices)
         .then(initProcess)
-        .then(() => {
-          resolve({
-            dbs: customers['SPEC'].dbs
-          })
-        }) // For test, return 1 database
+        .then(resolve)
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: ${err}`)
           reject(err)
@@ -52,50 +46,6 @@ const init = () => {
       // Install/uninstall as a service
       serviceFunctions(process.argv).then(resolve)
     }
-  })
-}
-
-const initializeCustomer = (customersList, i) => {
-  return new Promise((resolve, reject) => {
-    if (i >= customersList.length) resolve()
-    else {
-      customers[customersList[i].name] = {}
-      migrations.init('sqlite', customersList[i].name, '2017')
-        .then((knexRefs) => debugTestdbs(knexRefs, customersList[i].name))
-        .then(() => initializeCustomer(customersList, i + 1))
-        .then(() => resolve())
-        .catch(reject)
-    }
-  })
-}
-
-// debug: verifies that each knex object for each db exists
-const debugTestdbs = (dbs, customer) => {
-  return new Promise((resolve, reject) => {
-    log.info('Verifying migration')
-    let kState = dbs['state']
-    let kObjects = dbs['objects']
-    let kInputs = dbs['inputs']
-    customers[customer].dbs = dbs
-    logM.debug('DB ' + customer)
-
-    kState.select().table('settings')
-      .then((collection) => {
-        logM.debug('settings len  = ' + collection.length)
-        return kObjects.select().table('entity_1')
-      })
-      .then((collection) => {
-        logM.debug('entity_1 len  = ' + collection.length)
-        return kInputs.select().table('input_1_201707')
-      })
-      .then((collection) => {
-        logM.debug('input_1_201707 len  = ' + collection.length)
-        resolve()
-      })
-      .catch((err) => {
-        console.log('ERROR: ' + err)
-        reject(err)
-      })
   })
 }
 
@@ -129,15 +79,11 @@ const query = (req, res, session) => {
   })
 }
 
-const getDatabases = (customer) => {
-  return customers[customer].dbs
-}
 
 const initServices = () => {
   return new Promise((resolve, reject) => {
     try {
       log.info('initServices')
-      sessions.init(customers)
       logic.init(sessions, state, coms)
       coms.init(logic, sessions)
       resolve()
@@ -193,7 +139,6 @@ const serviceFunctions = (args) => {
 }
 
 module.exports = {
-  getDatabases,
   init
 }
 
