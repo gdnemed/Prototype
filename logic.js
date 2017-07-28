@@ -11,6 +11,7 @@ const squeries = require('./objects/squeries')
 const CT = require('./CT')
 const utils = require('./utils/utils')
 const httpServer = require('./httpServer')
+const g = require('./global')
 
 let sessionService, stateService, comsService, log
 
@@ -313,6 +314,7 @@ const nextVersion = (session, obj, type) => {
           } else {
             comsService.globalSend('record_delete', {records: {id: code}})
           }
+          g.getEventEmitter().emit(g.EVT.onEntityVersionChange)
         }
       }
     })

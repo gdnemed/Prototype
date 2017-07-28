@@ -15,7 +15,8 @@ let log
 let _evtEmitter
 // Events names
 const EVT = {
-  onEndImport: 'onEndImport' // emitted by 'files' when an import process is finished
+  onEndImport: 'onEndImport', // emitted by 'files' when an import process is finished
+  onEntityVersionChange: 'onEntityVersionChange' // emitted by 'logi' when an entity version is increased
 }
 // Creates an instance of 'EventEmitter' that allows emision and reception of events
 // via eventEmitter.emit(...) / eventEmitter.on(...)

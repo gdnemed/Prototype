@@ -175,9 +175,27 @@ const expectProps = (realObj, expectedObj) => {
 // Sends 'data' via http POST query to 'route'
 const sendGET = (route) => chai.request(t.lemuriaAPI).get(route).set('Authorization', 'APIKEY 123')
 // Sends 'data' via http POST query to 'route'
-const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
+// const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
 // Gets the DB related to 'section' &  'tableName'
 const getCollection = (section, tableName) => t.dbs[section].select().table(tableName)
+
+const sendPOST = (route, data) => {
+  let _resp
+  return new Promise((resolve, reject) => {
+    const handler = () => {
+      t.eventEmitter.removeListener(g.EVT.onEntityVersionChange, handler)
+      resolve(_resp)
+    }
+    t.eventEmitter.on(g.EVT.onEntityVersionChange, handler)
+    chai.request(t.lemuriaAPI)
+      .post(route)
+      .set('Authorization', 'APIKEY 123')
+      .send(data)
+      .then((reaponse) => {
+        _resp = reaponse
+      })
+  })
+}
 
 // Holds references to everything that a 'spec' or 'test' file can need, i.e dbs, config, lemuriaAPI, etc
 let t = {

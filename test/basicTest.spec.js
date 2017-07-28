@@ -45,7 +45,7 @@ describe('basicTest.spec.js', () => {
     })
   })
 
-  it('POST to /records/ creates a "record" and 1 "card" (oneUserOneCard)', (done) => {
+  it.only('POST to /records/ creates a "record" and 1 "card" (oneUserOneCard)', (done) => {
     t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
         t.expect(res.status).to.equal(200)
