@@ -59,21 +59,9 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
       keysData.push({fields: kDef[i], values: []})
     }
     if (str._subput_) {
-      let search = {
-        _entity_: str._entity_,
-        _filter: str._filter,
-        idEntity: 'id'
-      }
-      // Not direct put, but a filter to put properties or relations
-      get(session, variables, search, (err, rows) => {
-        if (err) callback(err)
-        else {
-          if (!Array.isArray(rows)) rows = [rows]
-          putRelated(rows, 0, params)
-            .then(() => callback(null, rows))
-            .catch((err) => callback(err))
-        }
-      })
+      filterBefore(params)
+        .then((rows) => callback(null, rows))
+        .catch(callback)
     } else if (keysData) {
       searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data)
         .then((id) => {
@@ -117,6 +105,26 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
       })
       .catch(callback)
   } else callback(new Error('Type not found'))
+}
+
+const filterBefore = (params) => {
+  return new Promise((resolve, reject) => {
+    let search = {
+      _entity_: params.str._entity_,
+      _filter: params.str._filter,
+      idEntity: 'id'
+    }
+    // Not direct put, but a filter to put properties or relations
+    get(params.session, params.variables, search, (err, rows) => {
+      if (err) reject(err)
+      else {
+        if (!Array.isArray(rows)) rows = [rows]
+        putRelated(rows, 0, params)
+          .then(() => resolve(rows))
+          .catch(reject)
+      }
+    })
+  })
 }
 
 /*

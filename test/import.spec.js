@@ -1,5 +1,6 @@
 /* global process, require, describe, beforeEach, it, afterEach */
 const TestMgr = require('./TestMgr.js')
+const equal = require('deep-equal')
 let t // Reference to data obtained from TestMgr().get
 
 describe('import.spec.js', () => {
@@ -70,16 +71,14 @@ describe('import.spec.js', () => {
         let rec0 = res.body[0]
         t.expectProps(rec0, {code: '8'})
         t.expectProps(rec0.text, {en: 'Holidays', es: 'Vacaciones'})
-        console.log('record code 8 => ttgrp is ' + JSON.stringify(rec0.timetype_grp[0]))
-        t.expect(rec0.timetype_grp).to.deep.include('HL01')
-        t.expect(rec0.timetype_grp).to.deep.include('OF2')
+        console.log('record code 8 => groups is ' + JSON.stringify(rec0.groups))
+        t.expect(equal(rec0.groups, ['HL01', 'OF2'])).to.equal(true)
         // ROW 1 check
         let rec1 = res.body[1]
         t.expectProps(rec1, {code: '9'})
         t.expectProps(rec1.text, {en: 'Business travel', es: 'Viaje de negocios'})
-        console.log(rec1.timetype_grp[0])
-        console.log('record code 9 => ttgrp is ' + JSON.stringify(rec1.timetype_grp[0]))
-        t.expect(rec0.timetype_grp).to.deep.include('HL01')
+        console.log('record code 9 => groups is ' + JSON.stringify(rec1.groups))
+        t.expect(equal(rec1.groups, ['OF2'])).to.equal(true)
         done()
       })
     })
