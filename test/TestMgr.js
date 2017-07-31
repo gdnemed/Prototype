@@ -211,6 +211,12 @@ const sendPOST = (route, data, sync = true) => {
   }
 }
 
+
+const sendDELETE = (route, data) => {
+  return chai.request(t.lemuriaAPI).delete(route).set('Authorization', 'APIKEY 123').send(data)
+}
+
+
 // Holds references to everything that a 'spec' or 'test' file can need, i.e dbs, config, lemuriaAPI, etc
 let t = {
   chai,
@@ -218,6 +224,7 @@ let t = {
   expect,
   sendPOST,
   sendGET,
+  sendDELETE,
   getCollection,
   expectProps,
   rollbackAndMigrateDatabases,

@@ -207,7 +207,7 @@ const del = (req, res, session, filter, entity) => {
     id: filter.field,
     drop: {_property_: 'drop'}
   }
-  squeries.put(session, stateService, {}, str,
+  squeries.del(session, stateService, {}, str,
     {drop: utils.now(), id: req.params[filter.variable]}, null, (err, rows) => {
       if (err) res.status(500).end(err.message)
       else {

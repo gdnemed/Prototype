@@ -48,6 +48,53 @@ describe('records.spec.js', () => {
       })
   })
 
+  it('POST (oneUserOneCard) to /records/ and GET via /records/:ID returns the user and card', (done) => {
+    t.sendPOST('/api/coms/records', oneUserOneCard)
+      .then((res) => {
+        t.expect(res.status).to.equal(200)
+        // GET via api/records
+        t.sendGET('/api/coms/records/' + oneUserOneCard.id).then((res) => {
+          t.expect(res.status).to.equal(200)
+          console.log(res.body)
+          let objRet = res.body
+          t.expectProps(objRet, {
+            id: oneUserOneCard.id,
+            code: oneUserOneCard.code,
+            name: oneUserOneCard.name,
+            language: oneUserOneCard.language
+          })
+          // chcking tt_group => array [{'code': 'TT_1U_1C'}],
+          t.expectProps(objRet.timetype_grp[0], oneUserOneCard.timetype_grp[0])
+          // checking validity
+          t.expectProps(objRet.validity[0], oneUserOneCard.validity[0])
+          done()
+        })
+      }).catch(({response}) => {
+        console.log('ERROR: ' + response.status + ' ' + response.text)
+      })
+  })
+
+  it.only('POST (oneUserOneCard) to /records/ and then DELETE via /records/:ID, and then GET ia /records/ returns no records', (done) => {
+    t.sendPOST('/api/coms/records', oneUserOneCard)
+      .then((res) => {
+        t.expect(res.status).to.equal(200)
+      })
+      .then(() => t.sendDELETE('/api/coms/records/' + oneUserOneCard.id).then((res) => {
+        t.expect(res.status).to.equal(200)
+        console.log(res.body)
+      }))
+      .then(() => {
+        t.sendGET('/api/coms/records').then((res) => {
+          t.expect(res.status).to.equal(200)
+          t.expect(res.body.length).to.equal(0)
+          done()
+        })
+      })
+      .catch(({response}) => {
+        console.log('ERROR: ' + response.status + ' ' + response.text)
+      })
+  })
+
   // GET /api/coms/records or GET /api/coms/records/:id
   // -------------------------------------------------------------------------------------------
   // afterEach(): OPTION 1) Destroys and recreates BD from it() to other it()'s

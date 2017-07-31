@@ -90,8 +90,19 @@ describe('timetypes.spec.js', () => {
   })
 
   it('DELETE (IC_00) to remove 1 time type', (done) => {
-    // TODO
-    done()
+    t.sendDELETE('/api/coms/timetypes/' + ttOne1LangMore.code)
+      .then((res) => {
+        t.expect(res.status).to.equal(200)
+        // GET via api/records
+        t.sendGET('/api/coms/timetypes').then((res) => {
+          t.expect(res.status).to.equal(200)
+          t.expect(res.length).to.equal(0) //NO RECORDS!
+          done()
+        })
+      })
+      .catch((err) => {
+        console.log(err)
+      })
   })
   // -------------------------------------------------------------------------------------------
   // afterEach(): OPTION 1) Destroys and recreates BD from it() to other it()'s
