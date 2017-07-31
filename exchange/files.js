@@ -284,7 +284,7 @@ const processRecord = (r, yesterday, records, partial, elemsToDelete) => {
 const processTtype = (r, yesterday, ttypes, partial, elemsToDelete) => {
   let ttype
   if (partial) {
-    ttype = {code: r.CODE, text: {}, ttgroup: []}
+    ttype = {code: r.CODE, text: {}, groups: []}
     if (r.OPERATION) {
       ttype.operation = r.OPERATION
       switch (ttype.operation) {
@@ -311,7 +311,7 @@ const processTtype = (r, yesterday, ttypes, partial, elemsToDelete) => {
   }
   if (r.LANGUAGE && r.LANGUAGE !== '') ttype.text[r.LANGUAGE] = r.TEXT
   if (r.TTGROUP && r.TTGROUP !== '') {
-    if (ttype.ttgroup.indexOf(r.TTGROUP) < 0) ttype.ttgroup.push(r.TTGROUP)
+    if (ttype.groups.indexOf(r.TTGROUP) < 0) ttype.groups.push(r.TTGROUP)
   }
 }
 
