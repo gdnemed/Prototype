@@ -104,7 +104,10 @@ let prepPutTimeType = {
 let prepPutEnroll = {
   _entity_: 'record',
   _filter_: {field: 'document', variable: 'id'},
-  enroll: {_property_: 'enroll'}
+  _subput_: {
+    _property_: 'enroll',
+    enroll: 't2'
+  }
 }
 
 let prepGetInfo = {

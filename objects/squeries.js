@@ -64,7 +64,7 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
           .then(() => callback(null, rowsFiltered))
           .catch(callback)
       } else if (keysData) {
-        searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data)
+        searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data, variables)
           .then((id) => {
             if (id) {
               params.id = id
@@ -221,7 +221,7 @@ Once done, calls callback function passing:
 - conflict: List of other id's which have values
 for some of the keys which would be repeated if data is inserted.
 */
-const searchFromKey = (session, entity, keysData, userKey, stateService, str, data) => {
+const searchFromKey = (session, entity, keysData, userKey, stateService, str, data, variables) => {
   return new Promise((resolve, reject) => {
     let finalKey
     if (userKey == null) {
@@ -234,10 +234,17 @@ const searchFromKey = (session, entity, keysData, userKey, stateService, str, da
           let found = false
           for (var p in str) {
             if (str.hasOwnProperty(p)) {
-              if (str[p] === key[j] && data.hasOwnProperty(p)) {
-                values.push(data[p])
-                found = true
-                break
+              if (str[p] === key[j]) {
+                // We try to get first key from url
+                if (i === 0 && variables.id) {
+                  values.push(variables.id)
+                  found = true
+                  break
+                } else if (data.hasOwnProperty(p)) {
+                  values.push(data[p])
+                  found = true
+                  break
+                }
               }
             }
           }

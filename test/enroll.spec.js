@@ -17,12 +17,11 @@ describe('enroll.spec.js', () => {
 
   it('POST enrollA', (done) => {
     sc.createSc1(t).then(() => {
-      /*t.sendPOST('/api/coms/records/1U_1C/enroll', enrollA)
+      t.sendPOST('/api/coms/records/1U_1C/enroll', enrollA)
         .then((res) => {
           t.expect(res.status).to.equal(200)
           done()
-        })*/
-      done()
+        })
     })
   })
 
