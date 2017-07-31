@@ -17,7 +17,7 @@ const ttOne1GrMore = {
 
 const ttOne1LangMore = {
   'code': 'IC_00',
-  'text': {es: 'TT_1_Sin_incidencia', en: 'TT_1_Without_abs', cat: 'TT_1_Sense_incidencia'},
+  'text': {es: 'TT_1_Sin_incidencia', en: 'TT_1_Without_abs', cat: 'TT_1_Sense_incidencia'}
 }
 
 describe('timetypes.spec.js', () => {
@@ -96,7 +96,7 @@ describe('timetypes.spec.js', () => {
         // GET via api/records
         t.sendGET('/api/coms/timetypes').then((res) => {
           t.expect(res.status).to.equal(200)
-          t.expect(res.length).to.equal(0) //NO RECORDS!
+          t.expect(res.body.length).to.equal(0) // NO RECORDS!
           done()
         })
       })

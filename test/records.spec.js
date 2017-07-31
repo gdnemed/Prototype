@@ -74,7 +74,7 @@ describe('records.spec.js', () => {
       })
   })
 
-  it.only('POST (oneUserOneCard) to /records/ and then DELETE via /records/:ID, and then GET ia /records/ returns no records', (done) => {
+  it('POST (oneUserOneCard) to /records/ and then DELETE via /records/:ID, and then GET ia /records/ returns no records', (done) => {
     t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
         t.expect(res.status).to.equal(200)

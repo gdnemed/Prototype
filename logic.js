@@ -79,6 +79,7 @@ let prepPutCards = {
 
 let prepGetTimeTypes = {
   _entity_: '[timetype]',
+  _filter_: {field: 'drop', value: 0},
   name: 'name',
   code: 'code',
   text: 'intname',
@@ -204,10 +205,10 @@ const put = (req, res, session, str) => {
 const del = (req, res, session, filter, entity) => {
   // We don't really delete, we just put a value in 'drop'
   let str = {_entity_: entity,
-    id: filter.field,
-    drop: {_property_: 'drop'}
+    drop: {_property_: 'drop'},
+    id: filter.field
   }
-  squeries.del(session, stateService, {}, str,
+  squeries.put(session, stateService, req.params, str,
     {drop: utils.now(), id: req.params[filter.variable]}, null, (err, rows) => {
       if (err) res.status(500).end(err.message)
       else {

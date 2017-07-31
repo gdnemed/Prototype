@@ -58,32 +58,35 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
     for (let i = 0; i < kDef.length; i++) {
       keysData.push({fields: kDef[i], values: []})
     }
-    if (str._subput_) {
-      filterBefore(params)
-        .then((rows) => callback(null, rows))
-        .catch(callback)
-    } else if (keysData) {
-      searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data)
-        .then((id) => {
-          if (id) {
-            params.id = id
-            executeUpdate(params)
-              .then((idPut) => callback(null, id))
-              .catch(callback)
-          } else {
-            // On insert, we need to block key data to prevent parallel inserts over same key
-            stateService.newId(session)
-              .then((id) => {
-                params.id = id
-                executeInsert(params)
-                  .then(() => callback(null, id))
-                  .catch(callback)
-              })
-              .catch((err) => release(session, e, stateService, callback, err))
-          }
-        })
-        .catch((err) => release(session, e, stateService, callback, err))
-    } else callback(new Error('Key not found'))
+    filterBefore(params).then((rowsFiltered) => {
+      if (str._subput_) {
+        putRelated(rowsFiltered, 0, params)
+          .then(() => callback(null, rowsFiltered))
+          .catch(callback)
+      } else if (keysData) {
+        searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data)
+          .then((id) => {
+            if (id) {
+              params.id = id
+              executeUpdate(params)
+                .then((idPut) => callback(null, id))
+                .catch(callback)
+            } else {
+              // On insert, we need to block key data to prevent parallel inserts over same key
+              stateService.newId(session)
+                .then((id) => {
+                  params.id = id
+                  executeInsert(params)
+                    .then(() => callback(null, id))
+                    .catch(callback)
+                })
+                .catch((err) => release(session, e, stateService, callback, err))
+            }
+          })
+          .catch((err) => release(session, e, stateService, callback, err))
+      } else callback(new Error('Key not found'))
+    })
+      .catch(callback)
   } else if (str._inputs_) {
     // Inputs insert/update.
     // For the moment, only insert
@@ -109,21 +112,21 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
 
 const filterBefore = (params) => {
   return new Promise((resolve, reject) => {
-    let search = {
-      _entity_: params.str._entity_,
-      _filter: params.str._filter,
-      idEntity: 'id'
-    }
-    // Not direct put, but a filter to put properties or relations
-    get(params.session, params.variables, search, (err, rows) => {
-      if (err) reject(err)
-      else {
-        if (!Array.isArray(rows)) rows = [rows]
-        putRelated(rows, 0, params)
-          .then(() => resolve(rows))
-          .catch(reject)
+    if (params.str._filter_) {
+      let search = {
+        _entity_: params.str._entity_,
+        _filter: params.str._filter,
+        idEntity: 'id'
       }
-    })
+      // Not direct put, but a filter to put properties or relations
+      return get(params.session, params.variables, search, (err, rows) => {
+        if (err) reject(err)
+        else {
+          if (!Array.isArray(rows)) rows = [rows]
+          resolve(rows)
+        }
+      })
+    } else resolve()
   })
 }
 
