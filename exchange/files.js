@@ -305,7 +305,7 @@ const processTtype = (r, yesterday, ttypes, partial, elemsToDelete) => {
   } else {
     ttype = ttypes[r.CODE]
     if (!ttype) {
-      ttype = {code: r.CODE, text: {}, ttgroup: []}
+      ttype = {code: r.CODE, text: {}, groups: []}
       ttypes[r.CODE] = ttype
     }
   }
