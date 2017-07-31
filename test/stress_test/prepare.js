@@ -28,8 +28,10 @@ const injectRecord = (i) => {
   let dayEnd = ensyreTwoDigitsStr((i + 15) % 28)
   let mStart = ensyreTwoDigitsStr(i % 12)
   let mEnd = ensyreTwoDigitsStr((i + 6) % 12)
-  let valStart = 2017 + mStart + dayStart
-  let valEnd = 2017 + mEnd + dayEnd
+  let yStart = new Date().getFullYear()
+  let yEnd = yStart + 1
+  let valStart = yStart + mStart + dayStart
+  let valEnd = yEnd + mEnd + dayEnd
   let arVals = [id, code, name, card, lang, ttgrp, acgrp, valStart, valEnd, '\n']
   return arVals.join(',')
 }
@@ -73,10 +75,10 @@ const createImportFile = (fileName, type, numElements) => {
 }
 
 // Creates a group of parametrized import files to use for testing performance
-const createStressTestImportFiles = () => {
+const createStressTestImportFiles = (n = 10) => {
   console.log('>> stress_test: createStressTestImportFiles')
-  createImportFile('RECORDS_20.txt', 'RECORDS', 20)
-  createImportFile('TTYPES_20.txt', 'TTYPES', 20)
+  createImportFile(`RECORDS_${n}.txt`, 'RECORDS', n)
+  createImportFile(`TTYPES_${n}.txt`, 'TTYPES', n)
 }
 
 console.log('>> stress_test: preparing...')
@@ -91,7 +93,9 @@ const readConfigFile = () => {
 
 const init = () => {
   readConfigFile()
-  createStressTestImportFiles()
+  createStressTestImportFiles(20)
+  createStressTestImportFiles(100)
+  createStressTestImportFiles(1000)
 }
 
 init()

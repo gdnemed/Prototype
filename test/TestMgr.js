@@ -72,11 +72,12 @@ const get = (env = 'test') => {
 
 // Returns a promise that resolves if a fileName located at /exchange_sources/ is copied to
 // a folder exchange_workdir/remote/ (the step required for 'files' module to start an import process)
-const prepareFileImport = (fieName) => {
+const prepareFileImport = (fieName, fileNameSrc) => {
   return new Promise((resolve, reject) => {
     try {
       let envFiles = t.config.exchange.files
-      let tSource = envFiles.sources + '\\' + fieName
+      let realFnameSrc = fileNameSrc || fieName
+      let tSource = envFiles.sources + '\\' + realFnameSrc
       let tDest = envFiles.dir + '\\' + fieName
       let strm = fs.createReadStream(tSource).pipe(fs.createWriteStream(tDest))
       strm.on('error', (err) => {
@@ -95,11 +96,11 @@ const prepareFileImport = (fieName) => {
 }
 
 // Allows file import tests to occur
-// Given a 'fileName' that exists in /exchange_sources/ dir, copies it to .../remote/ dir
-// via 'prepareFileImport()'.
+// Given a source file ('fileNameSrc' if defined, or fileNameDest if fileNameSrc is not defined)
+// that exists in /exchange_sources/ dir, copies it to .../remote/ dir via 'prepareFileImport()'.
 // After the .DWN file is copied, the system starts an import procedure whose end needs to be
 // detected. This is done via the 'eventEmitter' instance listening to 'onEndImport'
-const handleFileImport = (fileName) => {
+const handleFileImport = (fileNameDest, fileNameSrc) => {
   return new Promise((resolve, reject) => {
     // when a 'onEndImport' event is received, the event needs to be removed (to not interfere
     // other tests that also are listening to the event), and the promise can be resolved
@@ -110,7 +111,7 @@ const handleFileImport = (fileName) => {
     // starts listening 'onEndImport' events produced by 'files' module
     t.eventEmitter.on(g.EVT.onEndImport, handler)
     // copies the '*.DWN' file to /remote/ dir to trigger an import procedure
-    prepareFileImport(fileName).catch(({response}) => { // No 'then()' here: must wait until evt 'onEndImport' is emited
+    prepareFileImport(fileNameDest, fileNameSrc).catch(({response}) => { // No 'then()' here: must wait until evt 'onEndImport' is emited
       let err = 'ERROR: ' + response.status + ' ' + response.text
       console.log(err)
       reject(err)
@@ -121,31 +122,26 @@ const handleFileImport = (fileName) => {
 // Removes all files inside 'path'
 const removeDirectorySync = (removePath) => {
   console.log('TestMgr: removeDirectorySync : ' + removePath)
-  fs.readdir(removePath, (err, files) => {
-    if (err) return false
-    for (const file of files) {
-      let fileToRemove = path.join(removePath, file)
-      fs.unlink(fileToRemove, err => {
-        if (err) return false
-      })
-    }
-  })
+  let files = fs.readdirSync(removePath)
+  for (const file of files) {
+    let fileToRemove = path.join(removePath, file)
+    fs.unlinkSync(fileToRemove)
+  }
   return true
 }
 
 // After an 'import' process, a number of *.DWN and *.LOG files are created inside
 // exchange_workdir subdirectoris. Clears all this files and resolves a promise when done
-// A 10ms timeout is required in order to avoid untracked files due to filesystem latencies
 const cleanImportFiles = (fieName) => {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      let envFiles = t.config.exchange.files
-      let remotePath = envFiles.dir // exchange_workdir/remote/  (after an import process contains .LOG files)
-      let donePath = envFiles.workdir + '\\done\\' // exchange_workdirdone/  (after an import process contains .DWN files)
-      if (!removeDirectorySync(remotePath)) reject(new Error())
-      if (!removeDirectorySync(donePath)) reject(new Error())
-      resolve()
-    }, 10)
+    let envFiles = t.config.exchange.files
+    let remotePath = envFiles.dir // exchange_workdir/remote/  (after an import process contains .LOG files)
+    let donePath = envFiles.workdir + '\\done\\' // exchange_workdirdone/  (after an import process contains .DWN files)
+    let pendingPath = envFiles.workdir + '\\pending\\' // exchange_workdirdone/  (after an import process contains .DWN files)
+    if (!removeDirectorySync(remotePath)) reject(remotePath)
+    if (!removeDirectorySync(donePath)) reject(donePath)
+    if (!removeDirectorySync(pendingPath)) reject(pendingPath)
+    resolve()
   })
 }
 
