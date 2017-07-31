@@ -82,7 +82,7 @@ let prepGetTimeTypes = {
   name: 'name',
   code: 'code',
   text: 'intname',
-  timetype_grp: {_property_: '[ttgroup]', _field_: 'value'}
+  groups: {_property_: '[ttgroup]', _field_: 'value'}
 }
 
 let prepGetTimeType = {
@@ -90,14 +90,14 @@ let prepGetTimeType = {
   _filter_: {field: 'code', variable: 'id'},
   code: 'code',
   text: 'intname',
-  timetype_grp: {_property_: '[ttgroup]', code: 'value'}
+  groups: {_property_: '[ttgroup]', code: 'value'}
 }
 
-let prepPutTtype = {
+let prepPutTimeType = {
   _entity_: 'timetype',
   code: 'code',
   text: 'intname',
-  ttgroup: {_property_: '[ttgroup]', _mixed_: true}
+  groups: {_property_: '[ttgroup]', _mixed_: true}
 }
 
 let prepPutEnroll = {
@@ -241,8 +241,8 @@ const initAPI = () => {
   api.get('/api/coms/clockings_debug', apiCall(get, prepGetClockingsDebug))
   api.get('/api/coms/timetypes', apiCall(get, prepGetTimeTypes))
   api.get('/api/coms/timetypes/:id', apiCall(get, prepGetTimeType))
-  api.post('/api/coms/timetypes', apiCall(put, prepPutTtype))
-  api.post('/api/coms/timetypes/:id', apiCall(put, prepPutTtype))
+  api.post('/api/coms/timetypes', apiCall(put, prepPutTimeType))
+  api.post('/api/coms/timetypes/:id', apiCall(put, prepPutTimeType))
   api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
 }
 
