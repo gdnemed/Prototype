@@ -175,26 +175,37 @@ const expectProps = (realObj, expectedObj) => {
 // Sends 'data' via http POST query to 'route'
 const sendGET = (route) => chai.request(t.lemuriaAPI).get(route).set('Authorization', 'APIKEY 123')
 // Sends 'data' via http POST query to 'route'
-// const sendPOST = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
+const _post = (route, data) => {
+  return chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
+}
 // Gets the DB related to 'section' &  'tableName'
 const getCollection = (section, tableName) => t.dbs[section].select().table(tableName)
 
-const sendPOST = (route, data) => {
-  let _resp
-  return new Promise((resolve, reject) => {
-    const handler = () => {
-      t.eventEmitter.removeListener(g.EVT.onEntityVersionChange, handler)
-      resolve(_resp)
-    }
-    t.eventEmitter.on(g.EVT.onEntityVersionChange, handler)
-    chai.request(t.lemuriaAPI)
-      .post(route)
-      .set('Authorization', 'APIKEY 123')
-      .send(data)
-      .then((reaponse) => {
-        _resp = reaponse
+const sendPOST = (route, data, sync = true) => {
+  if (!sync) return _post(route, data)
+  else {
+    let _resp
+    let resolved = false
+    return new Promise((resolve, reject) => {
+      const handler = () => {
+        t.eventEmitter.removeListener(g.EVT.onEntityVersionChange, handler)
+        if (_resp) {
+          resolved = true
+          resolve(_resp)
+        }
+      }
+      t.eventEmitter.on(g.EVT.onEntityVersionChange, handler)
+      let pr = _post(route, data)
+      pr.then((resp) => {
+        _resp = resp
+        if (!resolved) {
+          resolved = true
+          resolve(_resp)
+        }
       })
-  })
+        .catch(reject)
+    })
+  }
 }
 
 // Holds references to everything that a 'spec' or 'test' file can need, i.e dbs, config, lemuriaAPI, etc

@@ -285,7 +285,10 @@ Indicates something has changed, so the terminals should be updated
 const nextVersion = (session, obj, type) => {
   // log.debug('nextVersion')
   // log.debug(obj)
-  if (type !== 'record') return
+  if (type !== 'record') {
+    g.getEventEmitter().emit(g.EVT.onEntityVersionChange)
+    return
+  }
   // Get current object state in database
   squeries.get(session, {id: obj[0]},
     {

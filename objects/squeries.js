@@ -80,7 +80,7 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
           if (id) {
             params.id = id
             executeUpdate(params)
-              .then((idPut) => callback(null, idPut))
+              .then((idPut) => callback(null, id))
               .catch(callback)
           } else {
             // On insert, we need to block key data to prevent parallel inserts over same key
@@ -88,7 +88,7 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
               .then((id) => {
                 params.id = id
                 executeInsert(params)
-                  .then((idPut) => callback(null, idPut))
+                  .then(() => callback(null, id))
                   .catch(callback)
               })
               .catch((err) => release(session, e, stateService, callback, err))

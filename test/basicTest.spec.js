@@ -45,7 +45,7 @@ describe('basicTest.spec.js', () => {
     })
   })
 
-  it.only('POST to /records/ creates a "record" and 1 "card" (oneUserOneCard)', (done) => {
+  it('POST to /records/ creates a "record" and 1 "card" (oneUserOneCard)', (done) => {
     t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
         t.expect(res.status).to.equal(200)
@@ -65,8 +65,9 @@ describe('basicTest.spec.js', () => {
           })
           done()
         })
-      }).catch(({response}) => {
-        console.log('ERROR: ' + response.status + ' ' + response.text)
+      }).catch((e) => {
+        if (e.response) console.log('ERROR: ' + e.response.status + ' ' + e.response.text)
+        else console.log.error(e)
       })
   })
 

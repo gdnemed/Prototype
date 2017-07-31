@@ -11,7 +11,7 @@ const rec1 = {
 
 const createSc1 = (t) => {
   return new Promise((resolve, reject) => {
-    t.sendPOST('/api/coms/records', rec1)
+    t.sendPOST('/api/coms/records', rec1, false)
       .then(() => {
         resolve()
       })
