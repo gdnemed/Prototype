@@ -174,13 +174,20 @@ const expectProps = (realObj, expectedObj) => {
 
 // Sends 'data' via http POST query to 'route'
 const sendGET = (route) => chai.request(t.lemuriaAPI).get(route).set('Authorization', 'APIKEY 123')
-// Sends 'data' via http POST query to 'route'
-const _post = (route, data) => {
-  return chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
-}
 // Gets the DB related to 'section' &  'tableName'
 const getCollection = (section, tableName) => t.dbs[section].select().table(tableName)
 
+// Sends 'data' via http POST query to 'route' (without syncronization)
+const _post = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
+
+// Sends 'data' via http POST (with syncronization by default)
+// If no sync is needed, a normal _post() is sent
+// DESCRIPTON: A normal test usually sends a POST, does some check to verify some data after the POST
+// operation, an then calls "done()". After this, the test's "afterEach()" method is called and
+// t.rollbackAndMigrateDatabases() is invoked. This implies that after a "sendPOST" called from
+// a test, the DB is recreated. Sometimes, there are other procedures executed inside the "logic" module
+// after a POST operation that require the DB to be present. When this happens (the DB is ready
+// to be destroyed,  the 'logic' module sends "onEntityVersionChange" event
 const sendPOST = (route, data, sync = true) => {
   if (!sync) return _post(route, data)
   else {
