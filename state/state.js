@@ -119,7 +119,7 @@ const blockType = (session, type, callback) => {
 }
 
 const timeoutBlock = (type) => {
-  logger.error(`Timeout exceeded blocking ${type} type`)
+  log.error(`Timeout exceeded blocking ${type} type`)
   delete typesBlocks[type]
 }
 
