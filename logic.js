@@ -309,17 +309,21 @@ const nextVersion = (session, obj, type) => {
         let code = parseInt(ret.code)
         let cardList
         if (ret) {
+          log.debug('Next version:')
           log.debug(ret)
-          cardList = ret.card
-          if (cardList && ret.drop === 0) {
-            for (let i = 0; i < cardList.length; i++) {
-              if (ret.code) {
-                comsService.globalSend('record_insert', {records: {id: code}})
-                comsService.globalSend('card_insert', {cards: [{card: cardList[i].code, id: code}]})
+          if (ret.code) {
+            comsService.globalSend(ret.drop === 0 ? 'record_insert' : 'record_delete', {records: [{id: code}]})
+            cardList = ret.card
+            if (cardList) {
+              for (let i = 0; i < cardList.length; i++) {
+                comsService.globalSend(ret.drop === 0 ? 'card_insert' : 'card_delete', {
+                  cards: [{
+                    card: cardList[i].code,
+                    id: code
+                  }]
+                })
               }
             }
-          } else {
-            comsService.globalSend('record_delete', {records: {id: code}})
           }
           g.getEventEmitter().emit(g.EVT.onEntityVersionChange)
         }
@@ -331,6 +335,10 @@ const nextVersion = (session, obj, type) => {
 Uploads into the terminal, every information with higher revision.
 */
 const initTerminal = (serial, customer) => {
+  // Until upload is completely implemented, we clean terminal every time it connects
+  comsService.send(serial, 'card_delete_complete', null)
+  comsService.send(serial, 'record_delete_complete', null)
+  // Go to DB to get records
   sessionService.getSession(customer, (err, session) => {
     if (err) log.error(err)
     else {

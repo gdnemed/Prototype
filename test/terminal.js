@@ -14,9 +14,7 @@ let records = {}
 let client = new net.Socket()
 let buffer
 
-init()
-
-function init () {
+const init = () => {
   client.connect(8092, '172.18.4.203', function () {
     console.log('Connected')
     let bin = Buffer.from('c8f6', 'hex')
@@ -70,6 +68,14 @@ function init () {
             break
           case 3:for (let i = 0; i < j.records.length; i++) records['r' + j.records[i].id] = true
             break
+          case 6:cards = {}
+            break
+          case 7:records = {}
+            break
+          case 8:for (let i = 0; i < j.cards.length; i++) delete cards['c' + j.cards[i].card]
+            break
+          case 9:for (let i = 0; i < j.records.length; i++) delete records['r' + j.records[i].id]
+            break
         }
         // client.write(JSON.stringify({seq:j.seq,cmd:j.cmd,ack:1}));
         send({cmd: j.cmd, ack: 1}, j.seq)
@@ -84,7 +90,7 @@ function init () {
   initAPIserver()
 }
 
-function send (data, seq) {
+const send = (data, seq) => {
   console.log(data)
   let m = msgpack.encode(data)
   let b = Buffer.allocUnsafe(m.length + 4)
@@ -101,7 +107,7 @@ function send (data, seq) {
   client.write(b2) */
 }
 
-function clocking (card, id) {
+const clocking = (card, id) => {
   let tmp = Math.floor(new Date().getTime() / 1000)
   send({cmd: 4,
     id: id,
@@ -112,7 +118,7 @@ function clocking (card, id) {
   sequence++)
 }
 
-function initAPIserver () {
+const initAPIserver = () => {
   api = express()
   api.use(bodyParser.json())
   // API functions
@@ -123,16 +129,18 @@ function initAPIserver () {
   api.listen('9090', function () {})
 }
 
-function getRecords (req, res) {
+const getRecords = (req, res) => {
   res.jsonp(records)
 }
 
-function getCards (req, res) {
+const getCards = (req, res) => {
   res.jsonp(cards)
 }
 
-function getClocking (req, res) {
+const getClocking = (req, res) => {
   var id = cards['c' + req.params.card]
   clocking(req.params.card, id)
   res.end(req.params.card + ' clocking')
 }
+
+init()
