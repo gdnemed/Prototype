@@ -83,12 +83,13 @@ const newClocking = (data, socket, logicService) => {
   clocking.gmt = utils.tsToTime(data.tmp * 1000, 'GMT')
   clocking.tmp = utils.tsToTime(data.tmp * 1000, info.timezone)
   logger.trace(clocking)
-  logicService.createClocking(clocking, info.customer, function (err) {
+  ack(data, socket)
+  /*logicService.createClocking(clocking, info.customer, function (err) {
     if (err) {
       logger.error(err.message)
       nack(data, socket, 0)
     } else ack(data, socket)
-  })
+  })*/
 }
 
 module.exports = {
