@@ -10,7 +10,7 @@ const chokidar = require('chokidar')
 const csvtojson = require('csvtojson')
 const request = require('request')
 const equal = require('deep-equal')
-const logger = require('../../utils/log')
+const logger = require('../utils/log')
 const g = require('../global')
 
 let ONE_DAY = 86400000

@@ -11,7 +11,7 @@ const net = require('net')
 const msgpack = require('msgpack-lite')
 const g = require('../global')
 
-const logger = require('../../utils/log')
+const logger = require('../utils/log')
 
 let clients = {}
 let tablesVersions = {records: 0, cards: 0, time_types: 0}

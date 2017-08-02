@@ -6,7 +6,7 @@
 // -Starts http server for API calls
 // -------------------------------------------------------------------------------------------
 
-const logger = require('../utils/log')
+const logger = require('./utils/log')
 const g = require('./global')
 const httpServer = require('./httpServer')
 const state = require('./state/state')

@@ -3,7 +3,7 @@
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
-const CT = require('../src/CT')
+const CT = require('../CT')
 
 const now = (timezone = 'GMT') => {
   return parseInt(moment.tz(new Date().getTime(), timezone).format('YYYYMMDDHHmmss'))
