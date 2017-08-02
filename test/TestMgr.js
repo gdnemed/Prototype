@@ -137,10 +137,8 @@ const cleanImportFiles = (fieName) => {
     let envFiles = t.config.exchange.files
     let remotePath = envFiles.dir // exchange_workdir/remote/  (after an import process contains .LOG files)
     let donePath = envFiles.workdir + '\\done\\' // exchange_workdirdone/  (after an import process contains .DWN files)
-    let pendingPath = envFiles.workdir + '\\pending\\' // exchange_workdirdone/  (after an import process contains .DWN files)
     if (!removeDirectorySync(remotePath)) reject(remotePath)
     if (!removeDirectorySync(donePath)) reject(donePath)
-    if (!removeDirectorySync(pendingPath)) reject(pendingPath)
     resolve()
   })
 }
