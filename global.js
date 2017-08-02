@@ -35,7 +35,7 @@ const initConfiguration = () => {
     let routeCfg = home
     switch (process.env.NODE_ENV) {
       case 'test': routeCfg = `${home}\\test`; break
-      case 'stress_test': routeCfg = `${home}\\test\\stress_test`; break
+      case 'stress_test': routeCfg = `${home}\\`; break
     }
     log.debug(`Using config file ${routeCfg}`)
     _cfg = JSON.parse(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
