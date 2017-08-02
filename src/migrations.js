@@ -2,7 +2,7 @@
 // -------------------------------------------------------------------------------------------
 // Handles all app Knex migrations (creation of BD via knex for every environtment)
 // -------------------------------------------------------------------------------------------
-const loggerMachine = require('./utils/log')
+const loggerMachine = require('../utils/log')
 const logger = loggerMachine.getLogger('migrations')
 const Knex = require('knex')
 

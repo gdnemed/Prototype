@@ -6,7 +6,7 @@
 // -Blocks types to avoid concurrent actions over keys.
 // -------------------------------------------------------------------------------------------
 
-const logger = require('../utils/log')
+const logger = require('../../utils/log')
 const httpServer = require('../httpServer')
 const sessions = require('../session/sessions')
 

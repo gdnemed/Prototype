@@ -6,7 +6,7 @@
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
-const logger = require('../utils/log')
+const logger = require('../../utils/log')
 const migrations = require('../migrations')
 
 let dbGlobal

@@ -8,7 +8,7 @@
 const express = require('express')
 const bodyParser = require('body-parser')
 const squeries = require('./objects/squeries')
-const logger = require('./utils/log')
+const logger = require('../utils/log')
 const g = require('./global')
 const sessions = require('./session/sessions')
 

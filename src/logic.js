@@ -6,10 +6,10 @@
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
-const logger = require('./utils/log')
+const logger = require('../utils/log')
 const squeries = require('./objects/squeries')
 const CT = require('./CT')
-const utils = require('./utils/utils')
+const utils = require('../utils/utils')
 const httpServer = require('./httpServer')
 const g = require('./global')
 

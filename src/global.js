@@ -4,7 +4,7 @@
 // -------------------------------------------------------------------------------------------
 
 const events = require('events')
-const logger = require('./utils/log')
+const logger = require('../utils/log')
 const fs = require('fs')
 
 let log

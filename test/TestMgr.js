@@ -15,8 +15,8 @@ chai.use(chaiHttp)
 const expect = chai.expect
 const fs = require('fs')
 const path = require('path')
-const g = require('../global')
-const sessions = require('../session/sessions')
+const g = require('../src/global')
+const sessions = require('../src/session/sessions')
 // -------------------------------------------------------------------------------------------
 // "Lemuria" services creation. "get()" procedure using '_t' as a cache
 // -------------------------------------------------------------------------------------------
@@ -45,7 +45,7 @@ const startLemuria = () => {
 // Initially, if Lemuria is not started, starts it. On every call, returns _t cached copy
 const get = (env = 'test') => {
   process.env.NODE_ENV = env
-  lemuria = require('../lemuria.js') // IMPORTANT: require lemuria after setting 'NODE_ENV'!
+  lemuria = require('../src/lemuria.js') // IMPORTANT: require lemuria after setting 'NODE_ENV'!
   console.log('>> TestMgr: config = ' + env)
   return new Promise((resolve, reject) => {
     if (!_lemuriaInitialized) {
