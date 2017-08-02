@@ -22,6 +22,13 @@ const init = () => {
   return new Promise((resolve, reject) => {
     _api = express()
     _api.use(bodyParser.json())
+    // Uncomment if enabling CORS is required
+    // _api.use((req, res, next) => {
+    //  res.header('Access-Control-Allow-Origin', '*')
+    //  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization')
+    //  next()
+    //})
+
     // For testing
     _api.post('/api/objects/query', (req, res) => sessions.manageSession(req, res, query))
 
