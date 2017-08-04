@@ -764,7 +764,7 @@ const prepareGet = (session, str) => {
 
     // Select over ENTITY
     if (!str._guide_.subquery) {
-      if (type && type.length > 0) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+      if (str._linked_ || (type && type.length > 0)) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
     }
     if (str._filter_) { // 1 more binding for every variable in filter
       if (str._filter_.variable) str._guide_.variablesMapping.push(str._filter_.variable)
@@ -1223,15 +1223,15 @@ const executeSelect = (str, variables, session, callback) => {
   // Variables substitution
   let v = str._guide_.variablesMapping
   let l = str._guide_.statement.bindings
-  // logger.debug(v)
-  // logger.debug(l)
+  logger.debug(v)
+  logger.debug(l)
   if (v) {
     for (let i = 0; i < l.length; i++) {
       if (v[i] !== null) l[i] = variables[v[i]]
     }
   }
 
-  // logger.debug(str._guide_.statement.toSQL())
+  logger.debug(str._guide_.statement.toSQL())
   let result
   str._guide_.statement
     .then((rows) => {
@@ -1247,7 +1247,9 @@ const executeSelect = (str, variables, session, callback) => {
       }
       callback(null, result)
     })
-    .catch((err) => callback(err))
+    .catch((err) => {
+      callback(err)
+    })
 }
 
 /*
@@ -1382,12 +1384,15 @@ const executeRelation = (str, forward, row, session, variables) => {
       // Modify query 'where' with current id
       let ss = sq._statement_._statements
       ss[ss.length - 1].value = row._id_
+      logger.debug(sq._statement_.toSQL())
       sq._statement_
         .then((h) => processRelationRow(row, forward, sq, h, 0, session, variables, (err) => {
           if (err) reject(err)
           else resolve()
         }))
-        .catch((err) => reject(err))
+        .catch((err) => {
+          reject(err)
+        })
     } else resolve()
   })
 }
@@ -1482,7 +1487,9 @@ const executePropertySq = (str, type, row) => {
         }
         resolve()
       })
-      .catch(reject)
+      .catch((err) => {
+        reject(err)
+      })
     } else resolve()
   })
 }
