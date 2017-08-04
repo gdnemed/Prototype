@@ -56,7 +56,6 @@ const initConfiguration = () => {
   }
 }
 
-
 const init = () => {
   console.log('>> global: init()')
   initConfiguration()

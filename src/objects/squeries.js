@@ -149,16 +149,19 @@ const putRelated = (rows, i, params) => {
 
 /*
 Generic delete function
+- session: Session of the user.
+- id: Internal id of the entity or input
+- entity: true it it's an entity. False if input.
+- period: It inputs, period (year-month) where input is.
+- extraFunction: Optional function to be executed after deletion.
  */
-const del = (session, variables, str, data, extraFunction, callback) => {
-  let id = variables.id
+const del = (session, id, entity, period, extraFunction, callback) => {
   if (!id) {
     callback(new Error('No id defined'))
     return
   }
   if (typeof id === 'string') id = parseInt(id)
-  let e = str._entity_
-  if (e) {
+  if (entity) {
     let db = session.dbs['objects']
     db('property_num_' + nodeId).where('entity', id).delete()
       .then(() => db('property_str_' + nodeId).where('entity', id).delete())
@@ -170,9 +173,8 @@ const del = (session, variables, str, data, extraFunction, callback) => {
         else callback(null, count)
       })
       .catch((err) => callback(err))
-  } else if (str._input_) {
+  } else { // If no entity, it's an input
     let db = session.dbs['inputs']
-    let period = variables.period
     db(`input_data_num_${nodeId}_${period}`).where('entity', id).delete()
       .then(() => db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete())
       .then(() => db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete())
@@ -761,7 +763,9 @@ const prepareGet = (session, str) => {
     let f = str._guide_.entity_fields
 
     // Select over ENTITY
-    if (!str._guide_.subquery) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+    if (!str._guide_.subquery) {
+      if (type && type.length > 0) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+    }
     if (str._filter_) { // 1 more binding for every variable in filter
       if (str._filter_.variable) str._guide_.variablesMapping.push(str._filter_.variable)
     }
@@ -815,8 +819,9 @@ const selectEntity = (sq, f, type, filter, helper) => {
   for (var c in f) {
     if (f.hasOwnProperty(c)) s.column(c + ' as ' + (helper.prefix ? helper.prefix : '') + f[c])
   }
-  if (type) s.where('type', type)
-  else if (!helper.subquery) s.where('id', 0)
+  if (type !== null && type !== undefined) {
+    if (type.length > 0) s.where('type', type)
+  } else if (!helper.subquery) s.where('id', 0)
   if (filter) addFilter(s, filter, helper)
   s.as(helper.subquery ? helper.prefix + 'r' : 'e')
   return s

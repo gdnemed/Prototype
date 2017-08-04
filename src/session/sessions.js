@@ -17,7 +17,9 @@ const getCustomersList = () => {
   let l = []
   for (let k in dbGlobal.customers) {
     if (dbGlobal.customers.hasOwnProperty(k)) {
-      l.push(dbGlobal.customers[k])
+      let c = dbGlobal.customers[k]
+      c.apikey = k.substr(1)
+      l.push(c)
     }
   }
   return l
@@ -30,7 +32,7 @@ const initializeCustomer = (customersList, i) => {
   return new Promise((resolve, reject) => {
     if (i >= customersList.length) resolve()
     else {
-      _customers[customersList[i].name] = {}
+      _customers[customersList[i].name] = {apikey: customersList[i].apikey}
       migrations.init('sqlite', customersList[i].name, '2017')
         .then((dbs) => {
           _customers[customersList[i].name].dbs = dbs
@@ -89,7 +91,7 @@ const debugTestdbs = (dbs) => {
 Gets the session object for a sessionID.
 }
  */
-const getSession = (custName, callback) => {
+const getSession = (custName) => {
   // For now, we don't use sessionID, just create a generic session object
   let ts = new Date().getTime()
   let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
@@ -97,8 +99,9 @@ const getSession = (custName, callback) => {
     name: custName,
     dbs: _customers[custName].dbs,
     now: parseInt(now),
-    today: parseInt(now.substring(0, 8))}
-  callback(null, session)
+    today: parseInt(now.substring(0, 8))
+  }
+  return Promise.resolve(session)
 }
 
 /*
@@ -110,10 +113,11 @@ const manageSession = (req, res, f) => {
   if (apiKey && apiKey.startsWith('APIKEY ')) {
     let customer = dbGlobal.customers['k' + apiKey.substr(7)]
     if (customer) {
-      getSession(customer.name, (err, session) => {
-        if (err) res.status(401).end(err.message)
-        else f(req, res, session)
-      })
+      getSession(customer.name)
+        .then((session) => {
+          f(req, res, session)
+        })
+        .catch((err) => res.status(401).end(err.message))
     } else res.status(401).end('Customer not found')
   } else res.status(401).end('Application key required')
 }
@@ -129,10 +133,22 @@ const checkSerial = (serial) => {
   })
 }
 
+/*
+Puts headers into API call, for a customer.
+*/
+const setAuthorization = (customer, data) => {
+  let c = _customers[customer]
+  if (c) {
+    data.headers = {'Authorization': 'APIKEY ' + c.apikey}
+    return true
+  } else return false
+}
+
 module.exports = {
   init,
   getSession,
   manageSession,
   checkSerial,
-  getDatabases
+  getDatabases,
+  setAuthorization
 }

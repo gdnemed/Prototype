@@ -13,6 +13,7 @@ const state = require('./state/state')
 const coms = require('./coms/coms')
 const files = require('./exchange/files')
 const logic = require('./logic')
+const scheduler = require('./tasks/scheduler')
 const sessions = require('./session/sessions')
 
 let log
@@ -54,6 +55,7 @@ const initServices = () => {
       .then(() => coms.init(logic, sessions))
       .then(state.init)
       .then(files.init)
+      .then(() => scheduler.init(sessions))
       .then(resolve)
       .catch((error) => {
         reject(new Error(`Error in services initialization: ${error.message}`))

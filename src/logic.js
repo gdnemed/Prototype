@@ -17,7 +17,7 @@ let sessionService, stateService, comsService, log
 
 let prepGetRecords = {
   _entity_: '[record]',
-  _filter_: {field: 'drop', value: 0},
+  _filter_: {field: 'drop', value: CT.END_OF_TIME},
   name: 'name',
   id: 'document',
   code: 'code',
@@ -79,7 +79,7 @@ let prepPutCards = {
 
 let prepGetTimeTypes = {
   _entity_: '[timetype]',
-  _filter_: {field: 'drop', value: 0},
+  _filter_: {field: 'drop', value: CT.END_OF_TIME},
   name: 'name',
   code: 'code',
   text: 'intname',
@@ -248,6 +248,7 @@ const initAPI = () => {
   api.post('/api/coms/timetypes', apiCall(put, prepPutTimeType))
   api.post('/api/coms/timetypes/:id', apiCall(put, prepPutTimeType))
   api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
+  api.post('/api/coms/clean', clean)
 }
 
 /*
@@ -262,7 +263,7 @@ const extraTreatment = (session, id, isInsert, isDelete, callback) => {
   let d = {property: 'drop', entity: id, value: day, t1: CT.START_OF_TIME, t2: CT.END_OF_TIME}
   if (isInsert) {
     db.insert(vc).into('property_num_1').then((rowid) => {
-      d.value = 0
+      d.value = CT.END_OF_TIME
       db.insert(d).into('property_num_1').then((rowid) => callback(null, id))
       .catch((err) => callback(err))
     })
@@ -273,7 +274,7 @@ const extraTreatment = (session, id, isInsert, isDelete, callback) => {
       .where('entity', id).where('property', 'revision')
       .then((rowid) => {
         db('property_num_1').where('entity', id).where('property', 'drop')
-          .update({value: 0})
+          .update({value: CT.END_OF_TIME})
           .then((rowid) => {
             callback(null, id)
           })
@@ -339,9 +340,8 @@ const initTerminal = (serial, customer) => {
   comsService.send(serial, 'card_delete_complete', null)
   comsService.send(serial, 'record_delete_complete', null)
   // Go to DB to get records
-  sessionService.getSession(customer, (err, session) => {
-    if (err) log.error(err)
-    else {
+  sessionService.getSession(customer)
+    .then((session) => {
       squeries.get(session, {},
         {
           _entity_: '[record]',
@@ -367,14 +367,13 @@ const initTerminal = (serial, customer) => {
             }
           }
         })
-    }
-  })
+    })
+    .catch((err) => log.error(err))
 }
 
 const createClocking = (clocking, customer, callback) => {
-  sessionService.getSession(customer, (err, session) => {
-    if (err) callback(err)
-    else {
+  sessionService.getSession(customer)
+    .then((session) => {
       // Find the owner
       squeries.get(session, {record: clocking.record},
         {
@@ -389,8 +388,39 @@ const createClocking = (clocking, customer, callback) => {
             // inputsService.createClocking(clocking, customer, callback)
           }
         })
-    }
-  })
+    })
+    .catch(callback)
+}
+
+/*
+Deletes every entity with drop property too old.
+*/
+const clean = (req, res) => {
+  sessionService.manageSession(req, res,
+    (req, res, session) => {
+      // stateService.getSettings(req, res, session)
+      let limit = 20170801000000 // Just for test
+      let str = {
+        _entity_: '[]',
+        _filter_: {field: 'drop', value: limit, condition: '<'},
+        id: 'id'
+      }
+      // First, we get every old entity
+      squeries.get(session, req.params, str, (err, ret) => {
+        if (err) res.status(500).end(err.message)
+        else {
+          // Now, iterate to delete them
+          if (ret) {
+            for (let i = 0; i < ret.length; i++) {
+              squeries.del(session, ret[i].id, true, null, null, (err, rows) => {
+                if (err) res.status(500).end(err.message)
+                else res.status(200).end()
+              })
+            }
+          }
+        }
+      })
+    })
 }
 
 /*
@@ -410,9 +440,9 @@ const getPendingRegisters = (tab, tv, customer, node, serial) => {
 }
 
 module.exports = {
-  init: init,
-  initAPI: initAPI,
-  initTerminal: initTerminal,
-  createClocking: createClocking,
-  getPendingRegisters: getPendingRegisters
+  init,
+  initAPI,
+  initTerminal,
+  createClocking,
+  getPendingRegisters
 }
