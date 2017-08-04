@@ -398,8 +398,9 @@ Deletes every entity with drop property too old.
 const clean = (req, res) => {
   sessionService.manageSession(req, res,
     (req, res, session) => {
+      let expireTime = 30
       // stateService.getSettings(req, res, session)
-      let limit = 20170801000000 // Just for test
+      let limit = utils.tsToTime(new Date().getTime() - (86400000 * expireTime)) // Just for test
       let str = {
         _entity_: '[]',
         _filter_: {field: 'drop', value: limit, condition: '<'},
