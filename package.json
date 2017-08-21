@@ -7,6 +7,7 @@
     "body-parser": "^1.17.2",
     "chokidar": "^1.7.0",
     "csvtojson": "^1.1.7",
+    "json2csv": "latest",
     "deep-equal": "^1.0.1",
     "express": "^4.15.3",
     "knex": "^0.13.0",
