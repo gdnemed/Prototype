@@ -5,7 +5,6 @@
 const MODEL = require('./model')
 const CT = require('../CT')
 const utils = require('../utils/utils')
-const logger = require('../utils/log').getLogger('db')
 
 let nodeId = 1
 
@@ -805,7 +804,8 @@ const getType = (str) => {
     if (type.charAt(0) === '[') {
       str._guide_.isArray = true
       type = type.substring(1, type.length - 1)
-    } else str._guide_.isArray = false
+    } else if (str._inputs_) str._guide_.isArray = true
+    else str._guide_.isArray = false
   }
   return type
 }

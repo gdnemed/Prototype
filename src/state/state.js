@@ -35,18 +35,20 @@ const newId = (session) => {
 }
 
 const newInputId = (session, callback) => {
-  if (inputSequences[session.name]) callback(null, inputSequences[session.name]++)
-  else {
-    // TODO: Select every table
-    let db = session.dbs['inputs']
-    db('input_1_201707').max('id as m')
-      .then((rows) => {
-        if (rows.length === 0) inputSequences[session.name] = 1
-        else inputSequences[session.name] = rows[0].m + 1
-        callback(null, inputSequences[session.name]++)
-      })
-      .catch((err) => callback(err))
-  }
+  return new Promise((resolve, reject) => {
+    if (inputSequences[session.name]) resolve(inputSequences[session.name]++)
+    else {
+      // TODO: Select every table
+      let db = session.dbs['inputs']
+      db('input_1_201707').max('id as m')
+        .then((rows) => {
+          if (rows.length === 0) inputSequences[session.name] = 1
+          else inputSequences[session.name] = rows[0].m + 1
+          resolve(inputSequences[session.name]++)
+        })
+        .catch(reject)
+    }
+  })
 }
 
 const getSettings = (req, res, session) => {

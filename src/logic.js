@@ -141,7 +141,7 @@ let prepPutInfo = {
 }
 
 let prepGetClockings = {
-  _inputs_: '201707',
+  _inputs_: '201708',
   tmp: 'tmp',
   card: {_property_: 'card'},
   record: {_property_: 'record'},
@@ -149,12 +149,12 @@ let prepGetClockings = {
 }
 
 let prepGetClockingsDebug = {
-  _inputs_: '201707',
+  _inputs_: '201708',
   id: 'id',
   tmp: 'tmp',
   gmt: 'gmt',
-  card: {_property__: 'card'},
-  record: {_property__: 'record'},
+  card: {_property_: 'card'},
+  record: {_property_: 'record'},
   result: 'result',
   owner: 'owner',
   reception: 'reception',
