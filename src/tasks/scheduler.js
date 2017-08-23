@@ -40,8 +40,8 @@ const checkTasks = () => {
       let tExec = new Date(now.getYear(), now.getMonth(), now.getDay(), t.hour, t.minute, 0)
       let lapse = tExec.getTime() - now.getTime()
       if ((!t.lastExecution ||
-        t.lastExecution.getDay() !== now.getDay() ||
-        t.lastExecution.getDay() !== now.getDay() ||
+        t.lastExecution.getYear() !== now.getYear() ||
+        t.lastExecution.getMonth() !== now.getMonth() ||
         t.lastExecution.getDay() !== now.getDay()) &&
         now >= tExec) executeTask(t, now)
       // Put new time, if it is less than any other

@@ -404,7 +404,7 @@ const createClocking = (clocking, customer, callback) => {
           if (err) callback(err)
           else {
             if (record && record.length > 0) clocking.owner = record[0].id
-            squeries.put(session, stateService, {}, prepPutClocking, clocking, callback)
+            squeries.put(session, stateService, {}, prepPutClocking, clocking, null, callback)
             // inputsService.createClocking(clocking, customer, callback)
           }
         })

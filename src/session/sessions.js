@@ -33,7 +33,8 @@ const initializeCustomer = (customersList, i) => {
     if (i >= customersList.length) resolve()
     else {
       _customers[customersList[i].name] = {apikey: customersList[i].apikey}
-      migrations.init('sqlite', customersList[i].name, '2017')
+      let year = new Date().getFullYear()
+      migrations.init('sqlite', customersList[i].name, year)
         .then((dbs) => {
           _customers[customersList[i].name].dbs = dbs
           log.debug('DB ' + customersList[i].name)
@@ -65,7 +66,7 @@ const debugTestdbs = (dbs) => {
     log.info('Verifying migration')
     let kState = dbs['state']
     let kObjects = dbs['objects']
-    let kInputs = dbs['inputs']
+    let kInputs = dbs['inputs2017']
 
     kState.select().table('settings')
       .then((collection) => {

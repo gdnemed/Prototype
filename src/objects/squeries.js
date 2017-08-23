@@ -173,7 +173,7 @@ const del = (session, id, entity, period, extraFunction, callback) => {
       })
       .catch((err) => callback(err))
   } else { // If no entity, it's an input
-    let db = session.dbs['inputs']
+    let db = session.dbs['inputs' + period]
     db(`input_data_num_${nodeId}_${period}`).where('entity', id).delete()
       .then(() => db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete())
       .then(() => db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete())
@@ -418,7 +418,7 @@ const executeInsertInput = (params) => {
         }
       }
     }
-    let db = params.session.dbs['inputs']
+    let db = params.session.dbs['inputs' + Math.trunc(params.period / 100)]
     let table = `input_${nodeId}_${params.period}`
     // And we add id to insert
     d.id = params.id
@@ -514,9 +514,14 @@ const putElemProperty = (property, modelProperty, propObj, elem, params) => {
     } else {
       // Input
       r.id = params.id
+      // Avoid null properties in inputs
+      if (elem === null || elem === undefined) {
+        resolve()
+        return
+      }
     }
 
-    let db = params.session.dbs[params.entity ? 'objects' : 'inputs']
+    let db = params.session.dbs[params.entity ? 'objects' : 'inputs' + Math.trunc(params.period / 100)]
     let table = params.entity ? `property_${modelProperty.type}_${nodeId}`
       : `input_data_${modelProperty.type}_${nodeId}_${params.period}`
     let s = db.from(table)
@@ -738,7 +743,7 @@ Prepare str structure for future execution, adding _guide_ field, which will con
 - relation_owner: Only for inputs which must be linked with owner entity
 */
 const prepareGet = (session, str) => {
-  let db = session.dbs[str._inputs_ ? 'inputs' : 'objects']
+  let db = session.dbs[str._inputs_ ? 'inputs' + str._inputs_.substr(0,4) : 'objects']
   str._guide_ = {
     entity_fields: {},
     property_fields: [],

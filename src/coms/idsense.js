@@ -79,6 +79,7 @@ const newClocking = (data, socket, logicService) => {
     result: data.resp,
     source: 0
   }
+  if (data.id === null || data.id === undefined) delete clocking.record
   clocking.reception = utils.now()
   clocking.gmt = utils.tsToTime(data.tmp * 1000, 'GMT')
   clocking.tmp = utils.tsToTime(data.tmp * 1000, info.timezone)
