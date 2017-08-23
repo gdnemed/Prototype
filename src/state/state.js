@@ -40,7 +40,7 @@ const newInputId = (session, callback) => {
     else {
       // TODO: Select every table
       let db = session.dbs['inputs']
-      db('input_1_201707').max('id as m')
+      db('input_1_201708').max('id as m')
         .then((rows) => {
           if (rows.length === 0) inputSequences[session.name] = 1
           else inputSequences[session.name] = rows[0].m + 1

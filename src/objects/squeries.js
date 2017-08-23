@@ -852,6 +852,7 @@ const addFilter = (statement, filter, helper) => {
       if (filter.condition === '=' || !filter.condition) {
         statement.where(filter.field, v)
       } else statement.where(filter.field, filter.condition, v)
+      if (filter.variable) helper.variablesMapping.unshift(filter.variable)
       break
     default:// Condition over property
       let pt = MODEL.PROPERTIES[filter.field]
@@ -957,6 +958,11 @@ const joins = (db, str, e, f, type) => {
   else {
     if (str._guide_.subquery) str._guide_.subquery.leftJoin(e, str._guide_.link_field_1, str._guide_.link_field_2)
     else str._guide_.statement = selectEntity(db, f, type, str._filter_, str._guide_)
+  }
+  if (str._order_) {
+    for (let i = 0; i < str._order_.length; i++) {
+      str._guide_.statement.orderBy(str._order_[i].column, str._order_[i].desc ? 'desc' : 'asc')
+    }
   }
   if (!str._guide_.subquery) {
     // Transform to raw for better use
@@ -1223,6 +1229,7 @@ const executeSelect = (str, variables, session, callback) => {
   // Variables substitution
   let v = str._guide_.variablesMapping
   let l = str._guide_.statement.bindings
+  // let logger = require('../utils/log').getLogger('db')
   // logger.debug(v)
   // logger.debug(l)
   if (v) {
@@ -1304,6 +1311,8 @@ const finalRowTreatment = (str, row, i) => {
       if (row[p] === undefined || row[p] === null) delete row[p]
     }
   }
+  // Post transformations
+  if (str._transform_) str._transform_(row)
 }
 
 /*

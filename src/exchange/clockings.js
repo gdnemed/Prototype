@@ -14,7 +14,7 @@ let remoteDir
 let remoteService
 let currentId = 0
 let period
-let headers = ['tmp', 'result', 'card', 'record']
+let headers = ['id', 'record', 'card', 'date', 'time', 'dir', 'ttype', 'result', 'clockpoint']
 
 const init = () => {
   log = logger.getLogger('clockings')
@@ -23,8 +23,13 @@ const init = () => {
   remoteService = params.server
   remoteDir = params.dir
   period = params.period && params.period > 0 ? 60000 * params.period : 60000
-  // TODO: restore currentId
-  setTimeout(periodicRoutine, period)
+  fs.readFile('./counter', 'utf8', (err, contents) => {
+    if (err && (err.code !== 'ENOENT')) log.error(err)
+    else {
+      if (contents) currentId = parseInt(contents)
+      setTimeout(periodicRoutine, 0)
+    }
+  })
   return Promise.resolve()
 }
 
@@ -34,9 +39,19 @@ const periodicRoutine = () => {
     else {
       if (response && response.statusCode === 200) {
         let json = JSON.parse(body)
-        if (body.length > 0) {
+        if (json.length > 0) {
           currentId = json[json.length - 1].id
-          // TODO: save currentId
+          for (let i = 0; i < json.length; i++) {
+            if (!json[i].dir) json[i].dir = 'N'
+            if (!json[i].ttype) json[i].ttype = 0
+            if (!json[i].clockpoint) json[i].clockpoint = 0
+          }
+          // Save current counter
+          let output = fs.createWriteStream('./counter')
+          output.once('open', () => {
+            output.write('' + currentId)
+            output.close()
+          })
           var csv = json2csv({data: json, fields: headers})
           let path = remoteDir + '/clk' + utils.now() + '.csv'
           fs.writeFile(path, csv, (err) => {
@@ -44,7 +59,7 @@ const periodicRoutine = () => {
             else log.info('clockings file saved')
           })
         }
-      } else log.error('Error in API call: ' + response.statusCode)
+      } else log.error('Error in API call: ' + response.statusCode + ': ' + response.body)
     }
     setTimeout(periodicRoutine, period)
   })

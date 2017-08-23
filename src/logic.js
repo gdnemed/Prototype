@@ -140,12 +140,32 @@ let prepPutInfo = {
   }
 }
 
+/*
+Adapts database data of clocking to API structure.
+*/
+const transformClocking = (c) => {
+  c.date = Math.trunc(c.tmp / 1000000)
+  c.time = c.tmp % 1000000
+  delete c.tmp
+  switch (c.result) {
+    case 0: c.result = 'E00'
+      break
+    case 1: c.result = 'E02'
+      break
+    default: delete c.result
+  }
+}
+
 let prepGetClockings = {
-  _inputs_: '201708',
+  _inputs_: '201708', // TODO: what if new clockings in very past of very future tables?
+  _filter_: {field: 'id', condition: '>', variable: 'fromid'},
+  _order_: [{column: 'id'}],
+  id: 'id',
   tmp: 'tmp',
   card: {_property_: 'card'},
   record: {_property_: 'record'},
-  result: 'result'
+  result: 'result',
+  _transform_: transformClocking
 }
 
 let prepGetClockingsDebug = {
@@ -185,7 +205,7 @@ const init = (sessions, state, coms) => {
 }
 
 const get = (req, res, session, str) => {
-  squeries.get(session, req.params, str, (err, ret) => {
+  squeries.get(session, req.query, str, (err, ret) => {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
