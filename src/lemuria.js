@@ -60,7 +60,7 @@ const initServices = () => {
       .then(() => scheduler.init(sessions))
       .then(resolve)
       .catch((error) => {
-        reject(new Error(`Error in services initialization: ${error.message}`))
+        reject(new Error(`Error in services initialization: ${error}`))
       })
   })
 }

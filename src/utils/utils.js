@@ -9,6 +9,10 @@ const now = (timezone = 'GMT') => {
   return parseInt(moment.tz(new Date().getTime(), timezone).format('YYYYMMDDHHmmss'))
 }
 
+const momentNow = (timezone = 'GMT') => {
+  return moment.tz(new Date().getTime(), timezone)
+}
+
 const tsToTime = (ts, timezone = 'GMT') => {
   return parseInt(moment.tz(ts, timezone).format('YYYYMMDDHHmmss'))
 }
@@ -54,10 +58,11 @@ const nextTime = (time) => {
 }
 
 module.exports = {
-  now: now,
-  tsToTime: tsToTime,
-  previousDay: previousDay,
-  previousTime: previousTime,
-  nextDay: nextDay,
-  nextTime: nextTime
+  now,
+  momentNow,
+  tsToTime,
+  previousDay,
+  previousTime,
+  nextDay,
+  nextTime
 }

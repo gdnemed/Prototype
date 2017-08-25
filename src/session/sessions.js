@@ -38,7 +38,7 @@ const initializeCustomer = (customersList, i) => {
         .then((dbs) => {
           _customers[customersList[i].name].dbs = dbs
           log.debug('DB ' + customersList[i].name)
-          return debugTestdbs(dbs, customersList[i].name)
+          return verifyDB(dbs, customersList[i].name)
         })
         .then(() => initializeCustomer(customersList, i + 1))
         .then(resolve)
@@ -61,12 +61,14 @@ const init = () => {
 }
 
 // debug: verifies that each knex object for each db exists
-const debugTestdbs = (dbs) => {
+const verifyDB = (dbs) => {
   return new Promise((resolve, reject) => {
     log.info('Verifying migration')
     let kState = dbs['state']
     let kObjects = dbs['objects']
-    let kInputs = dbs['inputs2017']
+    let year = 2016
+    let kInputs = dbs['inputs' + year]
+    kInputs.months = {}
 
     kState.select().table('settings')
       .then((collection) => {
@@ -75,15 +77,22 @@ const debugTestdbs = (dbs) => {
       })
       .then((collection) => {
         log.debug('entity_1 len  = ' + collection.length)
-        return kInputs.select().table('input_1_201707')
-      })
-      .then((collection) => {
-        log.debug('input_1_201707 len  = ' + collection.length)
-        resolve()
-      })
-      .catch((err) => {
-        console.log('ERROR: ' + err)
-        reject(err)
+        let months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
+        return Promise.all(months.map((month) => {
+          return kInputs('input_1_' + year + month).count('id')
+          .then((n) => {
+            kInputs.months[month] = true
+            log.debug(`${year}${month} inputs table found`)
+          })
+          .catch((err) => {
+            if (err) log.debug(`${year}${month} inputs table does not exists`)
+          })
+        }))
+          .then(resolve)
+          .catch((err) => {
+            console.log('ERROR: ' + err)
+            reject(err)
+          })
       })
   })
 }

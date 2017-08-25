@@ -9,6 +9,12 @@
 				"sources":"test\\exchange_sources",
 				"server":{"host":"localhost","port":4041},
 				"output": true
+			},
+			"clockings":{
+				"dir":"test\\exchange_workdir\\remote",
+				"workdir": "test\\exchange_workdir",
+				"server":{"host":"localhost","port":4041},
+				"period": 1
 			}
 		}
 }

@@ -11,6 +11,7 @@ const squeries = require('./objects/squeries')
 const CT = require('./CT')
 const utils = require('./utils/utils')
 const httpServer = require('./httpServer')
+const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
 const g = require('./global')
 
 let sessionService, stateService, comsService, log
@@ -418,30 +419,65 @@ Deletes every entity with drop property too old.
 const clean = (req, res) => {
   sessionService.manageSession(req, res,
     (req, res, session) => {
-      let expireTime = 30
-      // stateService.getSettings(req, res, session)
-      let limit = utils.tsToTime(new Date().getTime() - (86400000 * expireTime)) // Just for test
-      let str = {
-        _entity_: '[]',
-        _filter_: {field: 'drop', value: limit, condition: '<'},
-        id: 'id'
-      }
-      // First, we get every old entity
-      squeries.get(session, req.params, str, (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else {
-          // Now, iterate to delete them
-          if (ret) {
-            for (let i = 0; i < ret.length; i++) {
-              squeries.del(session, ret[i].id, true, null, null, (err, rows) => {
-                if (err) res.status(500).end(err.message)
-                else res.status(200).end()
-              })
-            }
-          }
-        }
-      })
+      stateService.getSettings(session)
+        .then((settings) => {
+          cleanRecords(settings, session)
+            .then(() => cleanInputs(settings, session))
+            .then(res.status(200).end())
+            .catch((err) => res.status(500).end(err.message))
+        })
+        .catch((err) => res.status(500).end(err.message))
     })
+}
+
+const cleanRecords = (settings, session) => {
+  return new Promise((resolve, reject) => {
+    let daysRecords = settings.daysRecords ? parseInt(settings.daysRecords) : 30
+    let limit = utils.tsToTime(new Date().getTime() - (86400000 * daysRecords)) // Just for test
+    let str = {
+      _entity_: '[]',
+      _filter_: {field: 'drop', value: limit, condition: '<'},
+      id: 'id'
+    }
+    // First, we get every old entity
+    squeries.get(session, {}, str, (err, ret) => {
+      if (err) reject(err)
+      else {
+        // Now, iterate to delete them
+        if (ret) delRecord(ret, session, 0).then(resolve).catch(reject)
+        else resolve()
+      }
+    })
+  })
+}
+
+const delRecord = (records, session, i) => {
+  return new Promise((resolve, reject) => {
+    if (i >= records.length) resolve()
+    else {
+      squeries.del(session, records[i].id, true, null, null, (err, rows) => {
+        if (err) reject(err)
+        else delRecord(records, session, i).then(resolve).catch(reject)
+      })
+    }
+  })
+}
+
+const cleanInputs = (settings, session) => {
+  return new Promise((resolve, reject) => {
+    let monthsInputs = settings.monthsInputs ? parseInt(settings.monthsInputs) : 12
+    let now = utils.momentNow().subtract(monthsInputs, 'months')
+    let ym = now.format('YYYYMM')
+    let year = ym.substr(0, 4)
+    let month = ym.substr(4, 6)
+    let db = session.dbs['inputs' + year]
+    if (db) {
+      if (db.months[month]) {
+        inputsMigrations.downMonth(db.schema, ym)
+        resolve()
+      } else resolve()
+    } else resolve()
+  })
 }
 
 /*

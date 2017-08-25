@@ -50,6 +50,12 @@ const initConfiguration = () => {
           'dir': '.',
           'workdir': '.',
           'server': {'host': '', 'port': 8081}
+        },
+        'clockings': {
+          'dir': '.',
+          'workdir': '.',
+          'server': {'host': '', 'port': 8081},
+          'period': 1
         }
       }
     }

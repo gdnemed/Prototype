@@ -51,41 +51,33 @@ const newInputId = (session, callback) => {
   })
 }
 
-const getSettings = (req, res, session) => {
-  let db = session.dbs['state']
-  selectSettings(db, (err, result) => {
-    if (err)res.status(500).end(err.message)
-    else res.status(200).jsonp(result)
+/* Call for putting settings values */
+const postSettings = (session, settings) => {
+  return new Promise((resolve, reject) => {
+    let db = session.dbs['state']
+    var l = []
+    for (var property in settings) {
+      if (settings.hasOwnProperty(property)) { l.push({setting: property, value: settings[property]}) }
+    }
+    Promise.all(l.map((x) => putSettingItem(db, x)))
+      .then(resolve).catch(reject)
   })
 }
 
-const selectSettings = (db, callback) => {
-  db.select('setting,value').from('settings').then((rows) => {
-    let ret = {}
-    for (var i = 0; i < rows.length; i++) ret[rows[i].setting] = rows[i].value
-    callback(null, ret)
-  })
-  .catch((err) => callback(err))
-}
-
-const postSettings = (req, res, session) => {
-  let db = session.dbs['state']
-  updateSettings(db, req.body, function (err, result) {
-    if (err)res.status(500).end(err.message)
-    else res.status(200).jsonp(result)
+/* Call for putting settings values */
+const getSettings = (session) => {
+  return new Promise((resolve, reject) => {
+    let db = session.dbs['state']
+    db.select('setting', 'value').from('settings').then((rows) => {
+      let ret = {}
+      for (var i = 0; i < rows.length; i++) ret[rows[i].setting] = rows[i].value
+      resolve(ret)
+    })
+      .catch(reject)
   })
 }
 
-const updateSettings = (db, settings, callback) => {
-  var l = []
-  for (var property in settings) {
-    if (settings.hasOwnProperty(property)) { l.push({setting: property, value: settings[property]}) }
-  }
-  Promise.all(l.map((x) => putSettingItem(db, x, callback)))
-    .then(callback).catch(callback)
-}
-
-function putSettingItem (db, elem, callback) {
+function putSettingItem (db, elem) {
   return new Promise((resolve, reject) => {
     var setting = elem.setting
     var value = elem.value
@@ -139,11 +131,20 @@ const releaseType = (session, type, callback) => {
   callback()
 }
 
+/* Get session object and calls required function. */
+const apiCall = (req, res, f) => {
+  sessions.manageSession(req, res, (req, res, session) => {
+    f(session, req.body)
+      .then((result) => res.status(200).jsonp(result))
+      .catch((err) => res.status(500).end(err.message))
+  })
+}
+
 const init = () => {
   log = logger.getLogger('state')
   log.debug('>> state init()')
-  httpServer.getApi().post('/api/state/settings', (req, res) => sessions.manageSession(req, res, postSettings))
-  httpServer.getApi().get('/api/state/settings', (req, res) => sessions.manageSession(req, res, getSettings))
+  httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
+  httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
   return Promise.resolve()
 }
 
