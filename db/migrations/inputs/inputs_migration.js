@@ -58,16 +58,19 @@ exports.down = (knex, Promise) => {
   let r = knex.schema
   for (let i = 1; i <= 12; i++) {
     let month = year + (i < 10 ? '0' + i : i)
-    r = exports.downMonth(r, month)
+    exports.downMonth(r, month).then()
   }
   return r
 }
 
 exports.downMonth = (r, month) => {
-  r = r.dropTableIfExists('input_1_' + month)
-    .dropTableIfExists('input_data_str_1_' + month)
-    .dropTableIfExists('input_data_num_1_' + month)
-    .dropTableIfExists('input_data_bin_1_' + month)
-    .dropTableIfExists('input_rel_1_' + month)
-  return r
+  return new Promise((resolve, reject) => {
+    r.dropTableIfExists('input_1_' + month)
+      .then(() => r.dropTableIfExists('input_data_str_1_' + month))
+      .then(() => r.dropTableIfExists('input_data_num_1_' + month))
+      .then(() => r.dropTableIfExists('input_data_bin_1_' + month))
+      .then(() => r.dropTableIfExists('input_rel_1_' + month))
+      .then(() => resolve())
+      .catch(reject)
+  })
 }

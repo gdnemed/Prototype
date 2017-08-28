@@ -430,6 +430,9 @@ const clean = (req, res) => {
     })
 }
 
+/*
+Deletes old records (drop property beyond settings.daysRecords)
+*/
 const cleanRecords = (settings, session) => {
   return new Promise((resolve, reject) => {
     let daysRecords = settings.daysRecords ? parseInt(settings.daysRecords) : 30
@@ -463,20 +466,42 @@ const delRecord = (records, session, i) => {
   })
 }
 
+/*
+Drops tables containing old inputs (beyond settings.monthsInputs)
+*/
 const cleanInputs = (settings, session) => {
   return new Promise((resolve, reject) => {
     let monthsInputs = settings.monthsInputs ? parseInt(settings.monthsInputs) : 12
     let now = utils.momentNow().subtract(monthsInputs, 'months')
-    let ym = now.format('YYYYMM')
-    let year = ym.substr(0, 4)
-    let month = ym.substr(4, 6)
-    let db = session.dbs['inputs' + year]
-    if (db) {
-      if (db.months[month]) {
-        inputsMigrations.downMonth(db.schema, ym)
-        resolve()
+    cleanMonthInputs(now, session, 0)
+      .then(resolve).catch(reject)
+  })
+}
+
+/*
+Recursively drops inputs tables until 1 year before the limit.
+*/
+const cleanMonthInputs = (now, session, i) => {
+  return new Promise((resolve, reject) => {
+    if (i >= 12) resolve()
+    else {
+      now = now.subtract(1, 'months')
+      let ym = now.format('YYYYMM')
+      let year = ym.substr(0, 4)
+      let month = ym.substr(4, 6)
+      let db = session.dbs['inputs' + year]
+      if (db) {
+        if (db.months[month]) {
+          inputsMigrations.downMonth(db.schema, ym)
+            .then(() => {
+              delete db.months[month]
+              cleanMonthInputs(now, session, i + 1)
+                .then(resolve).catch(reject)
+            })
+            .catch(reject)
+        } else resolve()
       } else resolve()
-    } else resolve()
+    }
   })
 }
 
