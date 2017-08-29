@@ -9,6 +9,7 @@
 const logger = require('../utils/log')
 const httpServer = require('../httpServer')
 const sessions = require('../session/sessions')
+const g = require('../global')
 
 // Numeric sequences for id's (entities and inputs)
 let sequences = {}
@@ -141,10 +142,12 @@ const apiCall = (req, res, f) => {
 }
 
 const init = () => {
-  log = logger.getLogger('state')
-  log.debug('>> state init()')
-  httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
-  httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
+  if (g.getConfig().api_listen) {
+    log = logger.getLogger('state')
+    log.debug('>> state init()')
+    httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
+    httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
+  }
   return Promise.resolve()
 }
 

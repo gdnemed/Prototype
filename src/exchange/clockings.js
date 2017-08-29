@@ -12,25 +12,35 @@ const g = require('../global')
 let log
 let remoteDir
 let remoteService
+let apiKey
 let currentId = 0
 let period
 let headers = ['id', 'record', 'card', 'date', 'time', 'dir', 'ttype', 'result', 'clockpoint']
 
 const init = () => {
-  log = logger.getLogger('clockings')
-  log.debug('>> clockings.init()')
-  let params = g.getConfig().exchange.clockings
-  remoteService = params.server
-  remoteDir = params.dir
-  period = params.period && params.period > 0 ? 60000 * params.period : 60000
-  fs.readFile('./counter', 'utf8', (err, contents) => {
-    if (err && (err.code !== 'ENOENT')) log.error(err)
+  let exc = g.getConfig().exchange
+  if (!exc) return Promise.resolve()
+  else {
+    let params = exc.clockings
+    if (!params) return Promise.resolve()
     else {
-      if (contents) currentId = parseInt(contents)
-      setTimeout(periodicRoutine, 0)
+      log = logger.getLogger('clockings')
+      log.debug('>> clockings.init()')
+
+      remoteService = params.server
+      remoteDir = params.dir
+      apiKey = '123'
+      period = params.period && params.period > 0 ? 60000 * params.period : 60000
+      fs.readFile('./counter', 'utf8', (err, contents) => {
+        if (err && (err.code !== 'ENOENT')) log.error(err)
+        else {
+          if (contents) currentId = parseInt(contents)
+          setTimeout(periodicRoutine, 0)
+        }
+      })
+      return Promise.resolve()
     }
-  })
-  return Promise.resolve()
+  }
 }
 
 const periodicRoutine = () => {
@@ -73,7 +83,7 @@ const call = (callback) => {
     '/api/coms/clockings?fromid=' + currentId
   let data = {method: 'GET', url: url}
   // if (headers) data.headers = headers
-  data.headers = {'Authorization': 'APIKEY 123'}
+  data.headers = {'Authorization': 'APIKEY ' + apiKey}
   request(data, (error, response, body) => callback(error, response, body))
 }
 

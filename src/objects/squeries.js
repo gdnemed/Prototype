@@ -114,7 +114,7 @@ const filterBefore = (params) => {
     if (params.str._filter_) {
       let search = {
         _entity_: params.str._entity_,
-        _filter: params.str._filter,
+        _filter_: params.str._filter_,
         idEntity: 'id'
       }
       // Not direct put, but a filter to put properties or relations
@@ -743,7 +743,7 @@ Prepare str structure for future execution, adding _guide_ field, which will con
 - relation_owner: Only for inputs which must be linked with owner entity
 */
 const prepareGet = (session, str) => {
-  let db = session.dbs[str._inputs_ ? 'inputs' + str._inputs_.substr(0,4) : 'objects']
+  let db = session.dbs[str._inputs_ ? 'inputs' + str._inputs_.substr(0, 4) : 'objects']
   str._guide_ = {
     entity_fields: {},
     property_fields: [],
@@ -768,11 +768,11 @@ const prepareGet = (session, str) => {
 
     // Select over ENTITY
     if (!str._guide_.subquery) {
-      if (str._linked_ || (type && type.length > 0)) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+      if (str._linked_ /* || (type && type.length > 0) */) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
     }
-    if (str._filter_) { // 1 more binding for every variable in filter
+   /* if (str._filter_) { // 1 more binding for every variable in filter
       if (str._filter_.variable) str._guide_.variablesMapping.push(str._filter_.variable)
-    }
+    } */
     let e = sq => {
       selectEntity(sq, f, type, str._filter_, str._guide_)
     }
@@ -824,10 +824,25 @@ const selectEntity = (sq, f, type, filter, helper) => {
   for (var c in f) {
     if (f.hasOwnProperty(c)) s.column(c + ' as ' + (helper.prefix ? helper.prefix : '') + f[c])
   }
+  // We keep mapping order, because selectEntity is called after joins
+  let tmpVar = helper.variablesMapping
+  helper.variablesMapping = []
   if (type !== null && type !== undefined) {
-    if (type.length > 0) s.where('type', type)
-  } else if (!helper.subquery) s.where('id', 0)
+    if (type.length > 0) {
+      s.where('type', type)
+      helper.variablesMapping.push(null) // 1 position in bindings is fixed
+    }
+  } else if (!helper.subquery) {
+    s.where('id', 0)
+    helper.variablesMapping.push(null) // 1 position in bindings is fixed
+  }
   if (filter) addFilter(s, filter, helper)
+  // Restore list
+  if (tmpVar) {
+    for (let i = 0; i < tmpVar.length; i++) {
+      helper.variablesMapping.push(tmpVar[i])
+    }
+  }
   s.as(helper.subquery ? helper.prefix + 'r' : 'e')
   return s
 }
@@ -842,7 +857,6 @@ const selectInput = (sq, f, period, filter, helper) => {
     if (f.hasOwnProperty(c)) s.column(c + ' as ' + f[c])
   }
   if (filter) addFilter(s, filter, helper)
-  helper.variablesMapping.push(null) // 1 position in bindings is fixed
   return s.as('e')
 }
 
@@ -857,7 +871,7 @@ const addFilter = (statement, filter, helper) => {
       if (filter.condition === '=' || !filter.condition) {
         statement.where(filter.field, v)
       } else statement.where(filter.field, filter.condition, v)
-      if (filter.variable) helper.variablesMapping.unshift(filter.variable)
+      if (filter.variable) helper.variablesMapping.push(filter.variable)
       break
     default:// Condition over property
       let pt = MODEL.PROPERTIES[filter.field]
@@ -1234,16 +1248,16 @@ const executeSelect = (str, variables, session, callback) => {
   // Variables substitution
   let v = str._guide_.variablesMapping
   let l = str._guide_.statement.bindings
-  // let logger = require('../utils/log').getLogger('db')
-  // logger.debug(v)
-  // logger.debug(l)
+  let logger = require('../utils/log').getLogger('db')
+  logger.debug(v)
+  logger.debug(l)
   if (v) {
     for (let i = 0; i < l.length; i++) {
       if (v[i] !== null) l[i] = variables[v[i]]
     }
   }
 
-  // logger.debug(str._guide_.statement.toSQL())
+  logger.debug(str._guide_.statement.toSQL())
   let result
   str._guide_.statement
     .then((rows) => {

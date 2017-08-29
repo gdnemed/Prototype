@@ -196,16 +196,25 @@ let prepPutClocking = {
 }
 
 const init = (sessions, state, coms) => {
-  log = logger.getLogger('logic')
-  log.debug('>> logic.init()')
-  sessionService = sessions
-  stateService = state
-  comsService = coms
-  initAPI()
+  if (g.getConfig().api_listen) {
+    log = logger.getLogger('logic')
+    log.debug('>> logic.init()')
+    sessionService = sessions
+    stateService = state
+    comsService = coms
+    initAPI()
+  }
   return Promise.resolve()
 }
 
 const get = (req, res, session, str) => {
+  // We add parameters from url into variables set
+  if (req.params) {
+    if (!req.query) req.query = {}
+    for (var p in req.params) {
+      if (req.params.hasOwnProperty(p)) req.query[p] = req.params[p]
+    }
+  }
   squeries.get(session, req.query, str, (err, ret) => {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)

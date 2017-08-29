@@ -56,11 +56,17 @@ exports.up = (knex, Promise) => {
 exports.down = (knex, Promise) => {
   let year = knex.schema.client.config.year
   let r = knex.schema
-  for (let i = 1; i <= 12; i++) {
-    let month = year + (i < 10 ? '0' + i : i)
-    exports.downMonth(r, month).then()
-  }
-  return r
+  return downMonthYear(r, year, 1)
+}
+
+const downMonthYear = (r, year, i) => {
+  return new Promise((resolve, reject) => {
+    if (i > 12) resolve()
+    exports.downMonth(r, year + (i < 10 ? '0' + i : i))
+      .then(() => downMonthYear(r, year, i + 1))
+      .then(resolve)
+      .catch(reject)
+  })
 }
 
 exports.downMonth = (r, month) => {

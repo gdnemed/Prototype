@@ -1,6 +1,7 @@
 {
 		"api_listen":{"host":"","port":4041},
 		"coms_listen":{"host":"","port":4042},
+		"db": {"dir": "./db"},
 		"node_id":1,
 		"exchange":{
 			"files":{

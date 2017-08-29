@@ -5,6 +5,7 @@
 const loggerMachine = require('./utils/log')
 const logger = loggerMachine.getLogger('migrations')
 const Knex = require('knex')
+const g = require('./global')
 
 // Each 'section' correspond to a folder inside /db/migrations
 const SECTIONS = {
@@ -24,10 +25,11 @@ let yearMigration
 
 const getDirForSqliteDB = () => {
   let environment = process.env.NODE_ENV || 'development'
+  let dir = g.getConfig().db.dir
   switch (environment) {
-    case 'stress_test': return './db/stress_test/' + customerName + '/'
-    case 'test': return './db/test/' + customerName + '/'
-    default: return './db/' + customerName + '/'
+    case 'stress_test': return dir + '/stress_test/' + customerName + '/'
+    case 'test': return dir + '/test/' + customerName + '/'
+    default: return dir + '/' + customerName + '/'
   }
 }
 
@@ -103,8 +105,8 @@ const migrateSection = (section, dbs, year) => {
     }
     let cfg = Object.assign({}, baseMigration)
     Object.assign(cfg, {
-      connection: {filename: getDirForSqliteDB() + `M_${section}${inputsSuffix}.db`},
-      migrations: {directory: `./db/migrations/${section}`}
+      connection: {filename: `${getDirForSqliteDB()}M_${section}${inputsSuffix}.db`},
+      migrations: {directory: `${__dirname}/../db/migrations/${section}`}
     })
     let sec = year ? section + year : section
     dbs[sec] = Knex(cfg)

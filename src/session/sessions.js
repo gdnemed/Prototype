@@ -8,6 +8,7 @@
 const moment = require('moment-timezone')
 const logger = require('../utils/log')
 const migrations = require('../migrations')
+const g = require('../global')
 
 let dbGlobal
 let _customers = {}
@@ -48,16 +49,18 @@ const initializeCustomer = (customersList, i) => {
 }
 
 const init = () => {
-  dbGlobal = process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test'
-    ? {customers: {k123: {name: 'SPEC'}, k124: {name: 'OCTIME'}}, devices: {t123: 'SPEC', t1105: 'SPEC'}}
-    : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC'}}
-  log = logger.getLogger('session')
-  log.debug('session: init() env: ' + process.env.NODE_ENV)
-  return new Promise((resolve, reject) => {
-    initializeCustomer(getCustomersList(), 0)
-      .then(resolve)
-      .catch(reject)
-  })
+  if (g.getConfig().api_listen) {
+    dbGlobal = process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test'
+      ? {customers: {k123: {name: 'SPEC'}, k124: {name: 'OCTIME'}}, devices: {t123: 'SPEC', t1105: 'SPEC'}}
+      : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC'}}
+    log = logger.getLogger('session')
+    log.debug('session: init() env: ' + process.env.NODE_ENV)
+    return new Promise((resolve, reject) => {
+      initializeCustomer(getCustomersList(), 0)
+        .then(resolve)
+        .catch(reject)
+    })
+  } else return Promise.resolve()
 }
 
 // debug: verifies that each knex object for each db exists
@@ -101,13 +104,13 @@ const verifyDB = (dbs) => {
 Gets the session object for a sessionID.
 }
  */
-const getSession = (custName) => {
+const getSession = (customerName) => {
   // For now, we don't use sessionID, just create a generic session object
   let ts = new Date().getTime()
   let now = moment.tz(ts, 'GMT').format('YYYYMMDDHHmmss')
   let session = {
-    name: custName,
-    dbs: _customers[custName].dbs,
+    name: customerName,
+    dbs: _customers[customerName].dbs,
     now: parseInt(now),
     today: parseInt(now.substring(0, 8))
   }

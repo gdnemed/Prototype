@@ -148,7 +148,7 @@ const cleanImportFiles = (fieName) => {
 // -------------------------------------------------------------------------------------------
 // For every section (objects, settings, etc), rollback() and migration() is invoked to grant cleaned tables
 const rollbackAndMigrateDatabases = () => {
-  let kObjects = t.dbs['objects'], kInputs = t.dbs['inputs'], kState = t.dbs['state']
+  let kObjects = t.dbs['objects'], kInputs = t.dbs['inputs2017'], kState = t.dbs['state']
   return kObjects.migrate.rollback()
     .then(() => kInputs.migrate.rollback())
     .then(() => kState.migrate.rollback())
@@ -160,8 +160,10 @@ const rollbackAndMigrateDatabases = () => {
 const expectProps = (realObj, expectedObj) => {
   for (let k in expectedObj) {
     if (expectedObj.hasOwnProperty(k)) {
-      console.log('checking property: ' + k + ' realValue: ' + realObj[k] + ' expected: ' + expectedObj[k])
-      expect(realObj[k]).to.equal(expectedObj[k])
+      if (realObj) {
+        console.log('checking property: ' + k + ' realValue: ' + realObj[k] + ' expected: ' + expectedObj[k])
+        expect(realObj[k]).to.equal(expectedObj[k])
+      } else expect(realObj).to.not.equal(undefined)
     }
   }
 }

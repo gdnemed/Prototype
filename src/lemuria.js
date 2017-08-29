@@ -38,7 +38,8 @@ const init = () => {
           resolve()
         })
         .catch((err) => {
-          log.error(`ERROR: cannot start Lemuria: ${err}`)
+          log.error(`ERROR: cannot start Lemuria: `)
+          log.error(err)
           reject(err)
         })
     } else {
@@ -64,7 +65,6 @@ const initServices = () => {
       })
   })
 }
-
 
 /*
 Installs/unistalls Lemuria as a Windows service.

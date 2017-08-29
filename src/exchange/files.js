@@ -21,23 +21,32 @@ let workDir
 let timeZone
 let remoteService
 let createOutput
+let apiKey
 
 /*
 Initialize variables and watching import files.
 */
 const init = () => {
-  log = logger.getLogger('files')
-  log.debug('>> files.init()')
-  let params = g.getConfig().exchange.files
-  remoteService = params.server
-  timeZone = 'Europe/Madrid'
-  remoteDir = params.dir
-  workDir = params.workdir
-  createOutput = params.output
-  watch('RECORDS', processRecord, 'records', 'records', 'records')
-  watch('TTYPES', processTtype, 'timetypes', 'timetypes', 'timetypes')
-  watch('INFO', processInfo, 'infos', 'records/@/info', 'records/@/info')
-  return Promise.resolve()
+  let exc = g.getConfig().exchange
+  if (!exc) return Promise.resolve()
+  else {
+    let params = exc.files
+    if (!params) return Promise.resolve()
+    else {
+      log = logger.getLogger('files')
+      log.debug('>> files.init()')
+      remoteService = params.server
+      timeZone = 'Europe/Madrid'
+      remoteDir = params.dir
+      workDir = params.workdir
+      createOutput = params.output
+      apiKey = '123'
+      watch('RECORDS', processRecord, 'records', 'records', 'records')
+      watch('TTYPES', processTtype, 'timetypes', 'timetypes', 'timetypes')
+      watch('INFO', processInfo, 'infos', 'records/@/info', 'records/@/info')
+      return Promise.resolve()
+    }
+  }
 }
 
 /*
@@ -388,7 +397,7 @@ const call = (method, path, content, callback) => {
   let url = 'http://' + remoteService.host + ':' + remoteService.port + '/api/coms/' + path
   let data = {method: method, url: url}
   // if (headers) data.headers = headers
-  data.headers = {'Authorization': 'APIKEY 123'}
+  data.headers = {'Authorization': 'APIKEY ' + apiKey}
   if (content != null) {
     data.json = true
     data.body = content
