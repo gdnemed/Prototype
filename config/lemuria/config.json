@@ -1,0 +1,6 @@
+{
+		"api_listen":{"host":"","port":8081},
+		"coms_listen":{"host":"","port":"$COMS_PORT"},
+		"db": {"dir": "$DB_DIR$"},
+		"node_id":1
+}

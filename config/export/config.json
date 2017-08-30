@@ -1,0 +1,10 @@
+{
+		"node_id":1,
+		"exchange":{
+			"clockings":{
+				"dir":"$DIR_FILES$",
+				"server":{"host":"$SERVER$","port":"$PORT_SERVER$"},
+				"period": "$PERIOD_CLOCKINGS"
+			}
+		}
+}

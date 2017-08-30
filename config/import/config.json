@@ -1,0 +1,11 @@
+{
+		"node_id":1,
+		"exchange":{
+			"files":{
+				"dir":"$DIR_FILES$",
+				"workdir": "$WORK_DIR$",
+				"server":{"host":"$SERVER$","port":"$PORT_SERVER$"},
+				"output": true
+			}
+		}
+}
