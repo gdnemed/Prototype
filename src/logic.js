@@ -483,6 +483,7 @@ const cleanInputs = (settings, session) => {
     let monthsInputs = settings.monthsInputs ? parseInt(settings.monthsInputs) : 12
     let now = utils.momentNow().subtract(monthsInputs, 'months')
     cleanMonthInputs(now, session, 0)
+      .then(() => createFutureMonthInputs(utils.momentNow(), session, 0))
       .then(resolve).catch(reject)
   })
 }
@@ -505,6 +506,33 @@ const cleanMonthInputs = (now, session, i) => {
             .then(() => {
               delete db.months[month]
               cleanMonthInputs(now, session, i + 1)
+                .then(resolve).catch(reject)
+            })
+            .catch(reject)
+        } else resolve()
+      } else resolve()
+    }
+  })
+}
+
+/*
+Recursively creates monthly inputs tables for future inputs.
+*/
+const createFutureMonthInputs = (now, session, i) => {
+  return new Promise((resolve, reject) => {
+    if (i >= 12) resolve()
+    else {
+      now = now.add(1, 'months')
+      let ym = now.format('YYYYMM')
+      let year = ym.substr(0, 4)
+      let month = ym.substr(4, 6)
+      let db = session.dbs['inputs' + year]
+      if (db) {
+        if (db.months[month]) {
+          inputsMigrations.upMonth(db.schema, ym)
+            .then(() => {
+              db.months[month] = true
+              createFutureMonthInputs(now, session, i + 1)
                 .then(resolve).catch(reject)
             })
             .catch(reject)
