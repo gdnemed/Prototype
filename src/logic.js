@@ -14,6 +14,8 @@ const httpServer = require('./httpServer')
 const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
 const migrations = require('./migrations')
 const g = require('./global')
+const sseExpress = require('sse-express');
+const onFinished = require('on-finished');
 
 let sessionService, stateService, comsService, log
 
@@ -280,6 +282,25 @@ const initAPI = () => {
   api.post('/api/coms/timetypes/:id', apiCall(put, prepPutTimeType))
   api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
   api.post('/api/coms/clean', clean)
+  api.get('/api/coms/asap', sseExpress, apiCall(register))
+}
+
+let monitors = {}
+
+const register = (req, res, session) => {
+  let customer = session.name
+  let monitorsList = monitors[customer]
+  if (!monitorsList) {
+    monitorsList = []
+    monitors[customer] = monitorsList
+  }
+  let client = {
+    session: session,
+    req: req,
+    res: res
+  }
+  monitorsList.push(client)
+  onFinished(res, () => monitorsList.remove(client))
 }
 
 /*
@@ -415,12 +436,32 @@ const createClocking = (clocking, customer, callback) => {
           if (err) callback(err)
           else {
             if (record && record.length > 0) clocking.owner = record[0].id
-            squeries.put(session, stateService, {}, prepPutClocking, clocking, null, callback)
-            // inputsService.createClocking(clocking, customer, callback)
+            squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
+              if (err) callback(err)
+              else {
+                notifyMonitors(clocking, id, customer)
+                callback(err, id)
+              }
+            })
           }
         })
     })
     .catch(callback)
+}
+
+const notifyMonitors = (clocking, id, customer) => {
+  let c = {
+    result: clocking.result,
+    tmp: clocking.tmp,
+    id: id
+  }
+  if (clocking.card) c.card = clocking.card
+  if (clocking.record) c.record = clocking.record
+  transformClocking(c)
+  let list = monitors[customer]
+  if(list)
+    for (let i = 0; i < list.length; i++)
+      list[i].res.sse('clocking', c)
 }
 
 /*

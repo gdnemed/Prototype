@@ -8,6 +8,7 @@ const request = require('request')
 const logger = require('../utils/log')
 const utils = require('../utils/utils')
 const g = require('../global')
+const EventSource = require('eventsource')
 
 let log
 let remoteDir
@@ -30,14 +31,23 @@ const init = () => {
       remoteService = params.server
       remoteDir = params.dir
       apiKey = '123'
-      period = params.period && params.period > 0 ? 60000 * params.period : 60000
-      fs.readFile('./counter', 'utf8', (err, contents) => {
-        if (err && (err.code !== 'ENOENT')) log.error(err)
-        else {
-          if (contents) currentId = parseInt(contents)
-          setTimeout(periodicRoutine, 0)
-        }
-      })
+      period = params.period !== undefined ? 60000 * params.period : 60000
+      if (period === 0) { // As soon as possible
+        var eventSourceInitDict = {headers: {'Authorization': 'APIKEY ' + apiKey}};
+        let eventSource = new EventSource('http://' + remoteService.host + ':' + remoteService.port + '/api/coms/asap', eventSourceInitDict)
+        eventSource.addEventListener('clocking', (e) => {
+          writeClockings([e.data])
+          log.trace(e.data)
+        })
+      } else { // Periodic
+        fs.readFile('./counter', 'utf8', (err, contents) => {
+          if (err && (err.code !== 'ENOENT')) log.error(err)
+          else {
+            if (contents) currentId = parseInt(contents)
+            setTimeout(periodicRoutine, 0)
+          }
+        })
+      }
       return Promise.resolve()
     }
   }
@@ -62,18 +72,36 @@ const periodicRoutine = () => {
             output.write('' + currentId)
             output.close()
           })
-          var csv = json2csv({data: json, fields: headers})
-          let path = remoteDir + '/clk' + utils.now() + '.csv'
-          fs.writeFile(path, csv, (err) => {
-            if (err) log.error(err)
-            else log.info('clockings file saved')
-          })
+          writeClockings(json)
         }
       } else log.error('Error in API call: ' + response.statusCode + ': ' + response.body)
     }
     setTimeout(periodicRoutine, period)
   })
 }
+
+const writeClockings = (json) => {
+  var csv = json2csv({data: json, fields: headers})
+  if (period === 0) {
+    let path = remoteDir + '/clk.csv'
+    let stream = fs.crateWriteStream(path, {
+      flags: 'w+',
+      defaultEncoding: 'utf8',
+      mode: 0o666,
+      autoClose: true
+    })
+    stream.write(csv)
+    stream.close()
+  } else {
+    let path = remoteDir + '/clk' + utils.now() + '.csv'
+    fs.writeFile(path, csv, (err) => {
+      if (err) log.error(err)
+      else log.info('clockings file saved')
+    })
+  }
+}
+
+
 
 /*
 Calls Lemuria API
