@@ -16,7 +16,10 @@
     "msgpack-lite": "^0.1.26",
     "promise": "^8.0.1",
     "request": "^2.81.0",
-    "sqlite3": "^3.1.8"
+    "sqlite3": "^3.1.8",
+    "eventsource": "latest",
+    "sse-express": "latest",
+    "on-finished": "latest"
   },
   "scripts": {
     "test": "mocha"
