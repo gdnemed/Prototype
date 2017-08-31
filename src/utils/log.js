@@ -5,15 +5,20 @@
 const log4js = require('log4js')
 const fs = require('fs')
 
+let configured = false
+let customized = false
+
 /*
 Initial logging configuration, from a file.
 */
-const configure = (home) => {
+const configure = () => {
   try {
-    log4js.configure(JSON.parse(fs.readFileSync(home + '/logging.json', 'utf8')))
+    log4js.configure(JSON.parse(fs.readFileSync(process.cwd() + '/logging.json', 'utf8')))
+    customized = true
   } catch (err) {
     console.log('logging.json not found, log messages sent to stdout.')
   }
+  configured = true
 }
 
 /*
@@ -22,8 +27,11 @@ target: User defined name to classify.
 return: Logger object.
 */
 const getLogger = (target) => {
+  if (!configured) configure()
   let l = log4js.getLogger(target)
-  l.level = 'trace'
+  if (!customized) { // Default configuration when no 'HOME/logging.json' file is found
+    l.level = 'trace'
+  }
   return l
 }
 

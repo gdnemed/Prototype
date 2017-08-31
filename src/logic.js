@@ -215,6 +215,7 @@ const get = (req, res, session, str) => {
       if (req.params.hasOwnProperty(p)) req.query[p] = req.params[p]
     }
   }
+  log.info(`GET ${req.url} params: ${JSON.stringify(req.query)}`)
   squeries.get(session, req.query, str, (err, ret) => {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
@@ -222,6 +223,7 @@ const get = (req, res, session, str) => {
 }
 
 const put = (req, res, session, str) => {
+  log.info(`POST ${req.url} params: ${JSON.stringify(req.params)} body: ${JSON.stringify(req.body)}`)
   squeries.put(session,
     stateService,
     req.params,
@@ -236,6 +238,7 @@ const put = (req, res, session, str) => {
 }
 
 const del = (req, res, session, filter, entity) => {
+  log.info(`DEL ${req.url} params: ${JSON.stringify(req.params)}`)
   // We don't really delete, we just put a value in 'drop'
   let str = {_entity_: entity,
     drop: {_property_: 'drop'},

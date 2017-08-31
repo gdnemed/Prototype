@@ -5,6 +5,7 @@
 const MODEL = require('./model')
 const CT = require('../CT')
 const utils = require('../utils/utils')
+let log = require('../utils/log').getLogger('db')
 
 let nodeId = 1
 
@@ -1248,16 +1249,15 @@ const executeSelect = (str, variables, session, callback) => {
   // Variables substitution
   let v = str._guide_.variablesMapping
   let l = str._guide_.statement.bindings
-  let logger = require('../utils/log').getLogger('db')
-  logger.debug(v)
-  logger.debug(l)
+  //log.debug(v)
+  //log.debug(l)
   if (v) {
     for (let i = 0; i < l.length; i++) {
       if (v[i] !== null) l[i] = variables[v[i]]
     }
   }
 
-  logger.debug(str._guide_.statement.toSQL())
+  log.debug(str._guide_.statement.toSQL())
   let result
   str._guide_.statement
     .then((rows) => {
@@ -1412,7 +1412,7 @@ const executeRelation = (str, forward, row, session, variables) => {
       // Modify query 'where' with current id
       let ss = sq._statement_._statements
       ss[ss.length - 1].value = row._id_
-      // logger.debug(sq._statement_.toSQL())
+      // log.debug(sq._statement_.toSQL())
       sq._statement_
         .then((h) => processRelationRow(row, forward, sq, h, 0, session, variables, (err) => {
           if (err) reject(err)
@@ -1493,7 +1493,7 @@ const executePropertySq = (str, type, row) => {
       let s = sq[type]._statement_
       let ss = s._statements
       ss[ss.length - 1].value = row._id_
-      // logger.debug(s.toSQL())
+      // log.debug(s.toSQL())
       s.then((h) => {
         for (let k = 0; k < h.length; k++) {
           let info = sq[type][h[k].property]

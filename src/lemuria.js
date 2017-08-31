@@ -21,8 +21,6 @@ let log
 
 const init = () => {
   // logger initialization
-  let home = process.cwd()
-  logger.configure(home)
   log = logger.getLogger('Main')
   // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
   g.init()
