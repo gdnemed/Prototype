@@ -17,7 +17,7 @@ Main visible function for getting data.
 */
 const get = (session, variables, str, callback) => {
   if (!str._guide_) {
-    if (!prepareGet(session, str)) {
+    if (!prepareGet(session, variables, str)) {
       callback(new Error('Syntax error'))
       return
     }
@@ -742,7 +742,7 @@ Prepare str structure for future execution, adding _guide_ field, which will con
   statement to be executed.
 - relation_owner: Only for inputs which must be linked with owner entity
 */
-const prepareGet = (session, str) => {
+const prepareGet = (session, variables, str) => {
   let db = session.dbs[str._inputs_ ? 'inputs' + str._inputs_.substr(0, 4) : 'objects']
   str._guide_ = {
     entity_fields: {},
@@ -762,7 +762,7 @@ const prepareGet = (session, str) => {
   }
   // Always a hidden id of the entity
   str._guide_.fields_to_remove = [(str._prefix_ ? str._prefix_ : '') + '_id_']
-  getFields(str, session, str._inputs_)
+  getFields(str, session, variables, str._inputs_)
   if (str._entity_ || str._linked_) {
     let f = str._guide_.entity_fields
 
@@ -776,7 +776,7 @@ const prepareGet = (session, str) => {
     let e = sq => {
       selectEntity(sq, f, type, str._filter_, str._guide_)
     }
-    joins(db, str, e, f, type)
+    joins(db, str, variables, e, f, type)
     preparePropertySubquery(db, str._guide_.property_subqueries, 'str')
     preparePropertySubquery(db, str._guide_.property_subqueries, 'num')
     preparePropertySubquery(db, str._guide_.property_subqueries, 'bin')
@@ -789,10 +789,12 @@ const prepareGet = (session, str) => {
       selectInput(sq, f, type, str._filter_, str._guide_)
     }
     joins(db, str, e, f, type)
-    preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'str', type)
-    preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'num', type)
-    preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'bin', type)
-    prepareRelationInput(db, str._guide_.relations_forward, type)
+    if (!variables.count) {
+      preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'str', type)
+      preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'num', type)
+      preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'bin', type)
+      prepareRelationInput(db, str._guide_.relations_forward, type)
+    }
   }
   return true
 }
@@ -946,7 +948,7 @@ and put the result in str._guide_.statement
 - f: Entity/input fields
 - type: type of entity, or period of inputs
 */
-const joins = (db, str, e, f, type) => {
+const joins = (db, str, variables, e, f, type) => {
   let ps = str._guide_.property_fields
   let dr = str._guide_.direct_relations
   if ((ps && ps.length > 0) || (dr && dr.length > 0)) {
@@ -983,10 +985,12 @@ const joins = (db, str, e, f, type) => {
       str._guide_.statement.orderBy(str._order_[i].column, str._order_[i].desc ? 'desc' : 'asc')
     }
   }
-  if (!str._guide_.subquery) {
+  if (!str._guide_.subquery || variables.count) {
     // Transform to raw for better use
     let sql = str._guide_.statement.toSQL()
-    str._guide_.statement = db.raw(sql.sql, sql.bindings)
+    let sentence = sql.sql
+    if (variables.count) sentence = 'select count(*) n from (' + sentence + ') countsubselect'
+    str._guide_.statement = db.raw(sentence, sql.bindings)
   }
 }
 
@@ -1139,7 +1143,7 @@ const putRelationInfo = (db, str, info, i, subquery) => {
 Analyze this level of str structure, and creates objects which
 guide the program to do queries.
 */
-const getFields = (str, session, forInputs) => {
+const getFields = (str, session, variables, forInputs) => {
   for (var property in str) {
     if (str.hasOwnProperty(property)) {
       if (property.charAt(0) === '_' &&
@@ -1162,7 +1166,7 @@ const getFields = (str, session, forInputs) => {
           str._guide_.relation_owner = f
           str._guide_.entity_fields.owner = '_owner_'
           str._guide_.fields_to_remove.push('_owner_')
-          prepareRelatedObject(f, str[property], null, session)
+          prepareRelatedObject(f, str[property], null, session, variables)
         } else if (f.type.indexOf('->') >= 0) {
           f.type = f.type.substring(0, f.type.length - 2)
           f.forward = true
@@ -1172,7 +1176,7 @@ const getFields = (str, session, forInputs) => {
           } else {
             str._guide_.direct_relations.push(f)
           }
-          prepareRelatedObject(f, str[property], true, session)
+          prepareRelatedObject(f, str[property], true, session, variables)
         } else if (f.type.indexOf('<-') >= 0) {
           f.type = f.type.substring(2, f.type.length)
           f.forward = false
@@ -1182,7 +1186,7 @@ const getFields = (str, session, forInputs) => {
           } else {
             str._guide_.direct_relations.push(f)
           }
-          prepareRelatedObject(f, str[property], false, session)
+          prepareRelatedObject(f, str[property], false, session, variables)
         } else { // It's a property
           f.typeProperty = MODEL.getTypeProperty(f.type)
           // Get simple fields of the property
@@ -1210,7 +1214,7 @@ Puts every relation field in the descriptor (f).
 - forward: indicates the direction of the relation.
 - entry: is the name of the relation in the main structure.
 */
-const prepareRelatedObject = (f, entry, forward, session) => {
+const prepareRelatedObject = (f, entry, forward, session, variables) => {
   let nfields = 0
   for (let rf in entry) {
     if (!f.fields) f.fields = {}
@@ -1237,7 +1241,7 @@ const prepareRelatedObject = (f, entry, forward, session) => {
   }
   if (f.nextEntity) {
     f.nextEntity._n_fields = nfields
-    if (f.isArray) prepareGet(session, f.nextEntity)
+    if (f.isArray) prepareGet(session, variables, f.nextEntity)
   }
 }
 
@@ -1265,7 +1269,9 @@ const executeSelect = (str, variables, session, callback) => {
       return processRow(str, rows, 0, session, variables)
     })
     .then(() => {
-      if (str._related_) {
+      if (variables.count) {
+        result = result[0]
+      } else if (str._related_) {
         result = result[0]._related_
         if (str._related_._relation_.charAt(0) !== '[') result = result[0]
       } else {
@@ -1286,20 +1292,24 @@ const processRow = (str, rows, i, session, variables) => {
   return new Promise((resolve, reject) => {
     if (i >= rows.length) resolve()
     else {
-      let row = rows[i]
-      // Subqueries for properties
-      executePropertySq(str, 'num', row)
-        .then(() => executePropertySq(str, 'str', row))
-        .then(() => executePropertySq(str, 'bin', row))
-        .then(() => executeInputOwner(str, row, session, variables))
-        .then(() => executeRelation(str, true, row, session, variables))
-        .then(() => executeRelation(str, false, row, session, variables))
-        .then(() => processRow(str, rows, i + 1, session, variables))
-        .then(() => {
-          finalRowTreatment(str, row)
-          resolve()
-        })
-        .catch(reject)
+      if (variables.count) {
+        resolve()
+      } else {
+        let row = rows[i]
+        // Subqueries for properties
+        executePropertySq(str, 'num', row)
+          .then(() => executePropertySq(str, 'str', row))
+          .then(() => executePropertySq(str, 'bin', row))
+          .then(() => executeInputOwner(str, row, session, variables))
+          .then(() => executeRelation(str, true, row, session, variables))
+          .then(() => executeRelation(str, false, row, session, variables))
+          .then(() => processRow(str, rows, i + 1, session, variables))
+          .then(() => {
+            finalRowTreatment(str, row)
+            resolve()
+          })
+          .catch(reject)
+      }
     }
   })
 }
