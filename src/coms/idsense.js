@@ -3,8 +3,7 @@
 // -------------------------------------------------------------------------------------------
 
 const msgpack = require('msgpack-lite')
-
-const logger = require('../utils/log').getLogger('coms')
+const log = require('../utils/log').getLogger('coms')
 const utils = require('../utils/utils')
 
 /*
@@ -45,7 +44,7 @@ const sendQueueItem = (socket, command, data) => {
     case 'record_delete_complete':data.cmd = 7; break
     case 'card_delete':data.cmd = 8; break
     case 'record_delete':data.cmd = 9; break
-    default:logger.error('Command not found: ' + command)
+    default:log.error('Command not found: ' + command)
       return
   }
   socket.specInfo.ackCount++
@@ -60,8 +59,8 @@ const nack = (frame, socket, code) => {
 }
 
 const sendFrame = (j, seq, socket) => {
-  logger.trace('-> Send data')
-  logger.trace(j)
+  log.trace('-> Send data')
+  log.trace(j)
   let str = msgpack.encode(j)
   let b = Buffer.allocUnsafe(str.length + 4)
   b.writeUInt16LE(b.length, 0)
@@ -83,10 +82,10 @@ const newClocking = (data, socket, logicService) => {
   clocking.reception = utils.now()
   clocking.gmt = utils.tsToTime(data.tmp * 1000, 'GMT')
   clocking.tmp = utils.tsToTime(data.tmp * 1000, info.timezone)
-  logger.trace(clocking)
+  log.trace(clocking)
   logicService.createClocking(clocking, info.customer, function (err) {
     if (err) {
-      logger.error(err.message)
+      log.error(err.message)
       nack(data, socket, 0)
     } else ack(data, socket)
   })

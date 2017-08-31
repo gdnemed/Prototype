@@ -2,8 +2,7 @@
 // -------------------------------------------------------------------------------------------
 // Handles all app Knex migrations (creation of BD via knex for every environtment)
 // -------------------------------------------------------------------------------------------
-const loggerMachine = require('./utils/log')
-const logger = loggerMachine.getLogger('migrations')
+const log = require('./utils/log').getLogger('migrations')
 const Knex = require('knex')
 const g = require('./global')
 
@@ -14,11 +13,6 @@ const SECTIONS = {
   INPUTS: 'inputs'
 }
 
-// sqlite, oracle, sqlserver, etc.
-// let dbType
-
-// Customer name
-// let customerName
 
 // Year of inputs migration
 let yearMigration
@@ -112,9 +106,9 @@ const migrateSection = (dbType, customerName, section, dbs, year) => {
     })
     let sec = year ? section + year : section
     dbs[sec] = Knex(cfg)
-    logger.debug(`Invoking knex.migrate.latest() for ${sec}`)
+    log.debug(`Invoking knex.migrate.latest() for ${sec}`)
     dbs[sec].migrate.latest().then((result) => {
-      logger.trace(`${sec} migration done: ${result}`)
+      log.trace(`${sec} migration done: ${result}`)
       resolve()
     })
       .catch((err) => {
@@ -131,7 +125,7 @@ const init = (type, customer, year) => {
   // A way to do this is creating a new Promise and resolve() or reject() it depending on the case
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
-    logger.info('info: migrations.init() : customer: ' + customer + ' type: ' + type)
+    log.info('info: migrations.init() : customer: ' + customer + ' type: ' + type)
     // Object that holds a reference to every section knex object
     let dbs = {}
     migrateSection(type, customer, SECTIONS.STATE, dbs)
@@ -145,8 +139,8 @@ const init = (type, customer, year) => {
 }
 
 const initYear = (type, customer, year, dbs) => {
-  logger.info('info: migrations.initYear() : customer: ' + customer + ' year: ' + year)
-  return migrateSection(type, customer, SECTIONS.INPUTS, dbs, year)
+  log.info('info: migrations.initYear() : customer: ' + customer + ' year: ' + year)
+  return migrateSection(SECTIONS.INPUTS, dbs, year)
 }
 module.exports = {
   init,
