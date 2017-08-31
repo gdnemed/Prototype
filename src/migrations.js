@@ -140,7 +140,7 @@ const init = (type, customer, year) => {
 
 const initYear = (type, customer, year, dbs) => {
   log.info('info: migrations.initYear() : customer: ' + customer + ' year: ' + year)
-  return migrateSection(SECTIONS.INPUTS, dbs, year)
+  return migrateSection(type, customer, SECTIONS.INPUTS, dbs, year)
 }
 module.exports = {
   init,

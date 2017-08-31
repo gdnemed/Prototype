@@ -990,7 +990,9 @@ const joins = (db, str, variables, e, f, type) => {
     // Transform to raw for better use
     let sql = str._guide_.statement.toSQL()
     let sentence = sql.sql
-    if (variables.count) sentence = 'select count(*) n from (' + sentence + ') countsubselect'
+    if (variables.count) {
+      sentence = 'select count(*) n from (' + sentence + ') countsubselect'
+    }
     str._guide_.statement = db.raw(sentence, sql.bindings)
   }
 }
@@ -1253,15 +1255,15 @@ const executeSelect = (str, variables, session, callback) => {
   // Variables substitution
   let v = str._guide_.variablesMapping
   let l = str._guide_.statement.bindings
-  //log.debug(v)
-  //log.debug(l)
+  log.trace(v)
+  log.trace(l)
   if (v) {
     for (let i = 0; i < l.length; i++) {
       if (v[i] !== null) l[i] = variables[v[i]]
     }
   }
 
-  log.debug(str._guide_.statement.toSQL())
+  log.trace(str._guide_.statement.toSQL())
   let result
   str._guide_.statement
     .then((rows) => {
@@ -1503,7 +1505,7 @@ const executePropertySq = (str, type, row) => {
       let s = sq[type]._statement_
       let ss = s._statements
       ss[ss.length - 1].value = row._id_
-      // log.debug(s.toSQL())
+      log.trace(s.toSQL())
       s.then((h) => {
         for (let k = 0; k < h.length; k++) {
           let info = sq[type][h[k].property]

@@ -14,8 +14,8 @@ const httpServer = require('./httpServer')
 const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
 const migrations = require('./migrations')
 const g = require('./global')
-const sseExpress = require('sse-express');
-const onFinished = require('on-finished');
+const sseExpress = require('sse-express')
+const onFinished = require('on-finished')
 
 let sessionService, stateService, comsService, log
 
@@ -219,7 +219,8 @@ const get = (req, res, session, str) => {
     }
   }
   log.info(`GET ${req.url} params: ${JSON.stringify(req.query)}`)
-  squeries.get(session, req.query, str, (err, ret) => {
+  let cloned = JSON.parse(JSON.stringify(str))
+  squeries.get(session, req.query, cloned, (err, ret) => {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
   })
@@ -227,10 +228,11 @@ const get = (req, res, session, str) => {
 
 const put = (req, res, session, str) => {
   log.info(`POST ${req.url} params: ${JSON.stringify(req.params)} body: ${JSON.stringify(req.body)}`)
+  let cloned = JSON.parse(JSON.stringify(str))
   squeries.put(session,
     stateService,
     req.params,
-    str, req.body, extraTreatment, (err, ret) => {
+    cloned, req.body, extraTreatment, (err, ret) => {
       if (err) res.status(500).end(err.message)
       else {
         if (!Array.isArray(ret)) ret = [ret]
