@@ -35,7 +35,7 @@ const initializeCustomer = (customersList, i) => {
     else {
       _customers[customersList[i].name] = {apikey: customersList[i].apikey}
       let year = new Date().getFullYear()
-      migrations.init('sqlite', customersList[i].name, year)
+      migrations.init('sqlite3', customersList[i].name, year)
         .then((dbs) => {
           _customers[customersList[i].name].dbs = dbs
           log.debug('DB ' + customersList[i].name)
@@ -67,12 +67,9 @@ const init = () => {
 const verifyDB = (dbs) => {
   return new Promise((resolve, reject) => {
     log.info('Verifying migration')
+    let year = new Date().getFullYear()
     let kState = dbs['state']
     let kObjects = dbs['objects']
-    let year = 2016
-    let kInputs = dbs['inputs' + year]
-    kInputs.months = {}
-
     kState.select().table('settings')
       .then((collection) => {
         log.debug('settings len  = ' + collection.length)
@@ -80,23 +77,36 @@ const verifyDB = (dbs) => {
       })
       .then((collection) => {
         log.debug('entity_1 len  = ' + collection.length)
-        let months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
-        return Promise.all(months.map((month) => {
-          return kInputs('input_1_' + year + month).count('id')
+        return verifyYear(dbs, year - 1)
+      })
+      .then(() => verifyYear(dbs, year))
+      .then(() => verifyYear(dbs, year + 1))
+      .then(resolve)
+      .catch(reject)
+  })
+}
+
+const verifyYear = (dbs, year) => {
+  return new Promise((resolve, reject) => {
+    let kInputs = dbs['inputs' + year]
+    if (kInputs) {
+      let months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
+      return Promise.all(months.map((month) => {
+        return kInputs('input_1_' + year + month).count('id')
           .then((n) => {
-            kInputs.months[month] = true
             log.debug(`${year}${month} inputs table found`)
+            kInputs.client.config.months[year + month] = true
           })
           .catch((err) => {
             if (err) log.debug(`${year}${month} inputs table does not exists`)
           })
-        }))
-          .then(resolve)
-          .catch((err) => {
-            console.log('ERROR: ' + err)
-            reject(err)
-          })
-      })
+      }))
+        .then(resolve)
+        .catch((err) => {
+          console.log('ERROR: ' + err)
+          reject(err)
+        })
+    } else resolve()
   })
 }
 

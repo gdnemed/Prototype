@@ -15,7 +15,7 @@ let client = new net.Socket()
 let buffer
 
 const init = () => {
-  client.connect(8092, '172.18.4.203', function () {
+  client.connect(8092, '172.18.4.107', function () {
     console.log('Connected')
     let bin = Buffer.from('c8f6', 'hex')
     let initStr = {serial: '123', cmd: 1, protocol: '0.1', bin: bin}

@@ -12,7 +12,10 @@ const CT = require('./CT')
 const utils = require('./utils/utils')
 const httpServer = require('./httpServer')
 const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
+const migrations = require('./migrations')
 const g = require('./global')
+const sseExpress = require('sse-express');
+const onFinished = require('on-finished');
 
 let sessionService, stateService, comsService, log
 
@@ -282,6 +285,25 @@ const initAPI = () => {
   api.post('/api/coms/timetypes/:id', apiCall(put, prepPutTimeType))
   api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
   api.post('/api/coms/clean', clean)
+  api.get('/api/coms/asap', sseExpress, apiCall(register))
+}
+
+let monitors = {}
+
+const register = (req, res, session) => {
+  let customer = session.name
+  let monitorsList = monitors[customer]
+  if (!monitorsList) {
+    monitorsList = []
+    monitors[customer] = monitorsList
+  }
+  let client = {
+    session: session,
+    req: req,
+    res: res
+  }
+  monitorsList.push(client)
+  onFinished(res, () => monitorsList.remove(client))
 }
 
 /*
@@ -417,12 +439,32 @@ const createClocking = (clocking, customer, callback) => {
           if (err) callback(err)
           else {
             if (record && record.length > 0) clocking.owner = record[0].id
-            squeries.put(session, stateService, {}, prepPutClocking, clocking, null, callback)
-            // inputsService.createClocking(clocking, customer, callback)
+            squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
+              if (err) callback(err)
+              else {
+                notifyMonitors(clocking, id, customer)
+                callback(err, id)
+              }
+            })
           }
         })
     })
     .catch(callback)
+}
+
+const notifyMonitors = (clocking, id, customer) => {
+  let c = {
+    result: clocking.result,
+    tmp: clocking.tmp,
+    id: id
+  }
+  if (clocking.card) c.card = clocking.card
+  if (clocking.record) c.record = clocking.record
+  transformClocking(c)
+  let list = monitors[customer]
+  if(list)
+    for (let i = 0; i < list.length; i++)
+      list[i].res.sse('clocking', c)
 }
 
 /*
@@ -496,24 +538,29 @@ Recursively drops inputs tables until 1 year before the limit.
 */
 const cleanMonthInputs = (now, session, i) => {
   return new Promise((resolve, reject) => {
-    if (i >= 12) resolve()
+    if (i >= 24) resolve()
     else {
       now = now.subtract(1, 'months')
       let ym = now.format('YYYYMM')
       let year = ym.substr(0, 4)
-      let month = ym.substr(4, 6)
       let db = session.dbs['inputs' + year]
       if (db) {
-        if (db.months[month]) {
-          inputsMigrations.downMonth(db.schema, ym)
-            .then(() => {
-              delete db.months[month]
+        if (db.client.config.months[ym]) {
+          inputsMigrations.downMonth(db, ym)
+            .then((empty) => {
+              if (empty) delete session.dbs['inputs' + year]
               cleanMonthInputs(now, session, i + 1)
                 .then(resolve).catch(reject)
             })
             .catch(reject)
-        } else resolve()
-      } else resolve()
+        } else {
+          cleanMonthInputs(now, session, i + 1)
+            .then(resolve).catch(reject)
+        }
+      } else {
+        cleanMonthInputs(now, session, i + 1)
+          .then(resolve).catch(reject)
+      }
     }
   })
 }
@@ -528,19 +575,33 @@ const createFutureMonthInputs = (now, session, i) => {
       now = now.add(1, 'months')
       let ym = now.format('YYYYMM')
       let year = ym.substr(0, 4)
-      let month = ym.substr(4, 6)
       let db = session.dbs['inputs' + year]
-      if (db) {
-        if (db.months[month]) {
-          inputsMigrations.upMonth(db.schema, ym)
-            .then(() => {
-              db.months[month] = true
-              createFutureMonthInputs(now, session, i + 1)
-                .then(resolve).catch(reject)
-            })
-            .catch(reject)
-        } else resolve()
-      } else resolve()
+      if (!db) {
+        let type = session.dbs['inputs' + (year - 1)].client.config.client
+        migrations.initYear(type, session.name, parseInt(year), session.dbs)
+          .then(() => createMonth(session.dbs['inputs' + year], ym, now, session, i))
+          .then(resolve)
+          .catch(reject)
+      } else {
+        createMonth(db, ym, now, session, i)
+          .then(resolve).catch(reject)
+      }
+    }
+  })
+}
+
+const createMonth = (db, ym, now, session, i) => {
+  return new Promise((resolve, reject) => {
+    if (!db.client.config.months[ym]) {
+      inputsMigrations.upMonth(db, ym)
+        .then(() => {
+          createFutureMonthInputs(now, session, i + 1)
+            .then(resolve).catch(reject)
+        })
+        .catch(reject)
+    } else {
+      createFutureMonthInputs(now, session, i + 1)
+        .then(resolve).catch(reject)
     }
   })
 }
