@@ -17,18 +17,12 @@ let programmedTasks = {
 }
 
 const init = (sessions) => {
-  if (g.getConfig().api_listen) {
+  remoteService = g.getConfig().logic
+  if (remoteService) {
     log = logger.getLogger('scheduler')
     log.debug('>> scheduler.init()')
     sessionsService = sessions
-    let logic = g.getConfig().logic
-    if (logic) {
-      let params = logic.server
-      if (params) {
-        remoteService = params.server
-        setTimeout(checkTasks, 1000)
-      }
-    }
+    setTimeout(checkTasks, 1000)
   }
   return Promise.resolve()
 }

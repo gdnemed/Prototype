@@ -15,15 +15,15 @@ const SECTIONS = {
 }
 
 // sqlite, oracle, sqlserver, etc.
-let dbType
+// let dbType
 
 // Customer name
-let customerName
+// let customerName
 
 // Year of inputs migration
 let yearMigration
 
-const getDirForSqliteDB = () => {
+const getDirForSqliteDB = (customerName) => {
   let environment = process.env.NODE_ENV || 'development'
   let dir = g.getConfig().db.dir
   switch (environment) {
@@ -34,18 +34,18 @@ const getDirForSqliteDB = () => {
 }
 
 // Executes the migration for the section, returning the implicit Promise of knex.migrate()
-const migrateSection = (section, dbs, year) => {
+const migrateSection = (dbType, customerName, section, dbs, year) => {
   return new Promise((resolve, reject) => {
     // Base object for composing other specific objects via "object.assing"
     let baseMigration
     switch (dbType) {
-      case 'sqlite':
+      case 'sqlite3':
         baseMigration = {
           client: 'sqlite3',
           useNullAsDefault: true
         }
         break
-      case 'oracle':
+      case 'oracledb':
         baseMigration = {
           client: 'oracledb',
           connection: {
@@ -57,7 +57,7 @@ const migrateSection = (section, dbs, year) => {
           useNullAsDefault: true
         }
         break
-      case 'sqlserver':
+      case 'mssql':
         baseMigration = {
           client: 'mssql',
           connection: {
@@ -69,7 +69,7 @@ const migrateSection = (section, dbs, year) => {
           useNullAsDefault: true
         }
         break
-      case 'mariadb':
+      case 'mariasql':
         baseMigration = {
           client: 'mariasql',
           connection: {
@@ -95,6 +95,7 @@ const migrateSection = (section, dbs, year) => {
         }
         break
     }
+    baseMigration.customer = customerName
     if (year) {
       yearMigration = '' + year
       baseMigration.year = yearMigration
@@ -102,10 +103,11 @@ const migrateSection = (section, dbs, year) => {
     let inputsSuffix = ''
     if (section === 'inputs') {
       inputsSuffix = '_' + yearMigration.substring(0, 4)
+      baseMigration.months = {}
     }
     let cfg = Object.assign({}, baseMigration)
     Object.assign(cfg, {
-      connection: {filename: `${getDirForSqliteDB()}M_${section}${inputsSuffix}.db`},
+      connection: {filename: `${getDirForSqliteDB(customerName)}M_${section}${inputsSuffix}.db`},
       migrations: {directory: `${__dirname}/../db/migrations/${section}`}
     })
     let sec = year ? section + year : section
@@ -130,15 +132,13 @@ const init = (type, customer, year) => {
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
     logger.info('info: migrations.init() : customer: ' + customer + ' type: ' + type)
-    dbType = type
-    customerName = customer
     // Object that holds a reference to every section knex object
     let dbs = {}
-    migrateSection(SECTIONS.STATE, dbs)
-      .then(() => migrateSection(SECTIONS.OBJECTS, dbs))
-      .then(() => initYear(type, customer, year - 1, dbs))
-      .then(() => initYear(type, customer, year + 1, dbs))
+    migrateSection(type, customer, SECTIONS.STATE, dbs)
+      .then(() => migrateSection(type, customer, SECTIONS.OBJECTS, dbs))
       .then(() => initYear(type, customer, year, dbs))
+      .then(() => initYear(type, customer, year + 1, dbs))
+      .then(() => initYear(type, customer, year - 1, dbs))
       .then(() => resolve(dbs))
       .catch((err) => reject(err))
   })
@@ -146,9 +146,7 @@ const init = (type, customer, year) => {
 
 const initYear = (type, customer, year, dbs) => {
   logger.info('info: migrations.initYear() : customer: ' + customer + ' year: ' + year)
-  dbType = type
-  customerName = customer
-  return migrateSection(SECTIONS.INPUTS, dbs, year)
+  return migrateSection(type, customer, SECTIONS.INPUTS, dbs, year)
 }
 module.exports = {
   init,

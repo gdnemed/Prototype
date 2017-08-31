@@ -12,6 +12,7 @@ const CT = require('./CT')
 const utils = require('./utils/utils')
 const httpServer = require('./httpServer')
 const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
+const migrations = require('./migrations')
 const g = require('./global')
 
 let sessionService, stateService, comsService, log
@@ -493,24 +494,29 @@ Recursively drops inputs tables until 1 year before the limit.
 */
 const cleanMonthInputs = (now, session, i) => {
   return new Promise((resolve, reject) => {
-    if (i >= 12) resolve()
+    if (i >= 24) resolve()
     else {
       now = now.subtract(1, 'months')
       let ym = now.format('YYYYMM')
       let year = ym.substr(0, 4)
-      let month = ym.substr(4, 6)
       let db = session.dbs['inputs' + year]
       if (db) {
-        if (db.months[month]) {
-          inputsMigrations.downMonth(db.schema, ym)
-            .then(() => {
-              delete db.months[month]
+        if (db.client.config.months[ym]) {
+          inputsMigrations.downMonth(db, ym)
+            .then((empty) => {
+              if (empty) delete session.dbs['inputs' + year]
               cleanMonthInputs(now, session, i + 1)
                 .then(resolve).catch(reject)
             })
             .catch(reject)
-        } else resolve()
-      } else resolve()
+        } else {
+          cleanMonthInputs(now, session, i + 1)
+            .then(resolve).catch(reject)
+        }
+      } else {
+        cleanMonthInputs(now, session, i + 1)
+          .then(resolve).catch(reject)
+      }
     }
   })
 }
@@ -525,19 +531,33 @@ const createFutureMonthInputs = (now, session, i) => {
       now = now.add(1, 'months')
       let ym = now.format('YYYYMM')
       let year = ym.substr(0, 4)
-      let month = ym.substr(4, 6)
       let db = session.dbs['inputs' + year]
-      if (db) {
-        if (db.months[month]) {
-          inputsMigrations.upMonth(db.schema, ym)
-            .then(() => {
-              db.months[month] = true
-              createFutureMonthInputs(now, session, i + 1)
-                .then(resolve).catch(reject)
-            })
-            .catch(reject)
-        } else resolve()
-      } else resolve()
+      if (!db) {
+        let type = session.dbs['inputs' + (year - 1)].client.config.client
+        migrations.initYear(type, session.name, parseInt(year), session.dbs)
+          .then(() => createMonth(session.dbs['inputs' + year], ym, now, session, i))
+          .then(resolve)
+          .catch(reject)
+      } else {
+        createMonth(db, ym, now, session, i)
+          .then(resolve).catch(reject)
+      }
+    }
+  })
+}
+
+const createMonth = (db, ym, now, session, i) => {
+  return new Promise((resolve, reject) => {
+    if (!db.client.config.months[ym]) {
+      inputsMigrations.upMonth(db, ym)
+        .then(() => {
+          createFutureMonthInputs(now, session, i + 1)
+            .then(resolve).catch(reject)
+        })
+        .catch(reject)
+    } else {
+      createFutureMonthInputs(now, session, i + 1)
+        .then(resolve).catch(reject)
     }
   })
 }
