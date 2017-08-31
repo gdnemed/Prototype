@@ -39,7 +39,7 @@ const initializeCustomer = (customersList, i) => {
         .then((dbs) => {
           _customers[customersList[i].name].dbs = dbs
           log.debug('DB ' + customersList[i].name)
-          return verifyDB(dbs, customersList[i].name)
+          return migrations.verifyDB(dbs, customersList[i].name)
         })
         .then(() => initializeCustomer(customersList, i + 1))
         .then(resolve)
@@ -61,53 +61,6 @@ const init = () => {
         .catch(reject)
     })
   } else return Promise.resolve()
-}
-
-// debug: verifies that each knex object for each db exists
-const verifyDB = (dbs) => {
-  return new Promise((resolve, reject) => {
-    log.info('Verifying migration')
-    let year = new Date().getFullYear()
-    let kState = dbs['state']
-    let kObjects = dbs['objects']
-    kState.select().table('settings')
-      .then((collection) => {
-        log.debug('settings len  = ' + collection.length)
-        return kObjects.select().table('entity_1')
-      })
-      .then((collection) => {
-        log.debug('entity_1 len  = ' + collection.length)
-        return verifyYear(dbs, year - 1)
-      })
-      .then(() => verifyYear(dbs, year))
-      .then(() => verifyYear(dbs, year + 1))
-      .then(resolve)
-      .catch(reject)
-  })
-}
-
-const verifyYear = (dbs, year) => {
-  return new Promise((resolve, reject) => {
-    let kInputs = dbs['inputs' + year]
-    if (kInputs) {
-      let months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
-      return Promise.all(months.map((month) => {
-        return kInputs('input_1_' + year + month).count('id')
-          .then((n) => {
-            log.debug(`${year}${month} inputs table found`)
-            kInputs.client.config.months[year + month] = true
-          })
-          .catch((err) => {
-            if (err) log.debug(`${year}${month} inputs table does not exists`)
-          })
-      }))
-        .then(resolve)
-        .catch((err) => {
-          console.log('ERROR: ' + err)
-          reject(err)
-        })
-    } else resolve()
-  })
 }
 
 /*

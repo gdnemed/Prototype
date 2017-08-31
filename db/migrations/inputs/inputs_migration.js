@@ -1,6 +1,6 @@
 const fs = require('fs')
 
-exports.up = (knex, Promise) => {
+const up = (knex, Promise) => {
   let year = knex.schema.client.config.year
   return upMonthYear(knex, year, 1)
 }
@@ -10,7 +10,7 @@ const upMonthYear = (knex, year, i) => {
     if (i > 12) resolve()
     else {
       let month = year + (i < 10 ? '0' + i : i)
-      exports.upMonth(knex, month)
+      upMonth(knex, month)
         .then(() => {
           knex.client.config.months[month] = true
           return upMonthYear(knex, year, i + 1)
@@ -30,7 +30,7 @@ const checkTable = (db, name, f) => {
     .catch((err) => Promise.reject(err))
 }
 
-exports.upMonth = (knex, month) => {
+const upMonth = (knex, month) => {
   const createTableInputs = () => checkTable(knex, 'input_1_' + month, (table) => {
     table.integer('id').primary()
     table.integer('tmp')
@@ -88,7 +88,7 @@ exports.upMonth = (knex, month) => {
   }
 }
 
-exports.down = (knex, Promise) => {
+const down = (knex, Promise) => {
   let year = knex.schema.client.config.year
   return downMonthYear(knex, year, 1)
 }
@@ -97,7 +97,7 @@ const downMonthYear = (knex, year, i) => {
   return new Promise((resolve, reject) => {
     if (i > 12) resolve()
     else {
-      exports.downMonth(knex, year + (i < 10 ? '0' + i : i))
+      downMonth(knex, year + (i < 10 ? '0' + i : i))
         .then(() => downMonthYear(knex, year, i + 1))
         .then(resolve)
         .catch(reject)
@@ -105,7 +105,7 @@ const downMonthYear = (knex, year, i) => {
   })
 }
 
-exports.downMonth = (db, month) => {
+const downMonth = (db, month) => {
   return new Promise((resolve, reject) => {
     let r = db.schema
     r.dropTableIfExists('input_1_' + month)
@@ -131,4 +131,33 @@ exports.downMonth = (db, month) => {
       })
       .catch(reject)
   })
+}
+
+const verifyYear = (dbs, year, log) => {
+  return new Promise((resolve, reject) => {
+    let kInputs = dbs['inputs' + year]
+    if (kInputs) {
+      let months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
+      return Promise.all(months.map((month) => {
+        return kInputs.schema.hasTable('input_1_' + year + month)
+          .then((exists) => {
+            if (exists) {
+              log.debug(`${year}${month} inputs table found`)
+              kInputs.client.config.months[year + month] = true
+            } else log.debug(`${year}${month} inputs table does not exists`)
+          })
+          .catch(reject)
+      }))
+        .then(resolve)
+        .catch(reject)
+    } else resolve()
+  })
+}
+
+module.exports = {
+  up,
+  upMonth,
+  down,
+  downMonth,
+  verifyYear
 }

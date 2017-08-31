@@ -11,8 +11,8 @@ const squeries = require('./objects/squeries')
 const CT = require('./CT')
 const utils = require('./utils/utils')
 const httpServer = require('./httpServer')
-const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
 const migrations = require('./migrations')
+const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
 const g = require('./global')
 const sseExpress = require('sse-express')
 const onFinished = require('on-finished')
@@ -464,9 +464,9 @@ const notifyMonitors = (clocking, id, customer) => {
   if (clocking.record) c.record = clocking.record
   transformClocking(c)
   let list = monitors[customer]
-  if(list)
-    for (let i = 0; i < list.length; i++)
-      list[i].res.sse('clocking', c)
+  if (list) {
+    for (let i = 0; i < list.length; i++) list[i].res.sse('clocking', c)
+  }
 }
 
 /*
@@ -546,24 +546,44 @@ const cleanMonthInputs = (now, session, i) => {
       let ym = now.format('YYYYMM')
       let year = ym.substr(0, 4)
       let db = session.dbs['inputs' + year]
-      if (db) {
-        if (db.client.config.months[ym]) {
-          inputsMigrations.downMonth(db, ym)
-            .then((empty) => {
-              if (empty) delete session.dbs['inputs' + year]
-              cleanMonthInputs(now, session, i + 1)
-                .then(resolve).catch(reject)
-            })
-            .catch(reject)
-        } else {
-          cleanMonthInputs(now, session, i + 1)
-            .then(resolve).catch(reject)
+      if (!db) {
+        // Connection to DB still not established. Try to connect before clean.
+        db = session.dbs['inputs' + new Date().getFullYear()]
+        // We'll probably have a connection for current year. If not, do nothing
+        if (!db) {
+          resolve()
+          return
         }
+        let type = db.client.config.client
+        migrations.connect(type, session.name, 'inputs', session.dbs, parseInt(year))
+          .then((section) => {
+            return inputsMigrations.verifyYear(session.dbs, year, log)
+          })
+          .then(() => {
+            db = session.dbs['inputs' + year]
+            cleanMonth(db, year, ym, session, now, i)
+              .then(() => cleanMonthInputs(now, session, i + 1))
+              .catch(reject)
+          })
       } else {
-        cleanMonthInputs(now, session, i + 1)
-          .then(resolve).catch(reject)
+        // Database exists. Clean month and call ourselves recursively
+        cleanMonth(db, year, ym, session, now, i)
+          .then(() => cleanMonthInputs(now, session, i + 1))
+          .catch(reject)
       }
     }
+  })
+}
+
+const cleanMonth = (db, year, ym, session, now, i) => {
+  return new Promise((resolve, reject) => {
+    inputsMigrations.downMonth(db, ym)
+      .then((empty) => {
+        if (empty) delete session.dbs['inputs' + year]
+        cleanMonthInputs(now, session, i + 1)
+          .then(resolve).catch(reject)
+      })
+      .catch(reject)
   })
 }
 
@@ -579,9 +599,18 @@ const createFutureMonthInputs = (now, session, i) => {
       let year = ym.substr(0, 4)
       let db = session.dbs['inputs' + year]
       if (!db) {
-        let type = session.dbs['inputs' + (year - 1)].client.config.client
+        // Database still not exists, let's create it now
+        // We'll probably have a connection for current year. If not, do nothing
+        if (!db) {
+          resolve()
+          return
+        }
+        let type = db.client.config.client
         migrations.initYear(type, session.name, parseInt(year), session.dbs)
-          .then(() => createMonth(session.dbs['inputs' + year], ym, now, session, i))
+          .then(() => {
+            db = session.dbs['inputs' + year]
+            return createMonth(db, ym, now, session, i)
+          })
           .then(resolve)
           .catch(reject)
       } else {
