@@ -123,12 +123,13 @@ const downMonth = (db, month) => {
         if (empty && db.client.config.client === 'sqlite3') {
           db.destroy(() => {
             fs.access(db.client.config.connection.filename, fs.constants.R_OK | fs.constants.W_OK, (err) => {
-              if (!err) {
+              /* if (!err) {
                 setTimeout(() => fs.unlink(db.client.config.connection.filename, (err) => {
                   if (err) console.log(err)
                   resolve(empty)
                 }), 2000)
-              } else resolve(empty)
+              } else */
+              resolve(empty)
             })
           })
         } else resolve(empty)

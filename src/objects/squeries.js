@@ -786,7 +786,7 @@ const prepareGet = (session, variables, str) => {
     let e = sq => {
       selectInput(sq, f, type, str._filter_, str._guide_, variables)
     }
-    joins(db, str, e, f, type)
+    joins(db, str, variables, e, f, type)
     if (!variables.count) {
       preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'str', type)
       preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'num', type)
