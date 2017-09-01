@@ -769,13 +769,10 @@ const prepareGet = (session, variables, str) => {
 
     // Select over ENTITY
     if (!str._guide_.subquery) {
-      if (str._linked_ /* || (type && type.length > 0) */) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+      if (str._linked_) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
     }
-   /* if (str._filter_) { // 1 more binding for every variable in filter
-      if (str._filter_.variable) str._guide_.variablesMapping.push(str._filter_.variable)
-    } */
     let e = sq => {
-      selectEntity(sq, f, type, str._filter_, str._guide_)
+      selectEntity(sq, f, type, str._filter_, str._guide_, variables)
     }
     joins(db, str, variables, e, f, type)
     preparePropertySubquery(db, str._guide_.property_subqueries, 'str')
@@ -787,7 +784,7 @@ const prepareGet = (session, variables, str) => {
     let f = str._guide_.entity_fields
     // Select over INPUTS
     let e = sq => {
-      selectInput(sq, f, type, str._filter_, str._guide_)
+      selectInput(sq, f, type, str._filter_, str._guide_, variables)
     }
     joins(db, str, e, f, type)
     if (!variables.count) {
@@ -821,7 +818,7 @@ const getType = (str) => {
 /*
 Basic select over entity table
 */
-const selectEntity = (sq, f, type, filter, helper) => {
+const selectEntity = (sq, f, type, filter, helper, variables) => {
   let s = sq.from('entity_' + nodeId)
   s.column('id as ' + (helper.prefix ? helper.prefix : '') + '_id_')
   for (var c in f) {
@@ -839,7 +836,7 @@ const selectEntity = (sq, f, type, filter, helper) => {
     s.where('id', 0)
     helper.variablesMapping.push(null) // 1 position in bindings is fixed
   }
-  if (filter) addFilter(s, filter, helper)
+  if (filter) addFilter(s, filter, helper, variables)
   // Restore list
   if (tmpVar) {
     for (let i = 0; i < tmpVar.length; i++) {
@@ -853,13 +850,13 @@ const selectEntity = (sq, f, type, filter, helper) => {
 /*
  Basic select over inputs table
  */
-const selectInput = (sq, f, period, filter, helper) => {
+const selectInput = (sq, f, period, filter, helper, variables) => {
   let s = sq.from('input_' + nodeId + '_' + period)
   s.column('id as _id_')
   for (var c in f) {
     if (f.hasOwnProperty(c)) s.column(c + ' as ' + f[c])
   }
-  if (filter) addFilter(s, filter, helper)
+  if (filter) addFilter(s, filter, helper, variables)
   return s.as('e')
 }
 
@@ -867,7 +864,11 @@ const selectInput = (sq, f, period, filter, helper) => {
 Adds a filter into an statement and update the variablesMapping of
 the helper structure.
 */
-const addFilter = (statement, filter, helper) => {
+const addFilter = (statement, filter, helper, variables) => {
+  if (filter.variables && ((variables[filter.variable] === undefined) ||
+      (variables[filter.variable] === null))) {
+    return // filter not used
+  }
   let v = filter.variable ? 0 : filter.value
   switch (filter.field) {
     case 'id':case 'document':
@@ -965,21 +966,21 @@ const joins = (db, str, variables, e, f, type) => {
       let propertyTable = str._inputs_
         ? 'input_data_' + ps[i].typeProperty + '_' + nodeId + '_' + type
         : 'property_' + ps[i].typeProperty + '_' + nodeId
-      joinProperty(str, ps, i, propertyTable, e, linkField)
+      joinProperty(str, variables, ps, i, propertyTable, e, linkField)
       last = ps[i].join
     }
     // Now, relations
     for (let i = 0; i < dr.length; i++) {
-      joinRelation(db, str, dr, i, ps, e)
+      joinRelation(db, str, variables, dr, i, ps, e)
       last = dr[i].join
     }
     if (str._guide_.subquery) {
       str._guide_.subquery.leftJoin(last, str._guide_.link_field_1, str._guide_.link_field_2)
     } else str._guide_.statement = db.from(last)
-  } else if (str._inputs_) str._guide_.statement = selectInput(db, f, type, str._filter_, str._guide_)
+  } else if (str._inputs_) str._guide_.statement = selectInput(db, f, type, str._filter_, str._guide_, variables)
   else {
     if (str._guide_.subquery) str._guide_.subquery.leftJoin(e, str._guide_.link_field_1, str._guide_.link_field_2)
-    else str._guide_.statement = selectEntity(db, f, type, str._filter_, str._guide_)
+    else str._guide_.statement = selectEntity(db, f, type, str._filter_, str._guide_, variables)
   }
   if (str._order_) {
     for (let i = 0; i < str._order_.length; i++) {
@@ -1016,7 +1017,7 @@ const filterTime = (join, withtime, elem, variablesMapping, beginning) => {
   }
 }
 
-const joinProperty = (str, a, i, propertyTable, e, linkField) => {
+const joinProperty = (str, variables, a, i, propertyTable, e, linkField) => {
   // Now, join with previous level
   a[i].join = sq => {
     let table = i === 0 ? 'e' : 'jps' + (i - 1)
@@ -1040,7 +1041,7 @@ const joinProperty = (str, a, i, propertyTable, e, linkField) => {
     else sq.leftJoin(propertyTable + ' as ps' + i, on)
 
     // If additional filters, put them in 'where'
-    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_, variables)
     // Select every column from previous joins
     sq.column(table + '.*')
     // Now, current relation columns. It could be just 'value' (the default)
@@ -1059,12 +1060,12 @@ const joinProperty = (str, a, i, propertyTable, e, linkField) => {
         str._guide_.fields_to_remove.push(a[i].fields.t2)
       }
     } else sq.column('ps' + i + '.value as ' + a[i].entry)
-    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_, variables)
     sq.as('jps' + i) // New alias for every join
   }
 }
 
-const joinRelation = (db, str, a, i, ps, e) => {
+const joinRelation = (db, str, variables, a, i, ps, e) => {
   // Now, join with previous level
   a[i].join = sq => {
     let table = i === 0 ? (ps.length > 0 ? ('jps' + (ps.length - 1)) : 'e') : 'jdr' + (i - 1)
@@ -1089,14 +1090,14 @@ const joinRelation = (db, str, a, i, ps, e) => {
     else sq.leftJoin('relation_' + nodeId + ' as dr' + i, on)
 
     // If additional filters, put them in 'where'
-    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_, variables)
     // Select every column from previous joins
     sq.column(table + '.*')
     // Now, current relation columns. It could be just 'value' (the default)
     // or a list of fields.
     if (a[i].fields) putRelationInfo(db, str, a[i], i, sq)
     else sq.column('dr' + i + (a[i].forward ? '.id2 as ' : '.id1 as ') + a[i].entry)
-    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_)
+    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_, variables)
     sq.as('jdr' + i) // New alias for every join
   }
 }
@@ -1248,10 +1249,23 @@ const prepareRelatedObject = (f, entry, forward, session, variables) => {
   }
 }
 
+const setOrder = (statement, variables) => {
+  if (variables.order) {
+    if (statement.orderBy) {
+      statement.orderBy(variables.order, variables.desc ? 'desc' : 'asc')
+    } else {
+      statement.sql += ' order by ' + variables.order + (variables.desc ? ' desc' : ' asc')
+    }
+    // Remove order for recursiva get's
+    delete variables.order
+  }
+}
+
 /*
 Select execution
 */
 const executeSelect = (str, variables, session, callback) => {
+  setOrder(str._guide_.statement, variables)
   // Variables substitution
   let v = str._guide_.variablesMapping
   let l = str._guide_.statement.bindings
@@ -1267,7 +1281,21 @@ const executeSelect = (str, variables, session, callback) => {
   let result
   str._guide_.statement
     .then((rows) => {
+      // Pagination
+      if (variables.pageStartIndex && variables.pageSize) {
+        let l = []
+        let startIndex = parseInt(variables.pageStartIndex)
+        let size = parseInt(variables.pageSize)
+        for (let k = 0; (k < size) && (startIndex + k < rows.length); k++) {
+          l[k] = rows[startIndex + k]
+        }
+        rows = l
+        // remove variables for recursive get's
+        delete variables.pageStartIndex
+        delete variables.pageSize
+      }
       result = rows
+      // Process every row in page
       return processRow(str, rows, 0, session, variables)
     })
     .then(() => {
