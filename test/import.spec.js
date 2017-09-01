@@ -12,8 +12,8 @@ describe('import.spec.js', () => {
     })
   })
 
-  it('RECORDS.DWN is properly imported, "onEndImport" event is received with ok = true', (done) => {
-    t.handleFileImport('RECORDS.DWN').then(({path, importType, ok}) => {
+  it('per.csv is properly imported, "onEndImport" event is received with ok = true', (done) => {
+    t.handleFileImport('per.csv').then(({path, importType, ok}) => {
       t.expect(ok).to.equal(true)
 
       // GET via api/records
@@ -57,8 +57,8 @@ describe('import.spec.js', () => {
     })
   })
 
-  it('TTYPES.DWN is properly imported, "onEndImport" event is received with ok = true', (done) => {
-    t.handleFileImport('TTYPES.DWN').then(({path, importType, ok}) => {
+  it('tty.csv is properly imported, "onEndImport" event is received with ok = true', (done) => {
+    t.handleFileImport('tty.csv').then(({path, importType, ok}) => {
       t.expect(ok).to.equal(true)
 
       // GET via api/records
