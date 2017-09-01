@@ -41,9 +41,9 @@ const init = () => {
       workDir = params.workdir
       createOutput = params.output
       apiKey = '123'
-      watch('RECORDS', processRecord, 'records', 'records', 'records')
-      watch('TTYPES', processTtype, 'timetypes', 'timetypes', 'timetypes')
-      watch('INFO', processInfo, 'infos', 'records/@/info', 'records/@/info')
+      watch('per', processRecord, 'records', 'records', 'records')
+      watch('tty', processTtype, 'timetypes', 'timetypes', 'timetypes')
+      watch('inf', processInfo, 'infos', 'records/@/info', 'records/@/info')
       return Promise.resolve()
     }
   }
@@ -53,9 +53,9 @@ const init = () => {
 Watches over an import file
 */
 const watch = (importType, fJson, pathGet, pathPost, pathDelete) => {
-  chokidar.watch(remoteDir + '/' + importType + '.DWN', {ignored: /(^|[/\\])\../})
+  chokidar.watch(remoteDir + '/' + importType + '*.csv', {ignored: /(^|[/\\])\../})
     .on('add', path => moveImportFile(path, importType, fJson, pathGet, pathPost, pathDelete, false))
-  chokidar.watch(remoteDir + '/' + importType + '_INC.DWN', {ignored: /(^|[/\\])\../})
+  chokidar.watch(remoteDir + '/' + importType + 'inc*.csv', {ignored: /(^|[/\\])\../})
     .on('add', path => moveImportFile(path, importType, fJson, pathGet, pathPost, pathDelete, true))
 }
 
@@ -66,17 +66,17 @@ deletes the original file, and begins import process.
 const moveImportFile = (path, importType, fJson, pathGet, pathPost, pathDelete, partial) => {
   log.debug(path)
   if (fs.existsSync(path)) {
-    let newPath = path.substring(0, path.length - 1) + 'T'
+    let newPath = path.substring(0, path.length - 1) + 't'
     fs.rename(path, newPath, (err) => {
       if (err) log.error(err)
       else {
-        let endPath = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC.DWT' : '.DWT')
+        let now = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDDHHmmss')
+        let endPath = workDir + '/' + 'pending' + '/' + importType + (partial ? 'inc.cst' : '.cst')
         try {
           fs.writeFileSync(endPath, fs.readFileSync(newPath))
           fs.unlink(newPath, (err) => { if (err) log.error(err) })
-          let now = moment.tz(new Date().getTime(), timeZone).format('YYYYMMDDHHmmss')
           if (createOutput) {
-            let logPath = workDir + '/' + 'pending' + '/' + importType + (partial ? '_INC_' : '_') + now + '.LOG'
+            let logPath = workDir + '/' + 'pending' + '/' + importType + (partial ? 'inc_' : '_') + now + '.log'
             let output = fs.createWriteStream(logPath)
             output.once('open', () => importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, output, now, partial))
           } else importPrepare(endPath, importType, fJson, pathGet, pathPost, pathDelete, null, now, partial)
@@ -112,7 +112,7 @@ const importPrepare = (path, importType, fJson, pathGet, pathPost, pathDelete, o
         let elemsToDelete = {}
         let d = JSON.parse(bodyResponse)
         for (let i = 0; i < d.length; i++) {
-          if (importType === 'TTYPES') elemsToDelete['ID' + d[i].code] = d[i]
+          if (importType === 'tty') elemsToDelete['ID' + d[i].code] = d[i]
           else elemsToDelete['ID' + d[i].id] = d[i]
         }
         importProcess(elemsToDelete, path, importType, fJson, pathPost, pathDelete, output, now, partial)
