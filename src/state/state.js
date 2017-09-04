@@ -35,19 +35,43 @@ const newId = (session) => {
   })
 }
 
-const newInputId = (session, callback) => {
+const newInputId = (session) => {
   return new Promise((resolve, reject) => {
     if (inputSequences[session.name]) resolve(inputSequences[session.name]++)
     else {
-      // TODO: Select every table
-      let db = session.dbs['inputs2017']
-      db('input_1_201708').max('id as m')
-        .then((rows) => {
-          if (rows.length === 0) inputSequences[session.name] = 1
-          else inputSequences[session.name] = rows[0].m + 1
-          resolve(inputSequences[session.name]++)
+      let l = []
+      for (let p in session.dbs) {
+        if (session.dbs.hasOwnProperty(p) && p.startsWith('inputs')) {
+          l.push(session.dbs[p])
+        }
+      }
+      let max = 0
+      Promise.all(l.map((db) => {
+        return new Promise((resolve, reject) => {
+          let months = []
+          for (let m in db.client.config.months) {
+            if (db.client.config.months.hasOwnProperty(m)) months.push(m)
+          }
+          Promise.all(months.map((m) => {
+            return new Promise((resolve, reject) => {
+              db('input_1_' + m).max('id as m')
+                .then((rows) => {
+                  if (rows.length > 0) {
+                    if (rows[0].m > max) max = rows[0].m
+                  }
+                  resolve()
+                })
+                .catch(reject)
+            })
+          }))
+            .then(resolve).catch(reject)
         })
-        .catch(reject)
+      }))
+      .then(() => {
+        inputSequences[session.name] = max + 2
+        resolve(max + 1)
+      })
+      .catch(reject)
     }
   })
 }

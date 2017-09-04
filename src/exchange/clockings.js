@@ -33,7 +33,7 @@ const init = () => {
       apiKey = '123'
       period = params.period !== undefined ? 60000 * params.period : 60000
       if (period === 0) { // As soon as possible
-        var eventSourceInitDict = {headers: {'Authorization': 'APIKEY ' + apiKey}};
+        var eventSourceInitDict = {headers: {'Authorization': 'APIKEY ' + apiKey}}
         let eventSource = new EventSource('http://' + remoteService.host + ':' + remoteService.port + '/api/coms/asap', eventSourceInitDict)
         eventSource.addEventListener('clocking', (e) => {
           writeClockings([e.data])
@@ -101,8 +101,6 @@ const writeClockings = (json) => {
   }
 }
 
-
-
 /*
 Calls Lemuria API
 */
@@ -116,5 +114,5 @@ const call = (callback) => {
 }
 
 module.exports = {
-  init: init
+  init
 }
