@@ -119,22 +119,27 @@ const downMonth = (db, month) => {
         for (let key in db.client.config.months) {
           if (db.client.config.months.hasOwnProperty(key)) empty = false
         }
-        // In sqlite, destroy connection and delete file when it's empty
-        if (empty && db.client.config.client === 'sqlite3') {
-          db.destroy(() => {
-            fs.access(db.client.config.connection.filename, fs.constants.R_OK | fs.constants.W_OK, (err) => {
-              /* if (!err) {
-                setTimeout(() => fs.unlink(db.client.config.connection.filename, (err) => {
-                  if (err) console.log(err)
-                  resolve(empty)
-                }), 2000)
-              } else */
-              resolve(empty)
-            })
-          })
-        } else resolve(empty)
+        resolve(empty)
       })
       .catch(reject)
+  })
+}
+
+const cleanFileDB = (path, type) => {
+  return new Promise((resolve, reject) => {
+    // In sqlite, destroy connection and delete file when it's empty
+    if (type === 'sqlite3') {
+      fs.access(path, fs.constants.R_OK | fs.constants.W_OK, (err) => {
+        if (!err) {
+          setTimeout(() => {
+            fs.unlink(path, (err) => {
+              if (err) reject(err)
+              else resolve()
+            })
+          }, 200)
+        } else resolve()
+      })
+    } else resolve()
   })
 }
 
@@ -147,9 +152,9 @@ const verifyYear = (dbs, year, log) => {
         return kInputs.schema.hasTable('input_1_' + year + month)
           .then((exists) => {
             if (exists) {
-              log.debug(`${year}${month} inputs table found`)
+              log.trace(`${year}${month} inputs table found`)
               kInputs.client.config.months[year + month] = true
-            } else log.debug(`${year}${month} inputs table does not exists`)
+            } else log.trace(`${year}${month} inputs table does not exists`)
           })
           .catch(reject)
       }))
@@ -164,5 +169,6 @@ module.exports = {
   upMonth,
   down,
   downMonth,
-  verifyYear
+  verifyYear,
+  cleanFileDB
 }

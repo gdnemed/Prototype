@@ -477,10 +477,11 @@ const clean = (req, res) => {
     (req, res, session) => {
       stateService.getSettings(session)
         .then((settings) => {
+        // Just return OK and start clean process
+          res.status(200).end()
           cleanRecords(settings, session)
-            .then(() => cleanInputs(settings, session))
-            .then(res.status(200).end())
-            .catch((err) => res.status(500).end(err.message))
+          cleanInputs(settings, session)
+          createFutureMonthInputs(session)
         })
         .catch((err) => res.status(500).end(err.message))
     })
@@ -526,115 +527,89 @@ const delRecord = (records, session, i) => {
 Drops tables containing old inputs (beyond settings.monthsInputs)
 */
 const cleanInputs = (settings, session) => {
-  return new Promise((resolve, reject) => {
-    let monthsInputs = settings.monthsInputs ? parseInt(settings.monthsInputs) : 12
-    let now = utils.momentNow().subtract(monthsInputs, 'months')
-    cleanMonthInputs(now, session, 0)
-      .then(() => createFutureMonthInputs(utils.momentNow(), session, 0))
-      .then(resolve).catch(reject)
-  })
+  // Get DB type from current db
+  let db = session.dbs['inputs' + new Date().getFullYear()]
+  if (!db) return Promise.resolve()
+  let type = db.client.config.client
+  let path = db.client.config.connection.filename
+  // Go back in time
+  let monthsInputs = settings.monthsInputs ? parseInt(settings.monthsInputs) : 12
+  let now = utils.momentNow().subtract(monthsInputs, 'months')
+  // Check if previous year still connected, and disconnect
+  let prevYear = (now.year() - 1)
+  let section = 'inputs' + prevYear
+  db = session.dbs[section]
+  if (db) { // Destroy connection
+    db.destroy()
+    delete session.dbs[section]
+  } else if (type === 'sqlite3') {
+    // If sqlite, try to destroy file for previous disconnected DB
+    path = path.substr(0, path.length - 7) + prevYear + '.db'
+    inputsMigrations.cleanFileDB(path, type)
+      .then(() => {}) // No more work to do
+      .catch((err) => log.error(err))
+  }
+  // Now, drop every table in year, previous to now
+  return cleanMonthInputs(type, now, session, 0)
 }
 
 /*
 Recursively drops inputs tables until 1 year before the limit.
 */
-const cleanMonthInputs = (now, session, i) => {
+const cleanMonthInputs = (type, now, session, i) => {
   return new Promise((resolve, reject) => {
-    if (i >= 24) resolve()
+    now = now.subtract(1, 'months')
+    let ym = now.format('YYYYMM')
+    let year = ym.substr(0, 4)
+    let month = ym.substr(4, 6)
+    // If we get december of previous year, work done
+    if (month === '12' && i > 0) resolve()
     else {
-      now = now.subtract(1, 'months')
-      let ym = now.format('YYYYMM')
-      let year = ym.substr(0, 4)
       let db = session.dbs['inputs' + year]
       if (!db) {
         // Connection to DB still not established. Try to connect before clean.
-        db = session.dbs['inputs' + new Date().getFullYear()]
-        // We'll probably have a connection for current year. If not, do nothing
-        if (!db) {
-          resolve()
-          return
-        }
-        let type = db.client.config.client
-        migrations.connect(type, session.name, 'inputs', session.dbs, parseInt(year))
+        migrations.connect(type, false, session.name, 'inputs', session.dbs, parseInt(year))
           .then((section) => {
-            return inputsMigrations.verifyYear(session.dbs, year, log)
+            if (section) return inputsMigrations.verifyYear(session.dbs, year, log)
+            else return Promise.resolve() // DB not exist, not necessary to do work
           })
           .then(() => {
             db = session.dbs['inputs' + year]
-            cleanMonth(db, year, ym, session, now, i)
-              .then(() => cleanMonthInputs(now, session, i + 1))
-              .catch(reject)
+            if (db) {
+              inputsMigrations.downMonth(db, ym)
+                .then(() => cleanMonthInputs(type, now, session, i + 1))
+                .catch(reject)
+            } else resolve()
           })
+          .catch(reject)
       } else {
         // Database exists. Clean month and call ourselves recursively
-        cleanMonth(db, year, ym, session, now, i)
-          .then(() => cleanMonthInputs(now, session, i + 1))
+        inputsMigrations.downMonth(db, ym)
+          .then(() => cleanMonthInputs(type, now, session, i + 1))
           .catch(reject)
       }
     }
-  })
-}
-
-const cleanMonth = (db, year, ym, session, now, i) => {
-  return new Promise((resolve, reject) => {
-    inputsMigrations.downMonth(db, ym)
-      .then((empty) => {
-        if (empty) delete session.dbs['inputs' + year]
-        cleanMonthInputs(now, session, i + 1)
-          .then(resolve).catch(reject)
-      })
-      .catch(reject)
   })
 }
 
 /*
 Recursively creates monthly inputs tables for future inputs.
 */
-const createFutureMonthInputs = (now, session, i) => {
-  return new Promise((resolve, reject) => {
-    if (i >= 12) resolve()
-    else {
-      now = now.add(1, 'months')
-      let ym = now.format('YYYYMM')
-      let year = ym.substr(0, 4)
-      let db = session.dbs['inputs' + year]
-      if (!db) {
-        // Database still not exists, let's create it now
-        // We'll probably have a connection for current year. If not, do nothing
-        if (!db) {
-          resolve()
-          return
-        }
-        let type = db.client.config.client
-        migrations.initYear(type, session.name, parseInt(year), session.dbs)
-          .then(() => {
-            db = session.dbs['inputs' + year]
-            return createMonth(db, ym, now, session, i)
-          })
-          .then(resolve)
-          .catch(reject)
-      } else {
-        createMonth(db, ym, now, session, i)
-          .then(resolve).catch(reject)
-      }
+const createFutureMonthInputs = (session) => {
+  let year = new Date().getFullYear()
+  let db = session.dbs['inputs' + year]
+  // We'll probably have a connection for current year. If not, do nothing
+  if (db) {
+    let type = db.client.config.client
+    year = year + 1
+    db = session.dbs['inputs' + year]
+    if (!db) {
+      // Database still not exists, let's create it now
+      migrations.initYear(type, session.name, year, session.dbs)
+        .then(() => log.info(`Future inputs tables created for ${session.name}, year ${year}`))
+        .catch((err) => log.error(err))
     }
-  })
-}
-
-const createMonth = (db, ym, now, session, i) => {
-  return new Promise((resolve, reject) => {
-    if (!db.client.config.months[ym]) {
-      inputsMigrations.upMonth(db, ym)
-        .then(() => {
-          createFutureMonthInputs(now, session, i + 1)
-            .then(resolve).catch(reject)
-        })
-        .catch(reject)
-    } else {
-      createFutureMonthInputs(now, session, i + 1)
-        .then(resolve).catch(reject)
-    }
-  })
+  }
 }
 
 /*

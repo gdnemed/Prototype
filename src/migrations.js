@@ -2,6 +2,7 @@
 // -------------------------------------------------------------------------------------------
 // Handles all app Knex migrations (creation of BD via knex for every environtment)
 // -------------------------------------------------------------------------------------------
+const fs = require('fs')
 const log = require('./utils/log').getLogger('migrations')
 const Knex = require('knex')
 const g = require('./global')
@@ -30,7 +31,7 @@ const getDirForSqliteDB = (customerName) => {
 // Executes the migration for the section, returning the implicit Promise of knex.migrate()
 const migrateSection = (dbType, customerName, section, dbs, year) => {
   return new Promise((resolve, reject) => {
-    connect(dbType, customerName, section, dbs, year)
+    connect(dbType, true, customerName, section, dbs, year)
       .then((sec) => {
         log.debug(`Invoking knex.migrate.latest() for ${sec}`)
         dbs[sec].migrate.latest()
@@ -44,7 +45,7 @@ const migrateSection = (dbType, customerName, section, dbs, year) => {
   })
 }
 
-const connect = (dbType, customerName, section, dbs, year) => {
+const connect = (dbType, createIfNotExists, customerName, section, dbs, year) => {
   return new Promise((resolve, reject) => {
     try {
       // Base object for composing other specific objects via "object.assing"
@@ -122,7 +123,15 @@ const connect = (dbType, customerName, section, dbs, year) => {
         migrations: {directory: `${__dirname}/../db/migrations/${section}`}
       })
       let sec = year ? section + year : section
-      dbs[sec] = Knex(cfg)
+      if (!createIfNotExists && baseMigration.client === 'sqlite3') {
+        fs.access(cfg.connection.filename, fs.constants.R_OK | fs.constants.W_OK, (err) => {
+          if (err) resolve(null)
+          else {
+            dbs[sec] = Knex(cfg)
+            resolve(sec)
+          }
+        })
+      } else dbs[sec] = Knex(cfg)
       resolve(sec)
     } catch (err) {
       reject(err)
@@ -144,8 +153,6 @@ const init = (type, customer, year) => {
     migrateSection(type, customer, SECTIONS.STATE, dbs)
       .then(() => migrateSection(type, customer, SECTIONS.OBJECTS, dbs))
       .then(() => initYear(type, customer, year, dbs))
-      .then(() => initYear(type, customer, year + 1, dbs))
-      .then(() => initYear(type, customer, year - 1, dbs))
       .then(() => resolve(dbs))
       .catch((err) => reject(err))
   })

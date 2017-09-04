@@ -41,7 +41,6 @@ const initializeCustomer = (customersList, i) => {
           log.debug('DB ' + customersList[i].name)
           return migrations.verifyDB(dbs, customersList[i].name)
         })
-        .then(() => initializeCustomer(customersList, i + 1))
         .then(resolve)
         .catch(reject)
     }
