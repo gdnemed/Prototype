@@ -1,3 +1,4 @@
+/* global process, require, module */
 // -------------------------------------------------------------------------------------------
 // Terminals simulator, for tests.
 // -------------------------------------------------------------------------------------------
@@ -15,9 +16,10 @@ let records = {}
 let client = new net.Socket()
 let buffer
 let mapClockings = {}
+let cfg
 
-const init = () => {
-  let cfg = JSON.parse(fs.readFileSync(process.cwd() + '/terminal.json', 'utf8'))
+const init = (subPath = '') => {
+  cfg = JSON.parse(fs.readFileSync(process.cwd() + subPath + '/terminal.json', 'utf8'))
   client.connect(cfg.server.port, cfg.server.host, function () {
     console.log('Connected')
     let bin = Buffer.from('c8f6', 'hex')
@@ -136,7 +138,10 @@ const initAPIserver = () => {
   api.get('/cards', getCards)
   api.get('/clocking/:card', getClocking)
   // Run http server
-  api.listen('9090', function () {})
+  let server = api.listen(cfg.api.port, (err) => {
+    let address = server.address()
+    console.log('>> Terminal emulator API listening at port ' + address.port)
+  })
 }
 
 const getRecords = (req, res) => {
@@ -155,4 +160,11 @@ const getClocking = (req, res) => {
   })
 }
 
-init()
+module.exports = {
+  init
+}
+
+// Start Lemuria when not testing (tests start Lemuria by themselves)
+if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test') {
+  init()
+}
