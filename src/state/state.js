@@ -185,6 +185,7 @@ const init = () => {
       .then(() => {
         httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
         httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
+        resolve()
       })
       .catch(reject)
     } else resolve()
