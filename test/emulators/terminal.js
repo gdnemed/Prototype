@@ -2,6 +2,7 @@
 // Terminals simulator, for tests.
 // -------------------------------------------------------------------------------------------
 
+const fs = require('fs')
 const net = require('net')
 const msgpack = require('msgpack-lite')
 const express = require('express')
@@ -13,9 +14,11 @@ let cards = {}
 let records = {}
 let client = new net.Socket()
 let buffer
+let mapClockings = {}
 
 const init = () => {
-  client.connect(8092, '172.18.4.203', function () {
+  let cfg = JSON.parse(fs.readFileSync(process.cwd() + '/terminal.json', 'utf8'))
+  client.connect(cfg.server.port, cfg.server.host, function () {
     console.log('Connected')
     let bin = Buffer.from('c8f6', 'hex')
     let initStr = {serial: '123', cmd: 1, protocol: '0.1', bin: bin}
@@ -61,7 +64,12 @@ const init = () => {
       let j = msgpack.decode(b)
       j.seq = s
       console.log(j)
-      if (j.ack) {
+      if (j.ack !== undefined) {
+        // If there is a callback for receive, call it
+        if (mapClockings[j.seq]) {
+          mapClockings[j.seq](j.ack)
+          delete mapClockings[j.seq]
+        }
       } else {
         switch (j.cmd) {
           case 2:for (let i = 0; i < j.cards.length; i++) cards['c' + j.cards[i].card] = j.cards[i].id
@@ -107,15 +115,17 @@ const send = (data, seq) => {
   client.write(b2) */
 }
 
-const clocking = (card, id) => {
+const clocking = (card, id, callback) => {
   let tmp = Math.floor(new Date().getTime() / 1000)
+  let seq = sequence++
+  mapClockings[seq] = callback
   send({cmd: 4,
     id: id,
     card: card,
     resp: id == null ? 1 : 0,
     reader: 0,
     tmp: tmp},
-  sequence++)
+  seq)
 }
 
 const initAPIserver = () => {
@@ -139,8 +149,10 @@ const getCards = (req, res) => {
 
 const getClocking = (req, res) => {
   var id = cards['c' + req.params.card]
-  clocking(req.params.card, id)
-  res.end(req.params.card + ' clocking')
+  clocking(req.params.card, id, (ack) => {
+    if (ack === 1) res.end(req.params.card + ' clocking')
+    else res.status(500).end('nack: ' + ack)
+  })
 }
 
 init()

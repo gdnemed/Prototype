@@ -41,6 +41,7 @@ const initializeCustomer = (customersList, i) => {
           log.debug('DB ' + customersList[i].name)
           return migrations.verifyDB(dbs, customersList[i].name)
         })
+        .then(() => initializeCustomer(customersList, i + 1))
         .then(resolve)
         .catch(reject)
     }
@@ -122,6 +123,7 @@ const setAuthorization = (customer, data) => {
 module.exports = {
   init,
   getSession,
+  getCustomersList,
   manageSession,
   checkSerial,
   getDatabases,

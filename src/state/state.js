@@ -39,40 +39,48 @@ const newInputId = (session) => {
   return new Promise((resolve, reject) => {
     if (inputSequences[session.name]) resolve(inputSequences[session.name]++)
     else {
-      let l = []
-      for (let p in session.dbs) {
-        if (session.dbs.hasOwnProperty(p) && p.startsWith('inputs')) {
-          l.push(session.dbs[p])
-        }
+      initInputsId(session)
+        .then(() => resolve(inputSequences[session.name]++))
+        .catch(reject)
+    }
+  })
+}
+
+const initInputsId = (session) => {
+  return new Promise((resolve, reject) => {
+    let l = []
+    for (let p in session.dbs) {
+      if (session.dbs.hasOwnProperty(p) && p.startsWith('inputs')) {
+        l.push(session.dbs[p])
       }
-      let max = 0
-      Promise.all(l.map((db) => {
-        return new Promise((resolve, reject) => {
-          let months = []
-          for (let m in db.client.config.months) {
-            if (db.client.config.months.hasOwnProperty(m)) months.push(m)
-          }
-          Promise.all(months.map((m) => {
-            return new Promise((resolve, reject) => {
-              db('input_1_' + m).max('id as m')
-                .then((rows) => {
-                  if (rows.length > 0) {
-                    if (rows[0].m > max) max = rows[0].m
-                  }
-                  resolve()
-                })
-                .catch(reject)
-            })
-          }))
-            .then(resolve).catch(reject)
-        })
-      }))
+    }
+    let max = 0
+    Promise.all(l.map((db) => {
+      return new Promise((resolve, reject) => {
+        let months = []
+        for (let m in db.client.config.months) {
+          if (db.client.config.months.hasOwnProperty(m)) months.push(m)
+        }
+        Promise.all(months.map((m) => {
+          return new Promise((resolve, reject) => {
+            db('input_1_' + m).max('id as m')
+              .then((rows) => {
+                if (rows.length > 0) {
+                  if (rows[0].m > max) max = rows[0].m
+                }
+                resolve()
+              })
+              .catch(reject)
+          })
+        }))
+          .then(resolve).catch(reject)
+      })
+    }))
       .then(() => {
-        inputSequences[session.name] = max + 2
-        resolve(max + 1)
+        inputSequences[session.name] = max + 1
+        resolve()
       })
       .catch(reject)
-    }
   })
 }
 
@@ -166,17 +174,26 @@ const apiCall = (req, res, f) => {
 }
 
 const init = () => {
-  if (g.getConfig().api_listen) {
-    log = logger.getLogger('state')
-    log.debug('>> state init()')
-    httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
-    httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
-  }
-  return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    if (g.getConfig().api_listen) {
+      log = logger.getLogger('state')
+      log.debug('>> state init()')
+      // Get inputs id for every customer
+      Promise.all(sessions.getCustomersList().map((c) => {
+        return initInputsId({name: c.name, dbs: sessions.getDatabases(c.name)})
+      }))
+      .then(() => {
+        httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
+        httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
+      })
+      .catch(reject)
+    } else resolve()
+  })
 }
 
 module.exports = {
   init,
+  initInputsId,
   postSettings,
   getSettings,
   newId,
