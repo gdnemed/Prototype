@@ -744,6 +744,9 @@ Prepare str structure for future execution, adding _guide_ field, which will con
 - relation_owner: Only for inputs which must be linked with owner entity
 */
 const prepareGet = (session, variables, str) => {
+  if (str._inputs_ === 'now') {
+    str._inputs_ = utils.momentNow().format('YYYYMM')
+  }
   let db = session.dbs[str._inputs_ ? 'inputs' + str._inputs_.substr(0, 4) : 'objects']
   str._guide_ = {
     entity_fields: {},
@@ -865,7 +868,7 @@ Adds a filter into an statement and update the variablesMapping of
 the helper structure.
 */
 const addFilter = (statement, filter, helper, variables) => {
-  if (filter.variables && ((variables[filter.variable] === undefined) ||
+  if (filter.variable && ((variables[filter.variable] === undefined) ||
       (variables[filter.variable] === null))) {
     return // filter not used
   }

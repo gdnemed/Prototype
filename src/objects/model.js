@@ -4,7 +4,7 @@
 
 const ENTITIES = {
   'card': {keys: [['code']], required: ['code']},
-  'record': {keys: [['code'], ['document']],
+  'record': {keys: [['document'], ['code']],
     required: ['code', 'document', 'name'],
     related_from: {identifies: 'card'}},
   'timetype': {keys: [['code']], required: ['code', 'intname']}

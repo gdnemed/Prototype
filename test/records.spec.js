@@ -13,6 +13,16 @@ const oneUserOneCard = {
   'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20170822}]
 }
 
+const oneUser2OneCard = {
+  'id': '1U_1C',
+  'name': '1U_1C José Ariño',
+  'code': '0456',
+  'language': 'en',
+  'validity': [{'start': 20170105, 'end': 20170622}],
+  'timetype_grp': [{'code': 'TT_1U2_1C'}],
+  'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20170822}]
+}
+
 describe('records.spec.js', () => {
   beforeEach((done) => {
     // Ensures Lemuria is created and all needed references are stored in "t"
@@ -94,6 +104,35 @@ describe('records.spec.js', () => {
         console.log('ERROR: ' + response.status + ' ' + response.text)
       })
   })
+
+  it('POST (oneUserOneCard) to /records/, then oneUser2OneCard ' +
+    'and GET via /records/ returns only oneUser2OneCard data', (done) => {
+    t.sendPOST('/api/coms/records', oneUserOneCard)
+      .then((res) => t.sendPOST('/api/coms/records', oneUser2OneCard))
+      .then((res) => {
+        t.expect(res.status).to.equal(200)
+        // GET via api/records
+        t.sendGET('/api/coms/records').then((res) => {
+          t.expect(res.status).to.equal(200)
+          console.log(res.body)
+          let rec0 = res.body[0]
+          t.expectProps(rec0, {
+            id: oneUser2OneCard.id,
+            code: oneUser2OneCard.code,
+            name: oneUser2OneCard.name,
+            language: oneUser2OneCard.language
+          })
+          // chcking tt_group => array [{'code': 'TT_1U_1C'}],
+          t.expectProps(rec0.timetype_grp[0], oneUser2OneCard.timetype_grp[0])
+          // checking validity
+          t.expectProps(rec0.validity[0], oneUser2OneCard.validity[0])
+          done()
+        })
+      }).catch(({response}) => {
+        console.log('ERROR: ' + response.status + ' ' + response.text)
+      })
+  })
+
 
   // GET /api/coms/records or GET /api/coms/records/:id
   // -------------------------------------------------------------------------------------------
