@@ -70,7 +70,11 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
               params.id = id
               executeUpdate(params)
                 .then((idPut) => callback(null, id))
-                .catch(callback)
+                .catch((err) => {
+                  release(session, e, stateService)
+                    .then(() => callback(err))
+                    .catch(callback)
+                })
             } else {
               // On insert, we need to block key data to prevent parallel inserts over same key
               stateService.newId(session)
@@ -78,12 +82,24 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
                   params.id = id
                   executeInsert(params)
                     .then(() => callback(null, id))
+                    .catch((err) => {
+                      release(session, e, stateService)
+                        .then(() => callback(err))
+                        .catch(callback)
+                    })
+                })
+                .catch((err) => {
+                  release(session, e, stateService)
+                    .then(() => callback(err))
                     .catch(callback)
                 })
-                .catch((err) => release(session, e, stateService, callback, err))
             }
           })
-          .catch((err) => release(session, e, stateService, callback, err))
+          .catch((err) => {
+            release(session, e, stateService)
+              .then(() => callback(err))
+              .catch(callback)
+          })
       } else callback(new Error('Key not found'))
     })
       .catch(callback)
@@ -336,7 +352,8 @@ const executeInsert = (params) => {
       if (r) {
         for (let m = 0; m < r.length; m++) {
           if (!d.hasOwnProperty(r[m])) {
-            reject(new Error(`${r[m]} required for ${params.entity}`))
+            let e = new Error(`${r[m]} required for ${params.entity}`)
+            reject(e)
             return
           }
         }

@@ -233,8 +233,9 @@ const put = (req, res, session, str) => {
     stateService,
     req.params,
     cloned, req.body, extraTreatment, (err, ret) => {
-      if (err) res.status(500).end(err.message)
-      else {
+      if (err) {
+        res.status(500).end(err.message)
+      } else {
         if (!Array.isArray(ret)) ret = [ret]
         res.status(200).jsonp(ret)
         nextVersion(session, ret, str._entity_)// Notify communications
