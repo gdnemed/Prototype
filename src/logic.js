@@ -161,7 +161,7 @@ const transformClocking = (c) => {
 }
 
 let prepGetClockings = {
-  _inputs_: '201708', // TODO: what if new clockings in very past of very future tables?
+  _inputs_: '201709', // TODO: what if new clockings in very past of very future tables?
   _filter_: {field: 'id', condition: '>', variable: 'fromid'},
   _order_: [{column: 'id'}],
   id: 'id',
@@ -173,7 +173,7 @@ let prepGetClockings = {
 }
 
 let prepGetClockingsDebug = {
-  _inputs_: '201708',
+  _inputs_: '201709',
   id: 'id',
   tmp: 'tmp',
   gmt: 'gmt',

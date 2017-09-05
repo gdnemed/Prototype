@@ -22,6 +22,8 @@ const sessions = require('../src/session/sessions')
 // -------------------------------------------------------------------------------------------
 let lemuria
 let _lemuriaInitialized = false
+let terminal
+let _terminalInitialized = false
 
 const startLemuria = () => {
   return new Promise((resolve, reject) => {
@@ -35,6 +37,9 @@ const startLemuria = () => {
         t.config = g.getConfig()
         let port = t.config.api_listen.port
         t.lemuriaAPI = `localhost:${port}`
+        let termEmulport = 5052
+        if (t.config.terminal_emulator) termEmulport = t.config.terminal_emulator.api.port
+        t.terminalEmulatorAPI = `localhost:${termEmulport}`
         console.log(`TestMgr: lemuriaAPI for testing is: ${t.lemuriaAPI}`)
         resolve()
       })
@@ -62,6 +67,19 @@ const get = (env = 'test') => {
       //            thus, a rollback() + migration() for all sections is needed in other to have
       //            the database cleaned before every it(...) sentence
       resolve(t)
+    }
+  })
+}
+
+const startTerminalEmulator = () => {
+  terminal = require('./emulators/terminal.js')
+  console.log('>> TestMgr: startTerminalEmulator')
+  return new Promise((resolve, reject) => {
+    if (!_terminalInitialized) {
+      terminal.init('/test/emulators') //SubPath is needed, because cwd where all testa are executed is  /LEMURIA/Prototype/
+      console.log('TestMgr: terminal init() was called')
+      _terminalInitialized = true
+      resolve()
     }
   })
 }
@@ -173,6 +191,10 @@ const sendGET = (route) => chai.request(t.lemuriaAPI).get(route).set('Authorizat
 // Gets the DB related to 'section' &  'tableName'
 const getCollection = (section, tableName) => t.dbs[section].select().table(tableName)
 
+const terminalEmulatorSendGET = (route) => {
+  return chai.request(t.terminalEmulatorAPI).get(route)
+}
+
 // Sends 'data' via http POST query to 'route' (without syncronization)
 const _post = (route, data) => chai.request(t.lemuriaAPI).post(route).set('Authorization', 'APIKEY 123').send(data)
 
@@ -229,9 +251,11 @@ let t = {
   expectProps,
   rollbackAndMigrateDatabases,
   handleFileImport,
-  cleanImportFiles
+  cleanImportFiles,
+  terminalEmulatorSendGET
 }
 
 module.exports = {
-  get
+  get,
+  startTerminalEmulator
 }

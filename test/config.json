@@ -1,6 +1,9 @@
 {
 		"api_listen":{"host":"","port":4041},
 		"coms_listen":{"host":"","port":4042},
+		"terminal_emulator": {
+			"api":{"host":"", "port": 5052}
+		},
 		"db": {"dir": "./db"},
 		"node_id":1,
 		"exchange":{
