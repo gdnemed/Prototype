@@ -29,6 +29,36 @@ describe('timetypes.spec.js', () => {
     })
   })
 
+  it('POST to /timetypes/ with no code. Must return error 500', (done) => {
+    let r = JSON.parse(JSON.stringify(ttOne))
+    delete r.code
+    t.sendPOST('/api/coms/timetypes', r)
+      .then((res) => {
+        t.expect(res.status).to.equal(500)
+        done()
+      })
+      .catch((response) => {
+        t.expect(response.status).to.equal(500)
+        console.log(response.text)
+        done()
+      })
+  })
+
+  it('POST to /timetypes/ with no text. Must return error 500', (done) => {
+    let r = JSON.parse(JSON.stringify(ttOne))
+    delete r.text
+    t.sendPOST('/api/coms/timetypes', r)
+      .then((res) => {
+        t.expect(res.status).to.equal(500)
+        done()
+      })
+      .catch((response) => {
+        t.expect(response.status).to.equal(500)
+        console.log(response.text)
+        done()
+      })
+  })
+
   it('POST (ttOne) to /timetypes/ and GET via /timetypes/ returns the timetype', (done) => {
     t.sendPOST('/api/coms/timetypes', ttOne)
       .then((res) => {

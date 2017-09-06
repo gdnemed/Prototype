@@ -429,30 +429,47 @@ const initTerminal = (serial, customer) => {
     .catch((err) => log.error(err))
 }
 
-const createClocking = (clocking, customer, callback) => {
-  sessionService.getSession(customer)
-    .then((session) => {
-      // Find the owner
-      squeries.get(session, {record: clocking.record},
-        {
-          _entity_: 'record',
-          id: 'id',
-          _filter_: {field: 'code', variable: 'record'}
-        }, (err, record) => {
-          if (err) callback(err)
-          else {
-            if (record && record.length > 0) clocking.owner = record[0].id
-            squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
-              if (err) callback(err)
-              else {
-                notifyMonitors(clocking, id, customer)
-                callback(err, id)
-              }
-            })
-          }
-        })
-    })
-    .catch(callback)
+/*
+Seeks the owner of the clocking and calls validate() to get a response.
+Then, stores the clocking into DB and resolves with the complete clocking object.
+*/
+const createClocking = (clocking, customer) => {
+  return new Promise((resolve, reject) => {
+    sessionService.getSession(customer)
+      .then((session) => {
+        // Find the owner
+        squeries.get(session, {record: clocking.record},
+          {
+            _entity_: 'record',
+            id: 'id',
+            _filter_: {field: 'code', variable: 'record'}
+          }, (err, record) => {
+            if (err) reject(err)
+            else {
+              if (record && record.length > 0) clocking.owner = record[0].id
+              validate(clocking)
+                .then((clocking) => {
+                  squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
+                    if (err) reject(err)
+                    else {
+                      notifyMonitors(clocking, id, customer)
+                      resolve(clocking)
+                    }
+                  })
+                })
+                .catch(reject)
+            }
+          })
+      })
+      .catch(reject)
+  })
+}
+
+/*
+Clocking processing. It adds a response, to send to device.
+*/
+const validate = (clocking) => {
+  return Promise.resolve(clocking)
 }
 
 const notifyMonitors = (clocking, id, customer) => {
