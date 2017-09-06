@@ -302,8 +302,8 @@ let t = {
   handleFileImport,
   cleanImportFiles,
   terminalEmulatorSendGET,
-  CORRECT_CLOCKING: 0, //Code for a correct clocking
-  INCORRECT_CLOCKING: 1 //Code for an incorrect clocking
+  CORRECT_CLOCKING: 'E00', //Code for a correct clocking
+  INCORRECT_CLOCKING: 'E02' //Code for an incorrect clocking
 }
 
 module.exports = {

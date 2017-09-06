@@ -47,8 +47,8 @@ describe('clockings.spec.js', () => {
                 t.expect(arClockings.length).to.equal(1)
                 let clkObj = arClockings[0]
                 t.expectProps(clkObj, {
-                  card: 'CARD_CODE_1U_1C'/*,
-                  result: t.CORRECT_CLOCKING*/ //TODO: no funciona, sempre és incorrecte!
+                  card: 'CARD_CODE_1U_1C',
+                  result: t.CORRECT_CLOCKING
                 })
                 done()
               })
@@ -60,6 +60,45 @@ describe('clockings.spec.js', () => {
         else console.log.error(e)
       })
   })
+
+  it('After posting a record {User,Card}, a simulated cloking OF A __MISSING_CARD_CODE__ via terminal emulator creates an input but result is "E02" instead of "E00"', (done) => {
+    t.sendPOST('/api/coms/records', oneUserOneCard)
+      .then((res) => {
+        t.expect(res.status).to.equal(200)
+        // An user and a card is the only content in table 'entity_1'
+        t.getCollection('objects', 'entity_1').then((collection) => {
+          t.expect(collection.length).to.equal(2)
+
+          // Via API, there are no clockings (an empty array is returned)
+          t.sendGET('/api/coms/clockings?fromid=0').then((res) => {
+            t.expect(res.status).to.equal(200)
+            t.expect(res.body.length).to.equal(0)
+
+            // Send a clocking via TerminalEmulator, that is live and listening via its API
+            t.terminalEmulatorSendGET('/clocking/__MISSING_CARD_CODE__').then((res) => {
+              t.expect(res.status).to.equal(200)
+
+              // Via API, noew there is one clocking, corresponding to card 'CARD_CODE_1U_1C'
+              t.sendGET('/api/coms/clockings?fromid=0').then((res) => {
+                t.expect(res.status).to.equal(200)
+                let arClockings = res.body
+                t.expect(arClockings.length).to.equal(1)
+                let clkObj = arClockings[0]
+                t.expectProps(clkObj, {
+                  card: '__MISSING_CARD_CODE__',
+                  result: t.INCORRECT_CLOCKING // "E02"
+                })
+                done()
+              })
+            })
+          })
+        })
+      }).catch((e) => {
+        if (e.response) console.log('ERROR: ' + e.response.status + ' ' + e.response.text)
+        else console.log.error(e)
+      })
+  })
+
   // -------------------------------------------------------------------------------------------
   // afterEach(): OPTION 1) Destroys and recreates BD from it() to other it()'s
   // -------------------------------------------------------------------------------------------

@@ -60,11 +60,11 @@ describe('export.spec.js', () => {
                 t.expect(arClockings.length).to.equal(1)
                 let clk = arClockings[0]
                 t.expectProps(clk, {
-                  card: cardId// ,
-                  // result: t.CORRECT_CLOCKING
+                  card: cardId,
+                  result: t.CORRECT_CLOCKING
                 })
                 // Obrir l'arxiu i verificar que conté el marcatge
-                t.verifyExportClockings([clk.id, clk.card, clk.result]).then(() => {
+                t.verifyExportClockings([clk.id, clk.card, clk.result, t.CORRECT_CLOCKING]).then(() => {
                   done()
                 })
               })
