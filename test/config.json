@@ -15,10 +15,10 @@
 				"output": true
 			},
 			"clockings":{
-				"dir":"test\\exchange_workdir\\remote",
-				"workdir": "test\\exchange_workdir",
+				"dir":"test\\export_clockings",
 				"server":{"host":"localhost","port":4041},
-				"period": 1
+				"period": 0,
+				"fileName": "export_clockings.txt"
 			}
 		}
 }

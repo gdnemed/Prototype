@@ -3,7 +3,7 @@
 const TestMgr = require('./TestMgr.js')
 let t // Reference to data obtained from TestMgr().get
 
-const oneUserOneCardVALID = {
+const oneUserOneCard = {
   'id': '1U_1C',
   'name': '1U_1C Alba Maria Estany',
   'code': '0455',
@@ -13,7 +13,7 @@ const oneUserOneCardVALID = {
   'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20180622}]
 }
 
-describe('clockingsTest.spec.js', () => {
+describe('clockings.spec.js', () => {
   beforeEach((done) => {
     // Ensures Lemuria is created and all needed references are stored in "t"
     TestMgr.get().then((_testdata) => {
@@ -24,7 +24,7 @@ describe('clockingsTest.spec.js', () => {
   })
 
   it('After posting a record {User,Card}, a simulated cloking of "Card" via terminal emulator creates an input that is checked via /api/coms/clockings', (done) => {
-    t.sendPOST('/api/coms/records', oneUserOneCardVALID)
+    t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
         t.expect(res.status).to.equal(200)
         // An user and a card is the only content in table 'entity_1'
@@ -46,7 +46,10 @@ describe('clockingsTest.spec.js', () => {
                 let arClockings = res.body
                 t.expect(arClockings.length).to.equal(1)
                 let clkObj = arClockings[0]
-                t.expectProps(clkObj, {card: 'CARD_CODE_1U_1C'})
+                t.expectProps(clkObj, {
+                  card: 'CARD_CODE_1U_1C'/*,
+                  result: t.CORRECT_CLOCKING*/ //TODO: no funciona, sempre és incorrecte!
+                })
                 done()
               })
             })

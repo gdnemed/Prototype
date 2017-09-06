@@ -161,6 +161,53 @@ const cleanImportFiles = (fieName) => {
   })
 }
 
+//Given a line of an exported file, ex: 3,"1205","3057323748",20170906,123733,"N",0,"E00",0
+//returns tru if every value in arrValues is inside the line, ex: [3,1205,E00]
+const checkValuesInsideLine = (line, arrValues) => {
+  let found = true
+  arrValues.forEach((value) => { //Allways iterates all element (no break is possible)
+    if (line.indexOf(value) < 0) found = false
+  })
+  return found
+}
+
+//Given the contents of a csv file (export), checks if it contains a line (separator is \r\n) with values contained in arrValues
+//Example: if "arrValues" == [3,1205,E00]
+//         a line inside 'content' containing =>  3,"1205","3057323748",20170906,123733,"N",0,"E00",0 will return true
+const checkCSVExport = (content, arrValues) => {
+  let arLines = content.split('\r\n')
+  const containsValues = (line) => line && checkValuesInsideLine(line, arrValues)
+  let arFiltered = arLines.filter(containsValues)
+  let found = arFiltered && arFiltered.length > 0
+  if (!found) console.log("CHECK ERROR: TestMgr =>  values [ " + arrValues.toString() + " ] not found inside file")
+  return found
+}
+
+const getExportClockingsFileName = () => {
+  let clkExports = t.config.exchange.clockings.dir
+  return clkExports + '\\' + t.config.exchange.clockings.fileName
+}
+
+// Checks the corresponding clocking export file (as specified in config.js) to contain a csv expression
+// corresponding to a clkObj (that correspond to the clocking returned by /api/coms/clockings
+const verifyExportClockings = (arrValues) => {
+  return new Promise((resolve, reject) => {
+    try {
+      fs.readFile(getExportClockingsFileName(), 'utf8', (err, contents) => {
+        if (err && (err.code !== 'ENOENT')) reject()
+        else if (contents && checkCSVExport(contents, arrValues)) resolve()
+        reject()
+      })
+    } catch (err) {reject(err)}
+  })
+}
+
+//Removes the 'exports' file (whose name & dir) appears i config.json
+//Removes Sync (no extra syncronization is required)
+const removeExportClockingsFile = () => {
+  fs.unlinkSync(getExportClockingsFileName())
+}
+
 // -------------------------------------------------------------------------------------------
 // Testing utility methods
 // -------------------------------------------------------------------------------------------
@@ -249,10 +296,14 @@ let t = {
   sendDELETE,
   getCollection,
   expectProps,
+  verifyExportClockings,
+  removeExportClockingsFile,
   rollbackAndMigrateDatabases,
   handleFileImport,
   cleanImportFiles,
-  terminalEmulatorSendGET
+  terminalEmulatorSendGET,
+  CORRECT_CLOCKING: 0, //Code for a correct clocking
+  INCORRECT_CLOCKING: 1 //Code for an incorrect clocking
 }
 
 module.exports = {
