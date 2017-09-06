@@ -23,7 +23,7 @@ describe('clockingsTest.spec.js', () => {
     })
   })
 
-  it('After posting a record {User,Card}, a simulated cloking of "Card" via terminal emulator creates an input that is checked via /api/coms/clockings', (done) => {
+  it.only('After posting a record {User,Card}, a simulated cloking of "Card" via terminal emulator creates an input that is checked via /api/coms/clockings', (done) => {
     t.sendPOST('/api/coms/records', oneUserOneCardVALID)
       .then((res) => {
         t.expect(res.status).to.equal(200)
