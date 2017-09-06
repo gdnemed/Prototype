@@ -97,7 +97,9 @@ const put = (session, stateService, variables, str, data, extraFunction, callbac
           })
           .catch((err) => {
             release(session, e, stateService)
-              .then(() => callback(err))
+              .then(() => {
+                callback(err)
+              })
               .catch(callback)
           })
       } else callback(new Error('Key not found'))

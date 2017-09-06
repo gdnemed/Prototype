@@ -220,6 +220,7 @@ const get = (req, res, session, str) => {
   }
   log.info(`GET ${req.url} params: ${JSON.stringify(req.query)}`)
   let cloned = JSON.parse(JSON.stringify(str))
+  if (str._transform_) cloned._transform_ = str._transform_
   squeries.get(session, req.query, cloned, (err, ret) => {
     if (err) res.status(500).end(err.message)
     else res.status(200).jsonp(ret)
@@ -229,6 +230,7 @@ const get = (req, res, session, str) => {
 const put = (req, res, session, str) => {
   log.info(`POST ${req.url} params: ${JSON.stringify(req.params)} body: ${JSON.stringify(req.body)}`)
   let cloned = JSON.parse(JSON.stringify(str))
+  if (str._transform_) cloned._transform_ = str._transform_
   squeries.put(session,
     stateService,
     req.params,
@@ -371,11 +373,14 @@ const nextVersion = (session, obj, type) => {
           log.debug('Next version:')
           log.debug(ret)
           if (ret.code) {
-            comsService.globalSend(ret.drop === 0 ? 'record_insert' : 'record_delete', {records: [{id: code}]})
+            // For TODO's: t1 and t2 should be checked against local timezone of each device!
+            // TODO: Should we check valid dates of record to do delete/insert?
+            comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'record_insert' : 'record_delete', {records: [{id: code}]})
             cardList = ret.card
             if (cardList) {
               for (let i = 0; i < cardList.length; i++) {
-                comsService.globalSend(ret.drop === 0 ? 'card_insert' : 'card_delete', {
+                // TODO: Should we check t1 and t2 to do delete/insert?
+                comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'card_insert' : 'card_delete', {
                   cards: [{
                     card: cardList[i].code,
                     id: code
@@ -429,30 +434,47 @@ const initTerminal = (serial, customer) => {
     .catch((err) => log.error(err))
 }
 
-const createClocking = (clocking, customer, callback) => {
-  sessionService.getSession(customer)
-    .then((session) => {
-      // Find the owner
-      squeries.get(session, {record: clocking.record},
-        {
-          _entity_: 'record',
-          id: 'id',
-          _filter_: {field: 'code', variable: 'record'}
-        }, (err, record) => {
-          if (err) callback(err)
-          else {
-            if (record && record.length > 0) clocking.owner = record[0].id
-            squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
-              if (err) callback(err)
-              else {
-                notifyMonitors(clocking, id, customer)
-                callback(err, id)
-              }
-            })
-          }
-        })
-    })
-    .catch(callback)
+/*
+Seeks the owner of the clocking and calls validate() to get a response.
+Then, stores the clocking into DB and resolves with the complete clocking object.
+*/
+const createClocking = (clocking, customer) => {
+  return new Promise((resolve, reject) => {
+    sessionService.getSession(customer)
+      .then((session) => {
+        // Find the owner
+        squeries.get(session, {record: clocking.record},
+          {
+            _entity_: 'record',
+            id: 'id',
+            _filter_: {field: 'code', variable: 'record'}
+          }, (err, record) => {
+            if (err) reject(err)
+            else {
+              if (record && record.length > 0) clocking.owner = record[0].id
+              validate(clocking)
+                .then((clocking) => {
+                  squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
+                    if (err) reject(err)
+                    else {
+                      notifyMonitors(clocking, id, customer)
+                      resolve(clocking)
+                    }
+                  })
+                })
+                .catch(reject)
+            }
+          })
+      })
+      .catch(reject)
+  })
+}
+
+/*
+Clocking processing. It adds a response, to send to device.
+*/
+const validate = (clocking) => {
+  return Promise.resolve(clocking)
 }
 
 const notifyMonitors = (clocking, id, customer) => {
