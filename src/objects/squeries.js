@@ -873,12 +873,21 @@ const selectEntity = (sq, f, type, filter, helper, variables) => {
  Basic select over inputs table
  */
 const selectInput = (sq, f, period, filter, helper, variables) => {
+  // We keep mapping order, because selectEntity is called after joins
+  let tmpVar = helper.variablesMapping
+  helper.variablesMapping = []
   let s = sq.from('input_' + nodeId + '_' + period)
   s.column('id as _id_')
   for (var c in f) {
     if (f.hasOwnProperty(c)) s.column(c + ' as ' + f[c])
   }
   if (filter) addFilter(s, filter, helper, variables)
+  // Restore list
+  if (tmpVar) {
+    for (let i = 0; i < tmpVar.length; i++) {
+      helper.variablesMapping.push(tmpVar[i])
+    }
+  }
   return s.as('e')
 }
 
