@@ -87,22 +87,20 @@ const writeClockings = (json) => {
     if (!json[i].ttype) json[i].ttype = 0
     if (!json[i].clockpoint) json[i].clockpoint = 0
   }
-  let filepath = path.join(remoteDir, fileName? fileName : ('clk' + utils.now() + '.csv'))
+  let filepath = path.join(remoteDir, fileName || ('clk' + utils.now() + '.csv'))
   fs.stat(filepath, function (err, stat) {
-    let hasCSVColumnTitle = false;
+    let hasCSVColumnTitle = false
     if (err != null) {
-      //if file don't exists write headers when is configured
-      if (err.code !== 'ENOENT')
-        throw err
-      hasCSVColumnTitle = hasHeaders;
+      // If file doesn't exists, write headers if configured
+      if (err.code !== 'ENOENT') throw err
+      hasCSVColumnTitle = hasHeaders
     }
-    //append csv row
+    // append csv row
     var csv = json2csv({data: json, fields: headers, hasCSVColumnTitle: hasCSVColumnTitle})
     fs.appendFile(filepath, csv + (os.EOL || '\n'), function (err) {
-      if (err)
-        throw err;
-    });
-  });
+      if (err) throw err
+    })
+  })
 }
 
 /*
