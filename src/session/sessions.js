@@ -52,7 +52,7 @@ const init = () => {
   if (g.getConfig().api_listen) {
     dbGlobal = process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test'
       ? {customers: {k123: {name: 'SPEC'}, k124: {name: 'OCTIME'}}, devices: {t123: 'SPEC', t1105: 'SPEC', t1101: 'SPEC'}}
-      : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC'}}
+      : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC', t1101: 'SPEC'}}
     log = logger.getLogger('session')
     log.debug('session: init() env: ' + process.env.NODE_ENV)
     return new Promise((resolve, reject) => {
