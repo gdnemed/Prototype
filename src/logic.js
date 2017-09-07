@@ -408,7 +408,7 @@ const initTerminal = (serial, customer) => {
       squeries.get(session, {},
         {
           _entity_: '[record]',
-          _filter_: {field: 'revision', condition: '>', value: 0},
+          _filter_: {field: 'drop', value: CT.END_OF_TIME},
           code: 'code',
           drop: {_property_: 'drop'},
           card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}

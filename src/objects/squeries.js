@@ -301,8 +301,11 @@ const searchFromKey = (session, entity, keysData, userKey, stateService, str, da
         }
         sentence.then((rows) => {
           if (rows.length === 0) resolve(null, null) // Insert
-          else if (rows.length > 1) reject(new Error('Ambiguous key: more than one entity found'))
-          else {
+          else if (rows.length > 1) {
+            let k = JSON.stringify(finalKey.fields)
+            let v = JSON.stringify(finalKey.values)
+            reject(new Error(`Ambiguous key ${k}: more than one entity found with ${v}`))
+          } else {
             resolve(rows[0].id)// Update
             // Entity found. Now we must ensure every key is respected
             /* loadKeyEntities(db, keysData, 0, {}, (err, ids) => {
