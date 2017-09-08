@@ -166,9 +166,10 @@ let prepGetClockings = {
   _order_: [{column: 'id'}],
   id: 'id',
   tmp: 'tmp',
-  card: {_property_: 'card'},
-  record: {_property_: 'record'},
   result: 'result',
+  card: {_property_: 'card'},
+  code: {_property_: 'record'},
+  record: {_relation_: 'owner', _field_: 'document'},
   _transform_: transformClocking
 }
 
@@ -447,11 +448,15 @@ const createClocking = (clocking, customer) => {
           {
             _entity_: 'record',
             id: 'id',
+            document: 'document',
             _filter_: {field: 'code', variable: 'record'}
           }, (err, record) => {
             if (err) reject(err)
             else {
-              if (record && record.length > 0) clocking.owner = record[0].id
+              if (record) {
+                clocking.owner = record.id
+                clocking.document = record.document
+              }
               validate(clocking)
                 .then((clocking) => {
                   squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
@@ -484,7 +489,8 @@ const notifyMonitors = (clocking, id, customer) => {
     id: id
   }
   if (clocking.card) c.card = clocking.card
-  if (clocking.record) c.record = clocking.record
+  if (clocking.record) c.code = clocking.record
+  if (clocking.document) c.record = clocking.document
   transformClocking(c)
   let list = monitors[customer]
   if (list) {

@@ -20,7 +20,7 @@ let currentId = 0
 let period
 let fileName
 let hasHeaders
-let headers = ['id', 'record', 'card', 'date', 'time', 'dir', 'ttype', 'result', 'clockpoint']
+let headers = ['id', 'record', 'code', 'card', 'date', 'time', 'dir', 'ttype', 'result', 'clockpoint']
 
 const init = () => {
   let exc = g.getConfig().exchange

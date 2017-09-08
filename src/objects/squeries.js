@@ -1279,7 +1279,7 @@ const prepareRelatedObject = (f, entry, forward, session, variables) => {
   }
   if (f.nextEntity) {
     f.nextEntity._n_fields = nfields
-    if (f.isArray) prepareGet(session, variables, f.nextEntity)
+    if (f.isArray || f.type === 'owner') prepareGet(session, variables, f.nextEntity)
   }
 }
 
@@ -1457,9 +1457,9 @@ Calls get() for related entity
 */
 const getNextEntity = (info, forward, parentRow, thisRow, session, variables, callback) => {
   // Already prepared, just substitute id (it's always the last condition)
-  let s = info.nextEntity._guide_.statement
   let id = thisRow ? (forward ? thisRow.id2 : thisRow.id1) : parentRow._owner_
   if (id) {
+    let s = info.nextEntity._guide_.statement
     s.bindings[s.bindings.length - 1] = id
     // Recursively call get
     get(session, variables, info.nextEntity, (err, r) => {
@@ -1551,6 +1551,8 @@ const completeRelation = (o, parentRow, info, data, forward) => {
     if (data.t2 && data.t2 !== CT.END_OF_DAYS &&
       data.t2 !== CT.END_OF_TIME) o[info.fields.t2] = data.t2
   }
+  // If it's a simple property, change object for content
+  if (o._field_) o = o._field_
   if (info.isArray) parentRow[info.entry].push(o)
   else parentRow[info.entry] = o
 }
