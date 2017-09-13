@@ -1,10 +1,7 @@
 {
 		"api_listen":{"host":"","port":8081},
 		"logic":{"host":"127.0.0.1","port":8081},
-		"coms_listen":{"host":"","port":"$COMS_PORT"},
-		"terminal_emulator": {
-			"api":{"host":"", "port": 5052}
-		},
+		"coms_listen":{"host":"","port":"$COMS_PORT$"},
 		"db": {"dir": "$DB_DIR$"},
 		"node_id":1
 }
