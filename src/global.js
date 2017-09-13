@@ -31,14 +31,15 @@ let _cfg
 const initConfiguration = () => {
   log = logger.getLogger('global')
   try {
-    let home = process.cwd()
+    let home = process.env.HOME
     let routeCfg = home
     switch (process.env.NODE_ENV) {
       case 'test': routeCfg = `${home}\\test`; break
       case 'stress_test': routeCfg = `${home}\\`; break
     }
     log.debug(`Using config file ${routeCfg}`)
-    _cfg = JSON.parse(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
+    let strConfig = applyEnvVars(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
+    _cfg = JSON.parse(strConfig)
   } catch (err) {
     log.info('config.json not found, using default configuration.')
     _cfg = {
@@ -60,6 +61,17 @@ const initConfiguration = () => {
       }
     }
   }
+}
+
+const applyEnvVars = (str) => {
+  const REGEXP_VAR = /\$[A-Za-z_][A-Za-z_0-9]*\$/g
+  let getValForKey = (key) => {
+    let newVal = process.env[key.replace(/\$/g, '')]
+    if (newVal !== undefined) return newVal
+    else return key
+  }
+  str = str.replace(REGEXP_VAR, getValForKey)
+  return str
 }
 
 const init = () => {

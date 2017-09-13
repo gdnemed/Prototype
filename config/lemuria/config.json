@@ -1,7 +1,7 @@
 {
-		"api_listen":{"host":"","port":8081},
-		"logic":{"host":"127.0.0.1","port":8081},
-		"coms_listen":{"host":"","port":"$COMS_PORT$"},
-		"db": {"dir": "$DB_DIR$"},
+		"api_listen":{"host":"","port": "$LEMURIA_PORT_API$"},
+		"logic":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
+		"coms_listen":{"host":"","port": $LEMURIA_PORT_COMS$},
+		"db": {"dir": "$LEMURIA_DIR_DB$"},
 		"node_id":1
 }

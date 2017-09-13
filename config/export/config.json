@@ -2,9 +2,9 @@
 		"node_id":1,
 		"exchange":{
 			"clockings":{
-				"dir":"$DIR_FILES$",
-				"server":{"host":"$SERVER$","port":"$PORT_SERVER$"},
-				"period": "$PERIOD_CLOCKINGS"
+				"dir":"$LEMURIA_DIR_FILES$",
+				"server":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
+				"period": $LEMURIA_PERIOD_CLOCKINGS$
 			}
 		}
 }

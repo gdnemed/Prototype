@@ -25,7 +25,9 @@ const init = () => {
   // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
   g.init()
   return new Promise((resolve, reject) => {
-    if (process.argv.length <= 2 || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
+    let startService = process.argv.indexOf('-i') !== -1
+    let endService = process.argv.indexOf('-u') !== -1
+    if ((!startService && !endService) || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
       // Run it as a program
       sessions.init()
@@ -43,7 +45,7 @@ const init = () => {
     } else {
       console.log('Starting lemuria as a service: ' + process.argv.length)
       // Install/uninstall as a service
-      serviceFunctions(process.argv).then(resolve)
+      serviceFunctions(startService).then(resolve)
     }
   })
 }
@@ -68,7 +70,7 @@ const initServices = () => {
 Installs/unistalls Lemuria as a Windows service.
 args: Command line parameters. args[2] contains i/u for installing/uninstalling.
 */
-const serviceFunctions = (args) => {
+const serviceFunctions = (startService) => {
   let Service = require('node-windows').Service
   return new Promise((resolve, reject) => {
     // Create a new service object
@@ -87,14 +89,8 @@ const serviceFunctions = (args) => {
       resolve()
     })
     // Execute command
-    switch (args[2]) {
-      case 'i':
-        svc.install()
-        break
-      case 'u':
-        svc.uninstall()
-        break
-    }
+    if (startService) svc.install()
+    else svc.uninstall()
   })
 }
 
