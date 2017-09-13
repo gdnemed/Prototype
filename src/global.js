@@ -41,25 +41,8 @@ const initConfiguration = () => {
     let strConfig = applyEnvVars(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
     _cfg = JSON.parse(strConfig)
   } catch (err) {
-    log.info('config.json not found, using default configuration.')
-    _cfg = {
-      'api_listen': {'host': '', 'port': 8081},
-      'coms_listen': {'host': '', 'port': 8092},
-      'node_id': 1,
-      'exchange': {
-        'files': {
-          'dir': '.',
-          'workdir': '.',
-          'server': {'host': '', 'port': 8081}
-        },
-        'clockings': {
-          'dir': '.',
-          'workdir': '.',
-          'server': {'host': '', 'port': 8081},
-          'period': 1
-        }
-      }
-    }
+    console.log('config.json not found, using default configuration.')
+    process.exit()
   }
 }
 

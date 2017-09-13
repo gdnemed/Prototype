@@ -1,4 +1,5 @@
 require('dotenv').config()
+require('./src/defaults').addDefaults()
 // If passed as an argument, override
 if (process.argv.indexOf('--home') !== -1) {
   process.env.HOME = process.argv[process.argv.indexOf('--home') + 1]

@@ -4,7 +4,8 @@
 			"clockings":{
 				"dir":"$LEMURIA_DIR_FILES$",
 				"server":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
-				"period": $LEMURIA_PERIOD_CLOCKINGS$
+				"period": $LEMURIA_PERIOD_CLOCKINGS$,
+				"fileName": "$LEMURIA_FILE_CLOCKINGS$"
 			}
 		}
 }
