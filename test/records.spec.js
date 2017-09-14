@@ -33,6 +33,16 @@ const oneUser2OneCard = {
   'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20170822}]
 }
 
+const oneUserWithSecLevelAndPIN = {
+  'id': '1U_SL_PIN',
+  'name': '1U_SL_PIN José Ariño',
+  'code': '0456',
+  'language': 'en',
+  'seclevel': '2',
+  'pin': '1234',
+  'validity': [{'start': 20170105, 'end': 20180622}]
+}
+
 const oneUserTwoCards = {
   'id': '1U_2C',
   'name': '1U_2C Alba Maria Estany',
@@ -80,6 +90,29 @@ describe('records.spec.js', () => {
         else console.log.error(e)
       })
   })
+
+ /* it('POST to /records/ creates a "record" with security level and PIN and checks database', (done) => {
+    t.sendPOST('/api/coms/records', oneUserWithSecLevelAndPIN)
+      .then((res) => {
+        t.expect(res.status).to.equal(200)
+        t.getCollection('objects', 'entity_1').then((collection) => {
+          t.expect(collection.length).to.equal(1)
+          // checks entity 'record' at row [0]
+          t.expectProps(collection[0], {
+            type: 'record',
+            name: oneUserWithSecLevelAndPIN.name,
+            document: oneUserWithSecLevelAndPIN.id,
+            code: oneUserWithSecLevelAndPIN.code,
+            pin: oneUserWithSecLevelAndPIN.pin,
+            seclevel: oneUserWithSecLevelAndPIN.seclevel
+          })
+          done()
+        })
+      }).catch((e) => {
+        if (e.response) console.log('ERROR: ' + e.response.status + ' ' + e.response.text)
+        else console.log.error(e)
+      })
+  }) */
 
   it('POST to /records/ creates a "record" and 2 "card" (oneUserTwoCard) and checks database', (done) => {
     t.sendPOST('/api/coms/records', oneUserTwoCards).then((res) => {

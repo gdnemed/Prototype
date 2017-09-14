@@ -8,17 +8,19 @@
 const moment = require('moment-timezone')
 const logger = require('../utils/log')
 const migrations = require('../migrations')
+const request = require('request')
 const g = require('../global')
 
-let dbGlobal
+let mapCustomers
+let mapDevices
 let _customers = {}
 let log
 
 const getCustomersList = () => {
   let l = []
-  for (let k in dbGlobal.customers) {
-    if (dbGlobal.customers.hasOwnProperty(k)) {
-      let c = dbGlobal.customers[k]
+  for (let k in mapCustomers) {
+    if (mapCustomers.hasOwnProperty(k)) {
+      let c = mapCustomers[k]
       c.apikey = k.substr(1)
       l.push(c)
     }
@@ -49,18 +51,41 @@ const initializeCustomer = (customersList, i) => {
 }
 
 const init = () => {
-  if (g.getConfig().api_listen) {
-    dbGlobal = process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test'
-      ? {customers: {k123: {name: 'SPEC'}, k124: {name: 'OCTIME'}}, devices: {t123: 'SPEC', t1105: 'SPEC', t1101: 'SPEC'}}
-      : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC', t1101: 'SPEC'}}
+  /* dbGlobal = process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test'
+  ? {
+    customers: {k123: {name: 'SPEC'}, k124: {name: 'OCTIME'}},
+    devices: {t123: 'SPEC', t1105: 'SPEC', t1101: 'SPEC'}
+  }
+  : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC', t1101: 'SPEC'}}
+  */
+  return new Promise((resolve, reject) => {
     log = logger.getLogger('session')
     log.debug('session: init() env: ' + process.env.NODE_ENV)
-    return new Promise((resolve, reject) => {
-      initializeCustomer(getCustomersList(), 0)
-        .then(resolve)
-        .catch(reject)
-    })
-  } else return Promise.resolve()
+    let cfg = g.getConfig()
+    // If we serve an API, we are not a simple exporter or importer, and we need global database
+    if (cfg.api_listen) {
+      // Ask for customers
+      let url = 'http://127.0.0.1:' + cfg.api_listen.port + '/global/'
+      let data = {method: 'GET', url: url + 'customers'}
+      request(data, (error, response, body) => {
+        if (error) reject(error)
+        else {
+          mapCustomers = JSON.parse(response.body)
+          // Ask for devices
+          data.url = url + 'devices'
+          request(data, (error, response, body) => {
+            if (error) reject(error)
+            else {
+              mapDevices = JSON.parse(response.body)
+              initializeCustomer(getCustomersList(), 0)
+                .then(resolve)
+                .catch(reject)
+            }
+          })
+        }
+      })
+    } else resolve()
+  })
 }
 
 /*
@@ -87,7 +112,7 @@ const manageSession = (req, res, f) => {
   // Simple api key
   let apiKey = req.header('Authorization')
   if (apiKey && apiKey.startsWith('APIKEY ')) {
-    let customer = dbGlobal.customers['k' + apiKey.substr(7)]
+    let customer = mapCustomers[apiKey.substr(7)]
     if (customer) {
       getSession(customer.name)
         .then((session) => {
@@ -103,7 +128,7 @@ Validates serial number of a device. Returns customer name.
  */
 const checkSerial = (serial) => {
   return new Promise((resolve, reject) => {
-    let d = dbGlobal.devices['t' + serial]
+    let d = mapDevices[serial]
     if (d) resolve(d)
     else reject(new Error('Invalid serial number'))
   })
