@@ -38,7 +38,7 @@ const oneUserWithSecLevelAndPIN = {
   'name': '1U_SL_PIN José Ariño',
   'code': '0456',
   'language': 'en',
-  'seclevel': '2',
+  'seclevel': 2,
   'pin': '1234',
   'validity': [{'start': 20170105, 'end': 20180622}]
 }
@@ -91,17 +91,18 @@ describe('records.spec.js', () => {
       })
   })
 
- /* it('POST to /records/ creates a "record" with security level and PIN and checks database', (done) => {
+  it('POST to /records/ creates a "record" with security level and PIN and checks database', (done) => {
     t.sendPOST('/api/coms/records', oneUserWithSecLevelAndPIN)
       .then((res) => {
         t.expect(res.status).to.equal(200)
-        t.getCollection('objects', 'entity_1').then((collection) => {
-          t.expect(collection.length).to.equal(1)
-          // checks entity 'record' at row [0]
-          t.expectProps(collection[0], {
-            type: 'record',
+        // GET via api/records
+        t.sendGET('/api/coms/records').then((res) => {
+          t.expect(res.status).to.equal(200)
+          console.log(res.body)
+          let rec0 = res.body[0]
+          t.expectProps(rec0, {
             name: oneUserWithSecLevelAndPIN.name,
-            document: oneUserWithSecLevelAndPIN.id,
+            id: oneUserWithSecLevelAndPIN.id,
             code: oneUserWithSecLevelAndPIN.code,
             pin: oneUserWithSecLevelAndPIN.pin,
             seclevel: oneUserWithSecLevelAndPIN.seclevel
@@ -112,7 +113,7 @@ describe('records.spec.js', () => {
         if (e.response) console.log('ERROR: ' + e.response.status + ' ' + e.response.text)
         else console.log.error(e)
       })
-  }) */
+  })
 
   it('POST to /records/ creates a "record" and 2 "card" (oneUserTwoCard) and checks database', (done) => {
     t.sendPOST('/api/coms/records', oneUserTwoCards).then((res) => {

@@ -150,6 +150,43 @@ let prepPutInfo = {
   }
 }
 
+let prepGetExternals = {
+  _entity_: '[external]',
+  id: 'code',
+  host: {_property_: 'host'},
+  port: {_property_: 'port'},
+  dir: {_property_: 'dir'},
+  workdir: {_property_: 'workdir'},
+  output: {_property_: 'output'},
+  period: {_property_: 'period'},
+  fileName: {_property_: 'fileName'}
+}
+
+let prepGetExternal = {
+  _entity_: 'external',
+  _filter_: {field: 'code', variable: 'id'},
+  id: 'code',
+  host: {_property_: 'host'},
+  port: {_property_: 'port'},
+  dir: {_property_: 'dir'},
+  workdir: {_property_: 'workdir'},
+  output: {_property_: 'output'},
+  period: {_property_: 'period'},
+  fileName: {_property_: 'fileName'}
+}
+
+let prepPutExternal = {
+  _entity_: 'external',
+  id: 'code',
+  host: {_property_: 'host'},
+  port: {_property_: 'port'},
+  dir: {_property_: 'dir'},
+  workdir: {_property_: 'workdir'},
+  output: {_property_: 'output'},
+  period: {_property_: 'period'},
+  fileName: {_property_: 'fileName'}
+}
+
 /*
 Adapts database data of clocking to API structure.
 */
@@ -298,6 +335,9 @@ const initAPI = () => {
   api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
   api.post('/api/coms/clean', clean)
   api.get('/api/coms/asap', sseExpress, apiCall(register))
+  api.get('/api/coms/externals', apiCall(get, prepGetExternals))
+  api.get('/api/coms/externals/:id', apiCall(get, prepGetExternal))
+  api.post('/api/coms/externals', apiCall(put, prepPutExternal))
 }
 
 let monitors = {}

@@ -545,8 +545,9 @@ const putElemProperty = (property, modelProperty, propObj, elem, params) => {
     }
 
     let db = params.session.dbs[params.entity ? 'objects' : 'inputs' + Math.trunc(params.period / 100)]
-    let table = params.entity ? `property_${modelProperty.type}_${nodeId}`
-      : `input_data_${modelProperty.type}_${nodeId}_${params.period}`
+    let typeProp = MODEL.getType(modelProperty.type)
+    let table = params.entity ? `property_${typeProp}_${nodeId}`
+      : `input_data_${typeProp}_${nodeId}_${params.period}`
     let s = db.from(table)
       .where(params.entity ? 'entity' : 'id', params.id).where('property', property)
     if (propObj._mixed_) s.where('value', r.value)
@@ -914,7 +915,7 @@ const addFilter = (statement, filter, helper, variables) => {
     default:// Condition over property
       let pt = MODEL.PROPERTIES[filter.field]
       if (pt) {
-        statement.join('property_' + pt.type + '_1 as pf', (sq) => {
+        statement.join('property_' + MODEL.getTypeProperty(filter.field) + '_1 as pf', (sq) => {
           sq.on('entity', 'id').on('property', filter.field)
           if (filter.condition === '=' || !filter.condition) sq.on('value', v)
           else sq.on('value', filter.condition, v)
