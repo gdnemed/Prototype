@@ -7,21 +7,30 @@ const ENTITIES = {
   'record': {keys: [['document'], ['code']],
     required: ['code', 'document', 'name'],
     related_from: {identifies: 'card'}},
-  'timetype': {keys: [['code']], required: ['code', 'intname']}
+  'timetype': {keys: [['code']], required: ['code', 'intname']},
+  'external': {keys: [['code']], required: ['code']}
 }
 
 const PROPERTIES = {
-  'language': {type: 'str', time: false},
-  'info': {type: 'str', time: false},
-  'enroll': {type: 'num', time: true},
-  'validity': {type: 'num', time: false},
-  'ttgroup': {type: 'str', time: false},
-  'revision': {type: 'num', time: true},
-  'drop': {type: 'num', time: true},
-  'card': {type: 'str'},
-  'record': {type: 'str'},
-  'seclevel': {type: 'num', time: false},
-  'pin': {type: 'str', time: false}
+  'language': {type: 'string', time: false},
+  'info': {type: 'string', time: false},
+  'enroll': {type: 'datetime', time: true},
+  'validity': {type: 'datetime', time: false},
+  'ttgroup': {type: 'string', time: false},
+  'revision': {type: 'number', time: true},
+  'drop': {type: 'datetime', time: true},
+  'card': {type: 'string'},
+  'record': {type: 'string'},
+  'seclevel': {type: 'number', time: false},
+  'pin': {type: 'string', time: false},
+  'host': {type: 'string'},
+  'port': {type: 'number'},
+  'dir': {type: 'string'},
+  'workdir': {type: 'string'},
+  'output': {type: 'boolean'},
+  'period': {type: 'number'},
+  'fileName': {type: 'string'}
+
 }
 
 const INPUTS = {
@@ -34,7 +43,19 @@ const RELATIONS = {
 }
 
 const getTypeProperty = (p) => {
-  return PROPERTIES[p].type
+  return getType(PROPERTIES[p].type)
+}
+
+const getType = (t) => {
+  switch (t) {
+    case 'string': return 'str'
+    case 'number': return 'num'
+    case 'blob': return 'bin'
+    case 'boolean': return 'num'
+    case 'date': return 'num'
+    case 'datetime': return 'num'
+    case 'time': return 'num'
+  }
 }
 
 const getRelatedEntity = (r, e, inverse) => {
@@ -42,10 +63,11 @@ const getRelatedEntity = (r, e, inverse) => {
 }
 
 module.exports = {
-  ENTITIES: ENTITIES,
-  PROPERTIES: PROPERTIES,
-  RELATIONS: RELATIONS,
-  INPUTS: INPUTS,
-  getTypeProperty: getTypeProperty,
-  getRelatedEntity: getRelatedEntity
+  ENTITIES,
+  PROPERTIES,
+  RELATIONS,
+  INPUTS,
+  getType,
+  getTypeProperty,
+  getRelatedEntity
 }
