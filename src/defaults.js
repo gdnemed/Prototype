@@ -8,7 +8,8 @@ const addDefaults = () => {
     LEMURIA_DIR_FILES: './remote',
     LEMURIA_DIR_WORK: '.',
     LEMURIA_PERIOD_CLOCKINGS: 1,
-    LEMURIA_FILE_CLOCKINGS: 'clk.csv'
+    LEMURIA_FILE_CLOCKINGS: 'clk.csv',
+    LEMURIA_PORT_API_EMULATOR: 8099
   }
   for (var p in defaults) {
     if (defaults.hasOwnProperty(p)) {

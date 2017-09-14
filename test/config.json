@@ -1,22 +1,23 @@
 {
-		"api_listen":{"host":"","port":4041},
-		"coms_listen":{"host":"","port":4042},
+		"api_listen":{"host":"","port":"$LEMURIA_PORT_API$"},
+		"logic":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
+		"coms_listen":{"host":"","port": $LEMURIA_PORT_COMS$},
 		"terminal_emulator": {
-			"api":{"host":"", "port": 5052}
+			"api":{"host":"", "port": $LEMURIA_PORT_API_EMULATOR$}
 		},
-		"db": {"dir": "./db"},
+		"db": {"dir": "$LEMURIA_DIR_DB$"},
 		"node_id":1,
 		"exchange":{
 			"files":{
 				"dir":"test\\exchange_workdir\\remote",
 				"workdir": "test\\exchange_workdir",
 				"sources":"test\\exchange_sources",
-				"server":{"host":"localhost","port":4041},
+				"server":{"host":"$LEMURIA_HOST_SERVER$","port":$LEMURIA_PORT_SERVER$},
 				"output": true
 			},
 			"clockings":{
 				"dir":"test\\export_clockings",
-				"server":{"host":"localhost","port":4041},
+				"server":{"host":"$LEMURIA_HOST_SERVER$","port":$LEMURIA_PORT_SERVER$},
 				"period": 0,
 				"fileName": "export_clockings.txt"
 			}

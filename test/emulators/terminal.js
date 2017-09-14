@@ -4,6 +4,7 @@
 // -------------------------------------------------------------------------------------------
 
 require('dotenv').config()
+require('../../src/defaults').addDefaults()
 const fs = require('fs')
 const net = require('net')
 const msgpack = require('msgpack-lite')
