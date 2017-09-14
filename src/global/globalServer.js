@@ -19,8 +19,8 @@ const init = () => {
       log.debug('>> global init()')
       try {
         dbGlobal = JSON.parse(fs.readFileSync('global.json', 'utf8'))
-        httpServer.getApi().get('/global/customers', getCustomers)
-        httpServer.getApi().get('/global/devices', getDevices)
+        httpServer.getApi().get('/api/global/customers', getCustomers)
+        httpServer.getApi().get('/api/global/devices', getDevices)
       } catch (e) {
         console.log('global database not found')
         process.exit()

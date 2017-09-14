@@ -65,7 +65,7 @@ const init = () => {
     // If we serve an API, we are not a simple exporter or importer, and we need global database
     if (cfg.api_listen) {
       // Ask for customers
-      let url = 'http://127.0.0.1:' + cfg.api_listen.port + '/global/'
+      let url = 'http://127.0.0.1:' + cfg.api_listen.port + '/api/global/'
       let data = {method: 'GET', url: url + 'customers'}
       request(data, (error, response, body) => {
         if (error) reject(error)

@@ -356,6 +356,23 @@ const register = (req, res, session) => {
   }
   monitorsList.push(client)
   onFinished(res, () => monitorsList.remove(client))
+  // If it has an identifier, get configuration and send it
+  if (req.query && req.query.id) {
+    let found = 0
+    for (let i = 0; i < monitorsList; i++) {
+      let q = monitorsList[i].req.query
+      if (q && q.id && q.id === req.query.id) found++
+    }
+    if (found > 1) {
+      res.status(500).end('id conflict')
+    } else {
+      let cloned = JSON.parse(JSON.stringify(prepGetExternal))
+      squeries.get(session, req.query, cloned, (err, ret) => {
+        if (err) res.status(500).end(err.message)
+        else res.sse('config', ret)
+      })
+    }
+  }
 }
 
 /*
