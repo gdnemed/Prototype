@@ -10,6 +10,8 @@
 // -------------------------------------------------------------------------------------------
 require('dotenv').config()
 require('../src/defaults').addDefaults()
+process.env.HOME = './test/scenarios/basic'
+
 const chai = require('chai')
 const chaiHttp = require('chai-http')
 chai.use(chaiHttp)
@@ -28,7 +30,6 @@ let _terminalInitialized = false
 
 const startLemuria = () => {
   return new Promise((resolve, reject) => {
-    process.env.HOME = './test'
     lemuria.init()
       .then(() => {
         // stores refences to knex objects
