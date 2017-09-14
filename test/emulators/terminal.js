@@ -20,9 +20,28 @@ let buffer
 let mapClockings = {}
 let cfg
 
-const init = (subPath = '/test/emulators') => {
-  let strConfig = applyEnvVars(fs.readFileSync(process.cwd() + subPath + '/terminal.json', 'utf8'))
-  cfg = JSON.parse(strConfig)
+const loadTerminalJsonFile = (path) => {
+  let fileName = path + 'terminal.json'
+  try {
+    console.log(`Using terminal.json file ${fileName}`)
+    return fs.readFileSync(fileName, 'utf8')
+  } catch (err) {
+    console.log(`File not found ${fileName}`)
+  }
+}
+
+const init = () => {
+  let fileContents
+  // If a spcecific 'terminal.json' file exists in HOME dir (directory of a specific configuration), loads it
+  // Otherwise, the default, located at "test/emulators/" must be loaded
+  if (!process.env.HOME || !(fileContents = loadTerminalJsonFile(process.env.HOME + '/'))) {
+    fileContents = loadTerminalJsonFile(process.cwd() + '/test/emulators/')
+  }
+  if (!fileContents) {
+    console.log('ERROR: cannot start terminalEmulator: terminal.json not found')
+    process.exit()
+  }
+  cfg = JSON.parse(applyEnvVars(fileContents))
   client.connect(cfg.server.port, cfg.server.host, function () {
     console.log('Connected')
     let bin = Buffer.from('c8f6', 'hex')

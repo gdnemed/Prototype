@@ -1,0 +1,25 @@
+{
+		"api_listen":{"host":"","port":7081},
+		"logic":{"host":"127.0.0.1","port": 7081},
+		"coms_listen":{"host":"","port": 7022},
+		"terminal_emulator": {
+			"api":{"host":"", "port": 7099}
+		},
+		"globalDB": "local",
+		"node_id":1,
+		"exchange":{
+			"files":{
+				"dir":"test/exchange_workdir/remote",
+				"workdir": "test/exchange_workdir",
+				"sources":"test/exchange_sources",
+				"server":{"host":"127.0.0.1","port": 7081},
+				"output": true
+			},
+			"clockings":{
+				"dir":"test/export_clockings",
+				"server":{"host":"127.0.0.1","port": 7081},
+				"period": 0,
+				"fileName": "export_clockings.txt"
+			}
+		}
+}

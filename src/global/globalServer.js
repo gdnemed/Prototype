@@ -11,20 +11,32 @@ const g = require('../global')
 
 let log
 let dbGlobal
+const loadGlobalJsonFile = (path) => {
+  let fileName = path + 'global.json'
+  try {
+    log.debug(`Using config file ${fileName}`)
+    return JSON.parse(fs.readFileSync(fileName, 'utf8'))
+  } catch (err) {
+    log.debug(`File not found ${fileName}`)
+  }
+}
 
 const init = () => {
   return new Promise((resolve, reject) => {
     if (g.getConfig().globalDB === 'local') {
       log = logger.getLogger('global')
       log.debug('>> global init()')
-      try {
-        dbGlobal = JSON.parse(fs.readFileSync('global.json', 'utf8'))
-        httpServer.getApi().get('/global/customers', getCustomers)
-        httpServer.getApi().get('/global/devices', getDevices)
-      } catch (e) {
-        console.log('global database not found')
+      // If a spcecific 'global.json' file exists in HOME dir, loads it
+      // Otherwise, the default, located at cwd must be loaded
+      if (!(dbGlobal = loadGlobalJsonFile(process.env.HOME + '/'))) {
+        dbGlobal = loadGlobalJsonFile('')
+      }
+      if (!dbGlobal) {
+        console.log('ERROR: cannot start Lemuria: global.json not found')
         process.exit()
       }
+      httpServer.getApi().get('/global/customers', getCustomers)
+      httpServer.getApi().get('/global/devices', getDevices)
       resolve()
     } else resolve()
   })

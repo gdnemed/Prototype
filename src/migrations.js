@@ -18,14 +18,46 @@ const SECTIONS = {
 // Year of inputs migration
 let yearMigration
 
-const getDirForSqliteDB = (customerName) => {
-  let environment = process.env.NODE_ENV || 'development'
-  let dir = g.getConfig().db.dir
-  switch (environment) {
-    case 'stress_test': return dir + '/stress_test/' + customerName + '/'
-    case 'test': return dir + '/test/' + customerName + '/'
-    default: return dir + '/' + customerName + '/'
+// In testing cases, sqlite db files location is forced to the HOME dir (where the configuration is)
+const _testGetDirForSqliteDB = (customerName) => {
+  // Checking: Path: test/scenarios/[SCENARIO_NAME]/db/
+  let sqlitePartialPath = process.env.HOME + '/db/'
+  try {
+    if (!fs.existsSync(sqlitePartialPath)) {
+      log.debug(`Creating directory for SQlite db : ${sqlitePartialPath}`)
+      fs.mkdirSync(sqlitePartialPath)
+    }
+  } catch (err) {
+    console.log(`Creating directory for SQlite db : ${err.message}`)
   }
+  // Checking: Path: test/scenarios/[SCENARIO_NAME]/db/[customerName]
+  let sqliteCompletePath = sqlitePartialPath + customerName + '/'
+  try {
+    if (!fs.existsSync(sqliteCompletePath)) {
+      log.debug(`Creating directory for SQlite db : ${sqliteCompletePath}`)
+      fs.mkdirSync(sqliteCompletePath)
+    }
+  } catch (err) {
+    console.log(`Creating directory for SQlite db : ${err.message}`)
+  }
+  return sqliteCompletePath
+}
+
+const getDirForSqliteDB = (customerName) => {
+  // Test mode
+  if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') { return _testGetDirForSqliteDB(customerName) }
+  // Development or production modes
+  let dir = g.getConfig().db.dir
+  let sqlitePath = dir + '/' + customerName + '/'
+  try {
+    if (!fs.existsSync(sqlitePath)) {
+      log.debug(`Creating directory for SQlite db : ${sqlitePath}`)
+      fs.mkdirSync(sqlitePath)
+    }
+  } catch (err) {
+    console.log(`Creating directory for SQlite db : ${err.message}`)
+  }
+  return sqlitePath
 }
 
 // Executes the migration for the section, returning the implicit Promise of knex.migrate()
