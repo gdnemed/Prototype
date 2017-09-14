@@ -3,6 +3,7 @@
 // Terminals simulator, for tests.
 // -------------------------------------------------------------------------------------------
 
+require('dotenv').config()
 const fs = require('fs')
 const net = require('net')
 const msgpack = require('msgpack-lite')
@@ -18,8 +19,9 @@ let buffer
 let mapClockings = {}
 let cfg
 
-const init = (subPath = '') => {
-  cfg = JSON.parse(fs.readFileSync(process.cwd() + subPath + '/terminal.json', 'utf8'))
+const init = (subPath = '/test/emulators') => {
+  let strConfig = applyEnvVars(fs.readFileSync(process.cwd() + subPath + '/terminal.json', 'utf8'))
+  cfg = JSON.parse(strConfig)
   client.connect(cfg.server.port, cfg.server.host, function () {
     console.log('Connected')
     let bin = Buffer.from('c8f6', 'hex')
@@ -98,6 +100,17 @@ const init = (subPath = '') => {
   })
 
   initAPIserver()
+}
+
+const applyEnvVars = (str) => {
+  const REGEXP_VAR = /\$[A-Za-z_][A-Za-z_0-9]*\$/g
+  let getValForKey = (key) => {
+    let newVal = process.env[key.replace(/\$/g, '')]
+    if (newVal !== undefined) return newVal
+    else return key
+  }
+  str = str.replace(REGEXP_VAR, getValForKey)
+  return str
 }
 
 const send = (data, seq) => {
