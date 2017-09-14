@@ -33,15 +33,11 @@ const initConfiguration = () => {
   try {
     let home = process.env.HOME
     let routeCfg = home
-    switch (process.env.NODE_ENV) {
-      case 'test': routeCfg = `${home}\\test`; break
-      case 'stress_test': routeCfg = `${home}\\`; break
-    }
     log.debug(`Using config file ${routeCfg}`)
     let strConfig = applyEnvVars(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
     _cfg = JSON.parse(strConfig)
   } catch (err) {
-    console.log('config.json not found, using default configuration.')
+    console.log('ERROR: cannot start Lemuria: ' + err.message)
     process.exit()
   }
 }

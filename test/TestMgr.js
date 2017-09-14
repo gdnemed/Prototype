@@ -8,7 +8,8 @@
 //   only at first "get()" call. After this first call, Lemuria and other data & references
 //   are cached in "_t"
 // -------------------------------------------------------------------------------------------
-
+require('dotenv').config()
+require('../src/defaults').addDefaults()
 const chai = require('chai')
 const chaiHttp = require('chai-http')
 chai.use(chaiHttp)
@@ -27,6 +28,7 @@ let _terminalInitialized = false
 
 const startLemuria = () => {
   return new Promise((resolve, reject) => {
+    process.env.HOME = './test'
     lemuria.init()
       .then(() => {
         // stores refences to knex objects
@@ -205,7 +207,10 @@ const verifyExportClockings = (arrValues) => {
 //Removes the 'exports' file (whose name & dir) appears i config.json
 //Removes Sync (no extra syncronization is required)
 const removeExportClockingsFile = () => {
-  fs.unlinkSync(getExportClockingsFileName())
+  let exportClkFileName = getExportClockingsFileName()
+  if (fs.existsSync(exportClkFileName)) {
+    fs.unlinkSync(exportClkFileName)
+  }
 }
 
 // -------------------------------------------------------------------------------------------
