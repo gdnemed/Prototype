@@ -35,8 +35,8 @@ const init = () => {
         console.log('ERROR: cannot start Lemuria: global.json not found')
         process.exit()
       }
-      httpServer.getApi().get('/global/customers', getCustomers)
-      httpServer.getApi().get('/global/devices', getDevices)
+      httpServer.getApi().get('/api/global/customers', getCustomers)
+      httpServer.getApi().get('/api/global/devices', getDevices)
       resolve()
     } else resolve()
   })
