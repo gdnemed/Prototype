@@ -16,6 +16,7 @@ const clockings = require('./exchange/clockings')
 const logic = require('./logic')
 const scheduler = require('./tasks/scheduler')
 const sessions = require('./session/sessions')
+const globalServer = require('./global/globalServer')
 
 let log
 
@@ -29,9 +30,9 @@ const init = () => {
     let endService = process.argv.indexOf('-u') !== -1
     if ((!startService && !endService) || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
-      // Run it as a program
-      sessions.init()
-        .then(httpServer.init)
+      httpServer.init()
+        .then(globalServer.init())
+        .then(sessions.init)
         .then(initServices)
         .then(() => {
           log.info('>> Services started. Application ready...')
