@@ -234,6 +234,12 @@ const processRecord = (r, yesterday, records, partial, elemsToDelete) => {
   if (r.NAME && r.NAME !== '') {
     record.name = r.NAME
   }
+  if (r.SECLEVEL && r.SECLEVEL !== '') {
+    record.seclevel = r.SECLEVEL
+  }
+  if (r.PIN && r.PIN !== '') {
+    record.pin = r.PIN
+  }
   if (r.LANGUAGE) {
     if (r.LANGUAGE === DELETE_MARK) record.language = ''
     else record.language = r.LANGUAGE

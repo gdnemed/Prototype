@@ -19,7 +19,9 @@ const PROPERTIES = {
   'revision': {type: 'num', time: true},
   'drop': {type: 'num', time: true},
   'card': {type: 'str'},
-  'record': {type: 'str'}
+  'record': {type: 'str'},
+  'seclevel': {type: 'num', time: false},
+  'pin': {type: 'str', time: false}
 }
 
 const INPUTS = {
