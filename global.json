@@ -1,0 +1,4 @@
+{
+  "customers": {"123": {"name": "SPEC"}, "124": {"name": "OCTIME"}},
+  "devices": {"123": "SPEC", "1105": "SPEC", "1101": "SPEC"}
+}
