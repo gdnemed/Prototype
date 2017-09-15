@@ -150,41 +150,52 @@ let prepPutInfo = {
   }
 }
 
-let prepGetExternals = {
-  _entity_: '[external]',
+let prepGetNodes = {
+  _entity_: '[node]',
   id: 'code',
-  host: {_property_: 'host'},
-  port: {_property_: 'port'},
-  dir: {_property_: 'dir'},
-  workdir: {_property_: 'workdir'},
-  output: {_property_: 'output'},
-  period: {_property_: 'period'},
-  fileName: {_property_: 'fileName'}
+  services: {
+    _relation_: '[<-runsIn]',
+    _field_: 'code'
+  }
 }
 
-let prepGetExternal = {
-  _entity_: 'external',
+let prepGetNode = {
+  _entity_: 'node',
   _filter_: {field: 'code', variable: 'id'},
   id: 'code',
-  host: {_property_: 'host'},
-  port: {_property_: 'port'},
-  dir: {_property_: 'dir'},
-  workdir: {_property_: 'workdir'},
-  output: {_property_: 'output'},
-  period: {_property_: 'period'},
-  fileName: {_property_: 'fileName'}
+  services: {
+    _relation_: '[<-runsIn]',
+    id: 'code',
+    dir: {_property_: 'dir'},
+    period: {_property_: 'period'},
+    fileName: {_property_: 'fileName'},
+    workdir: {_property_: 'workdir'},
+    output: {_property_: 'output'}
+  }
 }
 
-let prepPutExternal = {
-  _entity_: 'external',
-  id: 'code',
-  host: {_property_: 'host'},
-  port: {_property_: 'port'},
-  dir: {_property_: 'dir'},
-  workdir: {_property_: 'workdir'},
-  output: {_property_: 'output'},
-  period: {_property_: 'period'},
-  fileName: {_property_: 'fileName'}
+let prepPutNode = {
+  _entity_: 'node',
+  id: 'code'
+}
+
+let prepGetServices = {
+  _entity_: 'node',
+  _related_: {
+    _relation_: '[<-runsIn]',
+    dir: {_property_: 'dir'},
+    period: {_property_: 'period'},
+    fileName: {_property_: 'fileName'},
+    workdir: {_property_: 'workdir'},
+    output: {_property_: 'output'}
+  },
+  _filter_: {field: 'code', variable: 'id'}
+}
+
+let prepGetService = {
+}
+
+let prepPutService = {
 }
 
 /*
@@ -266,7 +277,7 @@ const get = (req, res, session, str) => {
   let cloned = JSON.parse(JSON.stringify(str))
   if (str._transform_) cloned._transform_ = str._transform_
   squeries.get(session, req.query, cloned, (err, ret) => {
-    if (err) res.status(500).end(err.message)
+    if (err) res.status(500).end(err.stack.toString())
     else res.status(200).jsonp(ret)
   })
 }
@@ -280,7 +291,7 @@ const put = (req, res, session, str) => {
     req.params,
     cloned, req.body, extraTreatment, (err, ret) => {
       if (err) {
-        res.status(500).end(err.message)
+        res.status(500).end(err.stack.toString())
       } else {
         if (!Array.isArray(ret)) ret = [ret]
         res.status(200).jsonp(ret)
@@ -298,7 +309,7 @@ const del = (req, res, session, filter, entity) => {
   }
   squeries.put(session, stateService, req.params, str,
     {drop: utils.now(), id: req.params[filter.variable]}, null, (err, rows) => {
-      if (err) res.status(500).end(err.message)
+      if (err) res.status(500).end(err.stack.toString())
       else {
         res.status(200).end()
         nextVersion(session, [rows], str._entity_)// Notify communications
@@ -335,9 +346,13 @@ const initAPI = () => {
   api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
   api.post('/api/coms/clean', clean)
   api.get('/api/coms/asap', sseExpress, apiCall(register))
-  api.get('/api/coms/externals', apiCall(get, prepGetExternals))
-  api.get('/api/coms/externals/:id', apiCall(get, prepGetExternal))
-  api.post('/api/coms/externals', apiCall(put, prepPutExternal))
+  api.get('/api/nodes', apiCall(get, prepGetNodes))
+  api.get('/api/nodes/:id', apiCall(get, prepGetNode))
+  api.post('/api/nodes', apiCall(put, prepPutNode))
+  api.post('/api/nodes/:id', apiCall(put, prepPutNode))
+  api.get('/api/nodes/:id/services', apiCall(get, prepGetServices))
+  api.get('/api/nodes/:id/services/:svc', apiCall(get, prepGetService))
+  api.post('/api/nodes/:id/services/:svc', apiCall(put, prepPutService))
 }
 
 let monitors = {}
@@ -366,7 +381,7 @@ const register = (req, res, session) => {
     if (found > 1) {
       res.status(500).end('id conflict')
     } else {
-      let cloned = JSON.parse(JSON.stringify(prepGetExternal))
+      let cloned = JSON.parse(JSON.stringify(prepGetNode))
       squeries.get(session, req.query, cloned, (err, ret) => {
         if (err) res.status(500).end(err.message)
         else res.sse('config', ret)

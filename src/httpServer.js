@@ -27,10 +27,7 @@ const init = () => {
       //  res.header('Access-Control-Allow-Origin', '*')
       //  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization')
       //  next()
-      //})
-
-      // For testing
-      _api.post('/api/objects/query', (req, res) => sessions.manageSession(req, res, query))
+      // })
 
       // Run http server
       let httpServer = _api.listen(g.getConfig().api_listen.port, (err) => {
@@ -43,13 +40,6 @@ const init = () => {
       })
     })
   } else return Promise.resolve()
-}
-
-const query = (req, res, session) => {
-  squeries.get(session, req.params, req.body, (err, ret) => {
-    if (err) res.status(500).end(err.message)
-    else res.status(200).jsonp(ret)
-  })
 }
 
 module.exports = {
