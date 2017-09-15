@@ -6,7 +6,7 @@ const fs = require('fs')
 const log = require('./utils/log').getLogger('migrations')
 const Knex = require('knex')
 const g = require('./global')
-const inputsMigrations = require('../db/migrations/inputs/inputs_migration')
+const inputsMigrations = require('./db/migrations/inputs/inputs_migration')
 
 // Each 'section' correspond to a folder inside /db/migrations
 const SECTIONS = {
@@ -152,7 +152,7 @@ const connect = (dbType, createIfNotExists, customerName, section, dbs, year) =>
       let cfg = Object.assign({}, baseMigration)
       Object.assign(cfg, {
         connection: {filename: `${getDirForSqliteDB(customerName)}M_${section}${inputsSuffix}.db`},
-        migrations: {directory: `${__dirname}/../db/migrations/${section}`}
+        migrations: {directory: `${__dirname}/db/migrations/${section}`}
       })
       let sec = year ? section + year : section
       if (!createIfNotExists && baseMigration.client === 'sqlite3') {
