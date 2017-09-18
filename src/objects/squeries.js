@@ -792,11 +792,6 @@ const prepareGet = (session, variables, str) => {
   getFields(str, session, variables, str._inputs_)
   if (str._entity_ || str._linked_) {
     let f = str._guide_.entity_fields
-
-    // Select over ENTITY
-    if (!str._guide_.subquery) {
-      if (str._linked_) str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
-    }
     let e = sq => {
       selectEntity(sq, f, type, str._filter_, str._guide_, variables)
     }
@@ -856,11 +851,13 @@ const selectEntity = (sq, f, type, filter, helper, variables) => {
   if (type !== null && type !== undefined) {
     if (type.length > 0) {
       s.where('type', type)
-      helper.variablesMapping.push(null) // 1 position in bindings is fixed
+      // 1 position in bindings is fixed
+      helper.variablesMapping.push(null)
     }
   } else if (!helper.subquery) {
     s.where('id', 0)
-    helper.variablesMapping.push(null) // 1 position in bindings is fixed
+    // Linked: 1 position for id
+    helper.variablesMapping.push(null)
   }
   if (filter) addFilter(s, filter, helper, variables)
   // Restore list
@@ -906,7 +903,7 @@ const addFilter = (statement, filter, helper, variables) => {
   }
   let v = filter.variable ? 0 : filter.value
   switch (filter.field) {
-    case 'id':case 'document':
+    case 'id':case 'document':case 'code':case 'name':case 'name2':
       if (filter.condition === '=' || !filter.condition) {
         statement.where(filter.field, v)
       } else statement.where(filter.field, filter.condition, v)
@@ -1461,7 +1458,7 @@ const getNextEntity = (info, forward, parentRow, thisRow, session, variables, ca
   let id = thisRow ? (forward ? thisRow.id2 : thisRow.id1) : parentRow._owner_
   if (id) {
     let s = info.nextEntity._guide_.statement
-    s.bindings[s.bindings.length - 1] = id
+    s.bindings[0] = id
     // Recursively call get
     get(session, variables, info.nextEntity, (err, r) => {
       if (err) callback(err)
