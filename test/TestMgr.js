@@ -10,7 +10,7 @@
 // -------------------------------------------------------------------------------------------
 require('dotenv').config()
 require('../src/defaults').addDefaults()
-process.env.HOME = './test/scenarios/basic'
+process.env.HOME = process.env.HOME || './test/scenarios/basic'
 
 const chai = require('chai')
 const chaiHttp = require('chai-http')

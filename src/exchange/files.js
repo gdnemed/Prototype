@@ -21,6 +21,7 @@ let workDir
 let timeZone
 let remoteService
 let createOutput
+let deleteFile
 let apiKey
 
 /*
@@ -40,6 +41,7 @@ const init = () => {
       remoteDir = params.dir
       workDir = params.workdir
       createOutput = params.output
+      deleteFile = params.deleteFile === undefined || params.deleteFile //true by default
       apiKey = '123'
       watch('per', processRecord, 'records', 'records', 'records')
       watch('tty', processTtype, 'timetypes', 'timetypes', 'timetypes')
@@ -150,7 +152,7 @@ const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDel
       sendOrders(pathPost, elems, elemsToDelete, output, partial, (nObjects, nErrors) => {
         if (output) outPut(output, nObjects + ' lines processed. ' + nErrors + ' errors.')
         deleteOrders(pathDelete, elemsToDelete, output, partial,
-          () => endImport(path, importType, output, now, true, partial))
+          () => endImport(path, importType, output, now, nErrors == 0, partial))
       })
     }
   })
@@ -199,9 +201,12 @@ Moves records to "done" directories.
 */
 const endImport = (path, importType, output, now, ok, partial) => {
   if (fs.existsSync(path)) {
-    let newPath = workDir + '/' + (ok ? 'done' : 'error') + '/' +
-      importType + (partial ? '_INC_' : '_') + now + '.DWN'
-    fs.rename(path, newPath, (err) => { if (err) log.error(err) })
+    if(deleteFile){
+      fs.unlink(path, (err) => { if (err) log.error(err) })
+    }else {
+      let newPath = workDir + '/' + (ok ? 'done' : 'error') + '/' + importType + (partial ? '_INC_' : '_') + now + '.DWN'
+      fs.rename(path, newPath, (err) => { if (err) log.error(err) })
+    }
   }
   if (output) {
     output.on('finish', () => {
@@ -382,7 +387,7 @@ const sendOrder = (l, i, apiPath, elemsToDelete, output, nObjects, nErrors, call
         log.error(err)
         if (output) outPut(output, err.message)
       } else if (response && response.statusCode !== 200 && response.statusCode !== 201) {
-        let msg = 'Error ' + response.statusCode + ' : ' + bodyResponse
+        let msg = 'Error ' + response.statusCode + ' for item "' + id + '": ' + bodyResponse
         log.error(msg)
         if (output) {
           outPut(output, msg)
