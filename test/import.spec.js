@@ -1,4 +1,6 @@
 /* global process, require, describe, beforeEach, it, afterEach */
+const fs = require('fs')
+const path = require('path')
 const TestMgr = require('./TestMgr.js')
 const equal = require('deep-equal')
 let t // Reference to data obtained from TestMgr().get
@@ -13,9 +15,10 @@ describe('import.spec.js', () => {
   })
 
   it('per.csv is properly imported, "onEndImport" event is received with ok = true', (done) => {
-    t.handleFileImport('per.csv').then(({path, importType, ok}) => {
+    t.handleFileImport('per.csv').then(({pathFile, importType, ok}) => {
       t.expect(ok).to.equal(true)
-
+      let files = fs.readdirSync(path.join(t.config.exchange.files.workdir, 'done'))
+      t.expect(files.length).to.equal(0)
       // GET via api/records
       t.sendGET('/api/coms/records').then((res) => {
         t.expect(res.status).to.equal(200)
