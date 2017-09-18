@@ -1,12 +1,15 @@
 /* global process, require, describe, beforeEach, it, afterEach */
-const TestMgr = require('./TestMgr.js')
-const sc = require('./scenarios')
+const TestMgr = require('../../TestMgr.js')
+const sc = require('../../scenarios')
 
 let t // Reference to data obtained from TestMgr().get
 
-let enrollA = {enroll: 20170803120845}
+const info1 = {
+  value: 'Holidays: 10:25',
+  date: 20170804
+}
 
-describe('enroll.spec.js', () => {
+describe('infos.spec.js', () => {
   beforeEach((done) => {
     // Ensures Lemuria is created and all needed references are stored in "t"
     TestMgr.get().then((_testdata) => {
@@ -15,13 +18,21 @@ describe('enroll.spec.js', () => {
     })
   })
 
-  it('POST enrollA', (done) => {
+  it('POST (simpleInfo) to /records/ and GET via /records/ returns the user and card', (done) => {
     sc.createSc1(t).then(() => {
-      t.sendPOST('/api/coms/records/1U_1C/enroll', enrollA)
+      t.sendPOST('/api/coms/records/1U_1C/info', info1)
         .then((res) => {
           t.expect(res.status).to.equal(200)
-          done()
+          // GET via api/records
+          t.sendGET('/api/coms/records/1U_1C/info')
+            .then((res) => {
+              t.expect(res.status).to.equal(200)
+              console.log(res.body)
+              done()
+            })
+            .catch(({response}) => console.log('ERROR: ' + response.status + ' ' + response.text))
         })
+        .catch(({response}) => console.log('ERROR: ' + response.status + ' ' + response.text))
     })
   })
 

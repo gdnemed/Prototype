@@ -1,7 +1,7 @@
 /* global process, require, describe, beforeEach, it, afterEach */
 const fs = require('fs')
 const path = require('path')
-const TestMgr = require('./TestMgr.js')
+const TestMgr = require('../../TestMgr.js')
 const equal = require('deep-equal')
 let t // Reference to data obtained from TestMgr().get
 

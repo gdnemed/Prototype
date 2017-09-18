@@ -1,7 +1,7 @@
 /* global process, require, describe, before, after, it */
 
 const equal = require('deep-equal')
-const TestMgr = require('./TestMgr.js')
+const TestMgr = require('../../TestMgr.js')
 let t // Reference to data obtained from TestMgr().get
 
 const ttOne = {

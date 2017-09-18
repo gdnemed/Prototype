@@ -5,7 +5,7 @@ const TestMgr = require('../../TestMgr.js')
 const equal = require('deep-equal')
 let t // Reference to data obtained from TestMgr().get
 
-describe('import.spec.js', () => {
+describe('noDeleteFile.spec.js', () => {
   beforeEach((done) => {
     // Ensures Lemuria is created and all needed references are stored in "t"
     TestMgr.get().then((_testdata) => {
@@ -14,7 +14,7 @@ describe('import.spec.js', () => {
     })
   })
 
-  xit('per.csv is properly imported, and moved to done directory', (done) => {
+  it('per.csv is properly imported, and moved to done directory', (done) => {
     t.handleFileImport('per.csv').then(({filePath, importType, ok}) => {
       t.expect(ok).to.equal(true)
       //Imported file is moved to done directory

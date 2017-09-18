@@ -1,6 +1,6 @@
 /* global process, require, describe, beforeEach, it, afterEach */
 
-const TestMgr = require('./TestMgr.js')
+const TestMgr = require('../../TestMgr.js')
 let t // Reference to data obtained from TestMgr().get
 
 const oneUserOneCardExport = {
