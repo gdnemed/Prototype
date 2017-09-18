@@ -3,12 +3,28 @@
 // -------------------------------------------------------------------------------------------
 
 const ENTITIES = {
-  'card': {keys: [['code']], required: ['code']},
-  'record': {keys: [['document'], ['code']],
+  'card': {
+    keys: [['code']],
+    required: ['code']
+  },
+  'record': {
+    keys: [['document'], ['code']],
     required: ['code', 'document', 'name'],
-    related_from: {identifies: 'card'}},
-  'timetype': {keys: [['code']], required: ['code', 'intname']},
-  'external': {keys: [['code']], required: ['code']}
+    related_from: {identifies: 'card'}
+  },
+  'timetype': {
+    keys: [['code']],
+    required: ['code', 'intname']
+  },
+  'node': {
+    keys: [['code']],
+    required: ['code'],
+    related_from: {runsIn: 'service'}
+  },
+  'service': {
+    keys: [['code']],
+    required: ['code']
+  }
 }
 
 const PROPERTIES = {
@@ -39,7 +55,8 @@ const INPUTS = {
 }
 
 const RELATIONS = {
-  'identifies': {time: false}
+  'identifies': {type: 'N->1', time: false},
+  'runsIn': {type: 'N->1', time: false}
 }
 
 const getTypeProperty = (p) => {

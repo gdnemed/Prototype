@@ -23,15 +23,15 @@ let log
 const init = () => {
   // logger initialization
   log = logger.getLogger('Main')
-  // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
-  g.init()
   return new Promise((resolve, reject) => {
     let startService = process.argv.indexOf('-i') !== -1
     let endService = process.argv.indexOf('-u') !== -1
     if ((!startService && !endService) || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
-      httpServer.init()
-        .then(globalServer.init())
+      // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
+      g.init()
+        .then(httpServer.init)
+        .then(globalServer.init)
         .then(sessions.init)
         .then(initServices)
         .then(() => {
