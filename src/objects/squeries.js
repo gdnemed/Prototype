@@ -795,7 +795,7 @@ const prepareGet = (session, variables, str) => {
     let e = sq => {
       selectEntity(sq, f, type, str._filter_, str._guide_, variables)
     }
-    joins(db, str, variables, e, f, type)
+    joins(db, str, session, variables, e, f, type)
     preparePropertySubquery(db, str._guide_.property_subqueries, 'str')
     preparePropertySubquery(db, str._guide_.property_subqueries, 'num')
     preparePropertySubquery(db, str._guide_.property_subqueries, 'bin')
@@ -807,13 +807,17 @@ const prepareGet = (session, variables, str) => {
     let e = sq => {
       selectInput(sq, f, type, str._filter_, str._guide_, variables)
     }
-    joins(db, str, variables, e, f, type)
+    joins(db, str, session, variables, e, f, type)
     if (!variables.count) {
       preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'str', type)
       preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'num', type)
       preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'bin', type)
       prepareRelationInput(db, str._guide_.relations_forward, type)
     }
+  }
+  if (str._prevVarMap_) {
+    str._guide_.subquery.toSQL()
+    str._prevVarMap_ = str._prevVarMap_.concat(str._guide_.variablesMapping)
   }
   return true
 }
@@ -982,11 +986,12 @@ and put the result in str._guide_.statement
 - f: Entity/input fields
 - type: type of entity, or period of inputs
 */
-const joins = (db, str, variables, e, f, type) => {
+const joins = (db, str, session, variables, e, f, type) => {
   let ps = str._guide_.property_fields
   let dr = str._guide_.direct_relations
   if ((ps && ps.length > 0) || (dr && dr.length > 0)) {
     let last
+    let lastLink
     // To avoid nulls
     if (!ps) ps = []
     if (!dr) dr = []
@@ -1000,19 +1005,27 @@ const joins = (db, str, variables, e, f, type) => {
         : 'property_' + ps[i].typeProperty + '_' + nodeId
       joinProperty(str, variables, ps, i, propertyTable, e, linkField)
       last = ps[i].join
+      lastLink = 'jps' + i
     }
     // Now, relations
     for (let i = 0; i < dr.length; i++) {
-      joinRelation(db, str, variables, dr, i, ps, e)
+      joinRelation(db, str, session, variables, dr, i, ps, e)
       last = dr[i].join
+      lastLink = 'jdr' + i
     }
     if (str._guide_.subquery) {
-      str._guide_.subquery.leftJoin(last, str._guide_.link_field_1, str._guide_.link_field_2)
+      if (str._guide_.direct_relations) {
+        let l1 = lastLink + str._guide_.link_field_1.substr(str._guide_.link_field_1.indexOf('.'))
+        str._guide_.subquery.join(last, l1, str._guide_.link_field_2)
+      } else str._guide_.subquery.leftJoin(last, str._guide_.link_field_1, str._guide_.link_field_2)
     } else str._guide_.statement = db.from(last)
   } else if (str._inputs_) str._guide_.statement = selectInput(db, f, type, str._filter_, str._guide_, variables)
   else {
-    if (str._guide_.subquery) str._guide_.subquery.leftJoin(e, str._guide_.link_field_1, str._guide_.link_field_2)
-    else str._guide_.statement = selectEntity(db, f, type, str._filter_, str._guide_, variables)
+    if (str._guide_.subquery) {
+      if (str._guide_.direct_relations) {
+        str._guide_.subquery.join(e, str._guide_.link_field_1, str._guide_.link_field_2)
+      } else str._guide_.subquery.leftJoin(e, str._guide_.link_field_1, str._guide_.link_field_2)
+    } else str._guide_.statement = selectEntity(db, f, type, str._filter_, str._guide_, variables)
   }
   if (str._order_) {
     for (let i = 0; i < str._order_.length; i++) {
@@ -1052,12 +1065,19 @@ const filterTime = (join, withtime, elem, variablesMapping, beginning) => {
 const joinProperty = (str, variables, a, i, propertyTable, e, linkField) => {
   // Now, join with previous level
   a[i].join = sq => {
-    let table = i === 0 ? 'e' : 'jps' + (i - 1)
+    let table
+    if (str._guide_.link_field_1 && i === 0) {
+      table = str._guide_.link_field_1.substr(0, str._guide_.link_field_1.indexOf('.'))
+    } else table = (i === 0 ? 'e' : 'jps' + (i - 1))
     sq.from(i === 0 ? e : a[i - 1].join)
     let on = (j) => {
       // Now, the 'on' links, using index (id,relation,t1,t2)
       // First id
-      j.on('ps' + i + linkField, table + '._id_')
+      let l = table + '._id_'
+      if (str._guide_.link_field_1) {
+        l = table + str._guide_.link_field_1.substr(str._guide_.link_field_1.indexOf('.'))
+      }
+      j.on('ps' + i + linkField, l)
       // Now, relation
       let pType = a[i].type
       j.onIn('ps' + i + '.property', [pType])
@@ -1097,7 +1117,7 @@ const joinProperty = (str, variables, a, i, propertyTable, e, linkField) => {
   }
 }
 
-const joinRelation = (db, str, variables, a, i, ps, e) => {
+const joinRelation = (db, str, session, variables, a, i, ps, e) => {
   // Now, join with previous level
   a[i].join = sq => {
     let table = i === 0 ? (ps.length > 0 ? ('jps' + (ps.length - 1)) : 'e') : 'jdr' + (i - 1)
@@ -1117,8 +1137,8 @@ const joinRelation = (db, str, variables, a, i, ps, e) => {
         filterTime(j, withtime, a[i], str._guide_.variablesMapping)
       }
     }
-    // If filter over property join, otherwise, left join
-    if (a[i].filter) sq.join('relation_' + nodeId + ' as dr' + i, on)
+    // If filter over join, otherwise, left join
+    if (a[i].nextEntity._filter_) sq.join('relation_' + nodeId + ' as dr' + i, on)
     else sq.leftJoin('relation_' + nodeId + ' as dr' + i, on)
 
     // If additional filters, put them in 'where'
@@ -1127,7 +1147,7 @@ const joinRelation = (db, str, variables, a, i, ps, e) => {
     sq.column(table + '.*')
     // Now, current relation columns. It could be just 'value' (the default)
     // or a list of fields.
-    if (a[i].fields) putRelationInfo(db, str, a[i], i, sq)
+    if (a[i].fields) putRelationInfo(session, variables, db, str, a[i], i, sq)
     else sq.column('dr' + i + (a[i].forward ? '.id2 as ' : '.id1 as ') + a[i].entry)
     if (a[i].filter) addFilter(sq, a[i].filter, str._guide_, variables)
     sq.as('jdr' + i) // New alias for every join
@@ -1141,7 +1161,7 @@ Puts columns in subquery, about relation table.
 - i: Index in joins array.
 - subquery: Query for this join.
 */
-const putRelationInfo = (db, str, info, i, subquery) => {
+const putRelationInfo = (session, variables, db, str, info, i, subquery) => {
   if (info.nextEntity) {
     let prefix = 'r' + i + '_'
     // Objects: we put the id for next get
@@ -1158,8 +1178,11 @@ const putRelationInfo = (db, str, info, i, subquery) => {
     info.nextEntity._link_field_1_ = prefix + 'r.' + prefix + '_id_'
     info.nextEntity._link_field_2_ = 'dr' + i + (info.forward ? '.id2' : '.id1')
     info.nextEntity._subquery_ = subquery
-    prepareGet(db, info.nextEntity)
-    subquery.column(prefix + 'r' + '.*')
+    info.nextEntity._prevVarMap_ = str._guide_.variablesMapping
+    info.nextEntity._prevStr_ = str
+    prepareGet(session, variables, info.nextEntity)
+    str._guide_.variablesMapping = info.nextEntity._prevVarMap_
+    subquery.column(/* TODO: prefix + 'r' */ 'jps4' + '.*')
   } else {
     // One field, from the relation table
     if (info.fields.t1) {
@@ -1335,7 +1358,7 @@ const executeSelect = (str, variables, session, callback) => {
         result = result[0]
       } else if (str._related_) {
         result = result[0]._related_
-        if (str._related_._relation_.charAt(0) !== '[') result = result[0]
+        // if (str._related_._relation_.charAt(0) !== '[') result = result[0]
       } else {
         if (!str._guide_.isArray) result = result[0]
       }
@@ -1419,6 +1442,12 @@ const treatRelatedObject = (dr, row) => {
       let prefix = dr[i].nextEntity._prefix_
       let o = {}
       if (dr[i].nextEntity._n_fields > 1) row[dr[i].entry] = o
+      for (let p in dr[i].nextEntity) {
+        if (p.charAt(0) !== '_' && row[p] !== null) {
+          o[p] = row[p]
+          delete row[p]
+        }
+      }
       for (let p in row) {
         // Nested relation have fields changed to r<i>_<field>
         if (row.hasOwnProperty(p)) {
@@ -1538,21 +1567,23 @@ Puts relation fields into the object to return (o),
 which is part of the parent object (parentRow).
 */
 const completeRelation = (o, parentRow, info, data, forward) => {
-  if (forward) {
-    if (info.fields.id2) o[info.fields.id2] = data.id2
-  } else if (info.fields.id1) o[info.fields.id1] = data.id1
-  if (info.fields.t1) {
-    if (data.t1 && data.t1 !== CT.START_OF_DAYS &&
-      data.t1 !== CT.START_OF_TIME) o[info.fields.t1] = data.t1
+  if (o) {
+    if (forward) {
+      if (info.fields.id2) o[info.fields.id2] = data.id2
+    } else if (info.fields.id1) o[info.fields.id1] = data.id1
+    if (info.fields.t1) {
+      if (data.t1 && data.t1 !== CT.START_OF_DAYS &&
+        data.t1 !== CT.START_OF_TIME) o[info.fields.t1] = data.t1
+    }
+    if (info.fields.t2) {
+      if (data.t2 && data.t2 !== CT.END_OF_DAYS &&
+        data.t2 !== CT.END_OF_TIME) o[info.fields.t2] = data.t2
+    }
+    // If it's a simple property, change object for content
+    if (o._field_) o = o._field_
+    if (info.isArray) parentRow[info.entry].push(o)
+    else parentRow[info.entry] = o
   }
-  if (info.fields.t2) {
-    if (data.t2 && data.t2 !== CT.END_OF_DAYS &&
-      data.t2 !== CT.END_OF_TIME) o[info.fields.t2] = data.t2
-  }
-  // If it's a simple property, change object for content
-  if (o._field_) o = o._field_
-  if (info.isArray) parentRow[info.entry].push(o)
-  else parentRow[info.entry] = o
 }
 
 /*

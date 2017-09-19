@@ -193,6 +193,18 @@ let prepGetServices = {
 }
 
 let prepGetService = {
+  _entity_: 'node',
+  _related_: {
+    _relation_: '<-runsIn',
+    _filter_: {field: 'code', variable: 'svc'},
+    code: 'code',
+    dir: {_property_: 'dir'} ,
+    period: {_property_: 'period'},
+    fileName: {_property_: 'fileName'},
+    workdir: {_property_: 'workdir'},
+    output: {_property_: 'output'}
+  },
+  _filter_: {field: 'code', variable: 'id'}
 }
 
 let prepPutService = {
