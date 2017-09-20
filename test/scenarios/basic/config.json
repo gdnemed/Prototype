@@ -7,19 +7,16 @@
 		},
 		"globalDB": "local",
 		"node_id":1,
-		"exchange":{
-			"files":{
-				"dir":"test/exchange_workdir/remote",
-				"workdir": "test/exchange_workdir",
-				"sources":"test/exchange_sources",
-				"server":{"host":"127.0.0.1","port": 7081},
-				"output": true
-			},
-			"clockings":{
-				"dir":"test/export_clockings",
-				"server":{"host":"127.0.0.1","port": 7081},
-				"period": 0,
-				"fileName": "export_clockings.txt"
-			}
+		"server":{"host":"127.0.0.1","port": 7081},
+		"files":{
+			"dir":"test/exchange_workdir/remote",
+			"workdir": "test/exchange_workdir",
+			"sources":"test/exchange_sources",
+			"output": true
+		},
+		"clockings":{
+			"dir":"test/export_clockings",
+			"period": 0,
+			"fileName": "export_clockings.txt"
 		}
 }

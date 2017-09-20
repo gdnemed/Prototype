@@ -23,39 +23,34 @@ let hasHeaders
 let headers = ['id', 'record', 'code', 'card', 'date', 'time', 'dir', 'ttype', 'result', 'clockpoint']
 
 const init = () => {
-  let exc = g.getConfig().exchange
-  if (!exc) return Promise.resolve()
+  let params = g.getConfig().clockings
+  if (!params) return Promise.resolve()
   else {
-    let params = exc.clockings
-    if (!params) return Promise.resolve()
-    else {
-      log = logger.getLogger('clockings')
-      log.debug('>> clockings.init()')
-
-      remoteService = params.server
-      remoteDir = params.dir
-      fileName = params.fileName
-      hasHeaders = params.headers
-      apiKey = '123'
-      period = params.period !== undefined ? 60000 * params.period : 60000
-      if (period === 0) { // As soon as possible
-        var eventSourceInitDict = {headers: {'Authorization': 'APIKEY ' + apiKey}}
-        let eventSource = new EventSource('http://' + remoteService.host + ':' + remoteService.port + '/api/coms/asap', eventSourceInitDict)
-        eventSource.addEventListener('clocking', (e) => {
-          writeClockings([JSON.parse(e.data)])
-          log.trace(e.data)
-        })
-      } else { // Periodic
-        fs.readFile('./counter', 'utf8', (err, contents) => {
-          if (err && (err.code !== 'ENOENT')) log.error(err)
-          else {
-            if (contents) currentId = parseInt(contents)
-            setTimeout(periodicRoutine, 0)
-          }
-        })
-      }
-      return Promise.resolve()
+    log = logger.getLogger('clockings')
+    log.debug('>> clockings.init()')
+    remoteService = g.getConfig().server
+    remoteDir = params.dir
+    fileName = params.fileName
+    hasHeaders = params.headers
+    apiKey = '123'
+    period = params.period !== undefined ? 60000 * params.period : 60000
+    if (period === 0) { // As soon as possible
+      var eventSourceInitDict = {headers: {'Authorization': 'APIKEY ' + apiKey}}
+      let eventSource = new EventSource('http://' + remoteService.host + ':' + remoteService.port + '/api/coms/asap', eventSourceInitDict)
+      eventSource.addEventListener('clocking', (e) => {
+        writeClockings([JSON.parse(e.data)])
+        log.trace(e.data)
+      })
+    } else { // Periodic
+      fs.readFile('./counter', 'utf8', (err, contents) => {
+        if (err && (err.code !== 'ENOENT')) log.error(err)
+        else {
+          if (contents) currentId = parseInt(contents)
+          setTimeout(periodicRoutine, 0)
+        }
+      })
     }
+    return Promise.resolve()
   }
 }
 

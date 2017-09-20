@@ -351,12 +351,12 @@ const executeInsert = (params) => {
   return new Promise((resolve, reject) => {
     if (params.entity) {
       // We pass every data to a new object d
-      let d = getProperFields(params.str, params.entity, params.data)
+      let d = getProperFields(params.str, params.entity, params.data, params.variables)
       // Check required fields
       let r = MODEL.ENTITIES[params.entity].required
       if (r) {
         for (let m = 0; m < r.length; m++) {
-          if (!d.hasOwnProperty(r[m])) {
+          if (!d.hasOwnProperty(r[m]) || d[r[m]] === null || d[r[m]] === undefined) {
             let e = new Error(`${r[m]} required for ${params.entity}`)
             reject(e)
             return
@@ -385,7 +385,7 @@ const executeInsert = (params) => {
 const executeUpdate = (params) => {
   return new Promise((resolve, reject) => {
     if (params.entity) {
-      let d = getProperFields(params.str, params.entity, params.data)
+      let d = getProperFields(params.str, params.entity, params.data, params.variables)
       // Check required fields
       let r = MODEL.ENTITIES[params.entity].required
       if (r) {
@@ -430,7 +430,7 @@ const putMore = (params, n, insert) => {
 const executeInsertInput = (params) => {
   return new Promise((resolve, reject) => {
     // We pass every data to a new object d
-    let d = getProperFields(params.str, null, params.data)
+    let d = getProperFields(params.str, null, params.data, params.variables)
     // Check required fields
     let r = MODEL.INPUTS.required
     if (r) {
@@ -730,15 +730,18 @@ const putElemRelation = (newStr, relObj, relation, modelRelation, relData, forwa
   })
 }
 
-const getProperFields = (str, entity, data) => {
+const getProperFields = (str, entity, data, variables) => {
   let d = entity ? {type: entity} : {}
   for (var p in str) {
     if (str.hasOwnProperty(p) &&
       p.charAt(0) !== '_' &&
-      typeof str[p] === 'string' && data[p] !== undefined &&
-      data[p] !== null) {
-      if (str[p] === 'intname') d[str[p]] = JSON.stringify(data[p])
-      else d[str[p]] = data[p]
+      typeof str[p] === 'string') {
+      let val = data[p]
+      if (val === undefined || val === null) val = variables[p]
+      if (val !== null && val !== undefined) {
+        if (str[p] === 'intname') d[str[p]] = JSON.stringify(val)
+        else d[str[p]] = val
+      }
     }
   }
   return d

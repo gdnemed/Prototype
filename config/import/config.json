@@ -1,11 +1,9 @@
 {
 		"node_id":1,
-		"exchange":{
-			"files":{
-				"dir":"$LEMURIA_DIR_FILES$",
-				"workdir": "$LEMURIA_DIR_WORK$",
-				"server":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
-				"output": true
-			}
+		"server":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
+		"files":{
+			"dir":"$LEMURIA_DIR_FILES$",
+			"workdir": "$LEMURIA_DIR_WORK$",
+			"output": true
 		}
 }

@@ -31,6 +31,7 @@ let _cfg
 const initConfiguration = () => {
   return new Promise((resolve, reject) => {
     // If url argument passed, configuration must be get from server
+    // for instance: http://server:port/api/nodes/:id/services
     if (process.argv.indexOf('--url') !== -1) {
       let url = process.argv[process.argv.indexOf('--url') + 1]
       let apiKey
@@ -63,7 +64,17 @@ const getRemoteConfiguration = (url, apiKey) => {
     request(data, (error, response, body) => {
       if (error) reject(error)
       else {
-        _cfg = JSON.parse(body)
+        let cfg = JSON.parse(body)
+        _cfg = {node_id: 1}
+        _cfg.id = cfg.id
+        for (let i = 0; i < cfg.services.length; i++) {
+          _cfg[cfg.services[i].id] = cfg.services[i]
+          delete _cfg[cfg.services[i].id].id
+        }
+        // Server address
+        let matcher = url.match('(https?://)([^:^/]*)(:\\d*)?(.*)?')
+        let port = matcher[3] ? parseInt(matcher[3].substring(1)) : 80
+        _cfg.server = {host: matcher[2], port: port}
         // We add remote access parameters, which are useful for future calls
         _cfg.url = url
         _cfg.apiKey = apiKey

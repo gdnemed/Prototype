@@ -198,7 +198,7 @@ let prepGetService = {
     _relation_: '<-runsIn',
     _filter_: {field: 'code', variable: 'svc'},
     code: 'code',
-    dir: {_property_: 'dir'} ,
+    dir: {_property_: 'dir'},
     period: {_property_: 'period'},
     fileName: {_property_: 'fileName'},
     workdir: {_property_: 'workdir'},
@@ -208,6 +208,17 @@ let prepGetService = {
 }
 
 let prepPutService = {
+  _entity_: 'node',
+  _filter_: {field: 'code', variable: 'id'},
+  services: {
+    _relation_: '[runsIn<-service]',
+    svc: 'code',
+    dir: {_property_: 'dir'},
+    period: {_property_: 'period'},
+    fileName: {_property_: 'fileName'},
+    workdir: {_property_: 'workdir'},
+    output: {_property_: 'output'}
+  }
 }
 
 /*
@@ -364,6 +375,7 @@ const initAPI = () => {
   api.post('/api/nodes/:id', apiCall(put, prepPutNode))
   api.get('/api/nodes/:id/services', apiCall(get, prepGetServices))
   api.get('/api/nodes/:id/services/:svc', apiCall(get, prepGetService))
+  api.post('/api/nodes/:id/services', apiCall(put, prepPutService))
   api.post('/api/nodes/:id/services/:svc', apiCall(put, prepPutService))
 }
 

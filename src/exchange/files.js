@@ -28,26 +28,22 @@ let apiKey
 Initialize variables and watching import files.
 */
 const init = () => {
-  let exc = g.getConfig().exchange
-  if (!exc) return Promise.resolve()
+  let params = g.getConfig().files
+  if (!params) return Promise.resolve()
   else {
-    let params = exc.files
-    if (!params) return Promise.resolve()
-    else {
-      log = logger.getLogger('files')
-      log.debug('>> files.init()')
-      remoteService = params.server
-      timeZone = 'Europe/Madrid'
-      remoteDir = params.dir
-      workDir = params.workdir
-      createOutput = params.output
-      deleteFile = params.deleteFile === undefined || params.deleteFile //true by default
-      apiKey = '123'
-      watch('per', processRecord, 'records', 'records', 'records')
-      watch('tty', processTtype, 'timetypes', 'timetypes', 'timetypes')
-      watch('inf', processInfo, 'infos', 'records/@/info', 'records/@/info')
-      return Promise.resolve()
-    }
+    log = logger.getLogger('files')
+    log.debug('>> files.init()')
+    remoteService = g.getConfig().server
+    timeZone = 'Europe/Madrid'
+    remoteDir = params.dir
+    workDir = params.workdir
+    createOutput = params.output
+    deleteFile = params.deleteFile === undefined || params.deleteFile //true by default
+    apiKey = '123'
+    watch('per', processRecord, 'records', 'records', 'records')
+    watch('tty', processTtype, 'timetypes', 'timetypes', 'timetypes')
+    watch('inf', processInfo, 'infos', 'records/@/info', 'records/@/info')
+    return Promise.resolve()
   }
 }
 

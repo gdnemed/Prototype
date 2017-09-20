@@ -96,7 +96,7 @@ const startTerminalEmulator = () => {
 const prepareFileImport = (fieName, fileNameSrc) => {
   return new Promise((resolve, reject) => {
     try {
-      let envFiles = t.config.exchange.files
+      let envFiles = t.config.files
       let realFnameSrc = fileNameSrc || fieName
       let tSource = envFiles.sources + '\\' + realFnameSrc
       let tDest = envFiles.dir + '\\' + fieName
@@ -155,7 +155,7 @@ const removeDirectorySync = (removePath) => {
 // exchange_workdir subdirectoris. Clears all this files and resolves a promise when done
 const cleanImportFiles = (fieName) => {
   return new Promise((resolve, reject) => {
-    let envFiles = t.config.exchange.files
+    let envFiles = t.config.files
     let remotePath = envFiles.dir // exchange_workdir/remote/  (after an import process contains .LOG files)
     let donePath = envFiles.workdir + '\\done\\' // exchange_workdirdone/  (after an import process contains .DWN files)
     if (!removeDirectorySync(remotePath)) reject(remotePath)
@@ -187,8 +187,8 @@ const checkCSVExport = (content, arrValues) => {
 }
 
 const getExportClockingsFileName = () => {
-  let clkExports = t.config.exchange.clockings.dir
-  return clkExports + '\\' + t.config.exchange.clockings.fileName
+  let clkExports = t.config.clockings.dir
+  return clkExports + '\\' + t.config.clockings.fileName
 }
 
 // Checks the corresponding clocking export file (as specified in config.js) to contain a csv expression

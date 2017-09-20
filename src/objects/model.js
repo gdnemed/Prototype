@@ -22,6 +22,7 @@ const ENTITIES = {
     related_from: {runsIn: 'service'}
   },
   'service': {
+    keyDependence: 'runsIn->',
     keys: [['code']],
     required: ['code']
   }

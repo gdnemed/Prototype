@@ -17,7 +17,7 @@ describe('import.spec.js', () => {
   it('per.csv is properly imported, "onEndImport" event is received with ok = true', (done) => {
     t.handleFileImport('per.csv').then(({pathFile, importType, ok}) => {
       t.expect(ok).to.equal(true)
-      let files = fs.readdirSync(path.join(t.config.exchange.files.workdir, 'done'))
+      let files = fs.readdirSync(path.join(t.config.files.workdir, 'done'))
       t.expect(files.length).to.equal(0)
       // GET via api/records
       t.sendGET('/api/coms/records').then((res) => {

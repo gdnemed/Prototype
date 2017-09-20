@@ -4,8 +4,8 @@ require('./src/defaults').addDefaults()
 if (process.argv.indexOf('--home') !== -1) {
   process.env.HOME = process.argv[process.argv.indexOf('--home') + 1]
   console.log('Lemuria init at ' + process.env.HOME)
-} else {
-  console.log('home variable required')
+} else if (process.argv.indexOf('--url') === -1) {
+  console.log('Init parameter needed: --home or --url')
   process.exit()
 }
 
