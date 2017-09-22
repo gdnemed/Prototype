@@ -299,10 +299,9 @@ const get = (req, res, session, str) => {
   log.info(`GET ${req.url} params: ${JSON.stringify(req.query)}`)
   let cloned = JSON.parse(JSON.stringify(str))
   if (str._transform_) cloned._transform_ = str._transform_
-  squeries.get(session, req.query, cloned, (err, ret) => {
-    if (err) res.status(500).end(err.stack.toString())
-    else res.status(200).jsonp(ret)
-  })
+  squeries.get(session, req.query, cloned)
+    .then((ret) => res.status(200).jsonp(ret))
+    .catch((err) => res.status(500).end(err.stack.toString()))
 }
 
 const put = (req, res, session, str) => {
@@ -312,14 +311,14 @@ const put = (req, res, session, str) => {
   squeries.put(session,
     stateService,
     req.params,
-    cloned, req.body, extraTreatment, (err, ret) => {
-      if (err) {
-        res.status(500).end(err.stack.toString())
-      } else {
-        if (!Array.isArray(ret)) ret = [ret]
-        res.status(200).jsonp(ret)
-        nextVersion(session, ret, str._entity_)// Notify communications
-      }
+    cloned, req.body, extraTreatment)
+    .then((ret) => {
+      if (!Array.isArray(ret)) ret = [ret]
+      res.status(200).jsonp(ret)
+      nextVersion(session, ret, str._entity_)// Notify communications
+    })
+    .catch((err) => {
+      res.status(500).end(err.stack.toString())
     })
 }
 
@@ -331,13 +330,12 @@ const del = (req, res, session, filter, entity) => {
     id: filter.field
   }
   squeries.put(session, stateService, req.params, str,
-    {drop: utils.now(), id: req.params[filter.variable]}, null, (err, rows) => {
-      if (err) res.status(500).end(err.stack.toString())
-      else {
-        res.status(200).end()
-        nextVersion(session, [rows], str._entity_)// Notify communications
-      }
+    {drop: utils.now(), id: req.params[filter.variable]}, null)
+    .then((rows) => {
+      res.status(200).end()
+      nextVersion(session, [rows], str._entity_)// Notify communications
     })
+    .catch((err) => res.status(500).end(err.stack.toString()))
 }
 
 const apiCall = (op, param1, param2) => {
@@ -406,10 +404,9 @@ const register = (req, res, session) => {
       res.status(500).end('id conflict')
     } else {
       let cloned = JSON.parse(JSON.stringify(prepGetNode))
-      squeries.get(session, req.query, cloned, (err, ret) => {
-        if (err) res.status(500).end(err.message)
-        else res.sse('config', ret)
-      })
+      squeries.get(session, req.query, cloned)
+        .then((ret) => res.sse('config', ret))
+        .catch((err) => res.status(500).end(err.message))
     }
   }
 }
@@ -417,34 +414,36 @@ const register = (req, res, session) => {
 /*
 Treatment for revision control and drop flag.
 */
-const extraTreatment = (session, id, isInsert, isDelete, callback) => {
-  let db = session.dbs['objects']
-  let vc = {property: 'revision', entity: id, value: 1, t1: CT.START_OF_TIME, t2: CT.END_OF_TIME}
-  let ts = new Date().getTime()
-  let now = moment.tz(ts, 'GMT').format('YYYYMMDD')
-  let day = parseInt(now)
-  let d = {property: 'drop', entity: id, value: day, t1: CT.START_OF_TIME, t2: CT.END_OF_TIME}
-  if (isInsert) {
-    db.insert(vc).into('property_num_1').then((rowid) => {
-      d.value = CT.END_OF_TIME
-      db.insert(d).into('property_num_1').then((rowid) => callback(null, id))
-      .catch((err) => callback(err))
-    })
-    .catch((err) => callback(err))
-  } else if (isDelete) {
-  } else { // Update: increment revision and set drop = 0
-    db('property_num_1').increment('value', 1)
-      .where('entity', id).where('property', 'revision')
-      .then((rowid) => {
-        db('property_num_1').where('entity', id).where('property', 'drop')
-          .update({value: CT.END_OF_TIME})
-          .then((rowid) => {
-            callback(null, id)
-          })
-          .catch((err) => callback(err))
-      })
-      .catch((err) => callback(err))
-  }
+const extraTreatment = (session, id, isInsert, isDelete) => {
+  return new Promise((resolve, reject) => {
+    let db = session.dbs['objects']
+    let vc = {property: 'revision', entity: id, value: 1, t1: CT.START_OF_TIME, t2: CT.END_OF_TIME}
+    let ts = new Date().getTime()
+    let now = moment.tz(ts, 'GMT').format('YYYYMMDD')
+    let day = parseInt(now)
+    let d = {property: 'drop', entity: id, value: day, t1: CT.START_OF_TIME, t2: CT.END_OF_TIME}
+    if (isInsert) {
+      db.insert(vc).into('property_num_1')
+        .then((rowid) => {
+          d.value = CT.END_OF_TIME
+          db.insert(d).into('property_num_1')
+            .then((rowid) => resolve(id))
+            .catch(reject)
+        })
+        .catch(reject)
+    } else if (isDelete) {
+    } else { // Update: increment revision and set drop = 0
+      db('property_num_1').increment('value', 1)
+        .where('entity', id).where('property', 'revision')
+        .then((rowid) => {
+          db('property_num_1').where('entity', id).where('property', 'drop')
+            .update({value: CT.END_OF_TIME})
+            .then((rowid) => resolve(id))
+            .catch(reject)
+        })
+        .catch(reject)
+    }
+  })
 }
 
 /*
@@ -466,36 +465,34 @@ const nextVersion = (session, obj, type) => {
       version: {_property_: 'revision'},
       drop: {_property_: 'drop'},
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
-    },
-    (err, ret) => {
-      if (err) log.error(err)
-      else if (ret) {
-        let code = parseInt(ret.code)
-        let cardList
-        if (ret) {
-          log.debug('Next version:')
-          log.debug(ret)
-          if (ret.code) {
-            // For TODO's: t1 and t2 should be checked against local timezone of each device!
-            // TODO: Should we check valid dates of record to do delete/insert?
-            comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'record_insert' : 'record_delete', {records: [{id: code}]})
-            cardList = ret.card
-            if (cardList) {
-              for (let i = 0; i < cardList.length; i++) {
-                // TODO: Should we check t1 and t2 to do delete/insert?
-                comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'card_insert' : 'card_delete', {
-                  cards: [{
-                    card: cardList[i].code,
-                    id: code
-                  }]
-                })
-              }
+    })
+    .then((ret) => {
+      let code = parseInt(ret.code)
+      let cardList
+      if (ret) {
+        log.debug('Next version:')
+        log.debug(ret)
+        if (ret.code) {
+          // For TODO's: t1 and t2 should be checked against local timezone of each device!
+          // TODO: Should we check valid dates of record to do delete/insert?
+          comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'record_insert' : 'record_delete', {records: [{id: code}]})
+          cardList = ret.card
+          if (cardList) {
+            for (let i = 0; i < cardList.length; i++) {
+              // TODO: Should we check t1 and t2 to do delete/insert?
+              comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'card_insert' : 'card_delete', {
+                cards: [{
+                  card: cardList[i].code,
+                  id: code
+                }]
+              })
             }
           }
-          g.getEventEmitter().emit(g.EVT.onEntityVersionChange)
         }
+        g.getEventEmitter().emit(g.EVT.onEntityVersionChange)
       }
     })
+    .catch((err) => log.error(err))
 }
 
 /*
@@ -515,24 +512,23 @@ const initTerminal = (serial, customer) => {
           code: 'code',
           drop: {_property_: 'drop'},
           card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
-        }, (err, ret) => {
-          if (err) log.error(err)
-          else {
-            for (let i = 0; i < ret.length; i++) {
-              if (ret[i].code && ret[i].code !== null) {
-                let r = {id: parseInt(ret[i].code)}
-                comsService.send(serial, 'record_insert', {records: [r]})
-                let card = ret[i].card
-                if (card) {
-                  for (let j = 0; j < card.length; j++) {
-                    let e = {card: card[j].code, id: parseInt(ret[i].code)}
-                    comsService.send(serial, 'card_insert', {cards: [e]})
-                  }
+        })
+        .then((ret) => {
+          for (let i = 0; i < ret.length; i++) {
+            if (ret[i].code && ret[i].code !== null) {
+              let r = {id: parseInt(ret[i].code)}
+              comsService.send(serial, 'record_insert', {records: [r]})
+              let card = ret[i].card
+              if (card) {
+                for (let j = 0; j < card.length; j++) {
+                  let e = {card: card[j].code, id: parseInt(ret[i].code)}
+                  comsService.send(serial, 'card_insert', {cards: [e]})
                 }
               }
             }
           }
         })
+        .catch((err) => log.error(err))
     })
     .catch((err) => log.error(err))
 }
@@ -552,26 +548,24 @@ const createClocking = (clocking, customer) => {
             id: 'id',
             document: 'document',
             _filter_: {field: 'code', variable: 'record'}
-          }, (err, record) => {
-            if (err) reject(err)
-            else {
-              if (record) {
-                clocking.owner = record.id
-                clocking.document = record.document
-              }
-              validate(clocking)
-                .then((clocking) => {
-                  squeries.put(session, stateService, {}, prepPutClocking, clocking, null, (err, id) => {
-                    if (err) reject(err)
-                    else {
-                      notifyMonitors(clocking, id, customer)
-                      resolve(clocking)
-                    }
-                  })
-                })
-                .catch(reject)
-            }
           })
+          .then((record) => {
+            if (record) {
+              clocking.owner = record.id
+              clocking.document = record.document
+            }
+            validate(clocking)
+              .then((clocking) => {
+                squeries.put(session, stateService, {}, prepPutClocking, clocking, null)
+                  .then((id) => {
+                    notifyMonitors(clocking, id, customer)
+                    resolve(clocking)
+                  })
+                  .catch(reject)
+              })
+              .catch(reject)
+          })
+          .catch(reject)
       })
       .catch(reject)
   })
@@ -631,14 +625,13 @@ const cleanRecords = (settings, session) => {
       id: 'id'
     }
     // First, we get every old entity
-    squeries.get(session, {}, str, (err, ret) => {
-      if (err) reject(err)
-      else {
+    squeries.get(session, {}, str)
+      .then((ret) => {
         // Now, iterate to delete them
         if (ret) delRecord(ret, session, 0).then(resolve).catch(reject)
         else resolve()
-      }
-    })
+      })
+      .catch(reject)
   })
 }
 
@@ -646,10 +639,11 @@ const delRecord = (records, session, i) => {
   return new Promise((resolve, reject) => {
     if (i >= records.length) resolve()
     else {
-      squeries.del(session, records[i].id, true, null, null, (err, rows) => {
-        if (err) reject(err)
-        else delRecord(records, session, i).then(resolve).catch(reject)
-      })
+      squeries.del(session, records[i].id, true, null, null)
+        .then((rows) => {
+          delRecord(records, session, i).then(resolve).catch(reject)
+        })
+      .catch(reject)
     }
   })
 }

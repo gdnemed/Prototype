@@ -137,12 +137,14 @@ Blocks entity type, to preserve keys.
  - session: API session
  - type: Entity type
 */
-const blockType = (session, type, callback) => {
-  if (typesBlocks[type]) callback(new Error(type + ' blocked'))
-  else {
-    typesBlocks[type] = {session: session, timeout: setTimeout(timeoutBlock, 5000, type)}
-    callback()
-  }
+const blockType = (session, type) => {
+  return new Promise((resolve, reject) => {
+    if (typesBlocks[type]) reject(new Error(type + ' blocked'))
+    else {
+      typesBlocks[type] = {session: session, timeout: setTimeout(timeoutBlock, 5000, type)}
+      resolve()
+    }
+  })
 }
 
 const timeoutBlock = (type) => {

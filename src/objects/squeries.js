@@ -16,18 +16,23 @@ Main visible function for getting data.
 -str: Structure for query
 -callback: Callback function
 */
-const get = (session, variables, str, callback) => {
-  if (!str._guide_) {
-    if (!prepareGet(session, variables, str)) {
-      callback(new Error('Syntax error'))
-      return
+const get = (session, variables, str) => {
+  return new Promise((resolve, reject) => {
+    // If query was previously prepared, we don't need this step
+    if (!str._guide_) {
+      // Build knex statement
+      if (!prepareGet(session, variables, str)) {
+        reject(new Error('Syntax error'))
+        return
+      }
     }
-  }
-  // It's always useful to have now and today values
-  if (!variables.now) variables.now = session.now
-  if (!variables.today) variables.today = session.today
-  // Do work
-  executeSelect(str, variables, session, callback)
+    // It's always useful to have now and today values
+    if (!variables.now) variables.now = session.now
+    if (!variables.today) variables.today = session.today
+    // Do work
+    executeSelect(str, variables, session)
+      .then(resolve).catch(reject)
+  })
 }
 
 /*
@@ -39,93 +44,87 @@ const get = (session, variables, str, callback) => {
  -data: Data to insert
  -callback: Callback function
  */
-const put = (session, stateService, variables, str, data, extraFunction, callback) => {
-  let e = str._entity_
-  if (e) {
-    let params = {
-      session: session,
-      str: str,
-      entity: e,
-      data: data,
-      variables: variables,
-      stateService: stateService,
-      extraFunction: extraFunction,
-      callback: callback
-    }
-    // Create keys structure, which maps fields to values
-    let keysData = []
-    let kDef = MODEL.ENTITIES[e].keys
-    for (let i = 0; i < kDef.length; i++) {
-      keysData.push({fields: kDef[i], values: []})
-    }
-    filterBefore(params).then((rowsFiltered) => {
-      if (str._subput_) {
-        putRelated(rowsFiltered, 0, params)
-          .then(() => callback(null, rowsFiltered))
-          .catch(callback)
-      } else if (keysData) {
-        searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data, variables)
-          .then((id) => {
-            if (id) {
-              params.id = id
-              executeUpdate(params)
-                .then((idPut) => callback(null, id))
-                .catch((err) => {
-                  release(session, e, stateService)
-                    .then(() => callback(err))
-                    .catch(callback)
-                })
-            } else {
-              // On insert, we need to block key data to prevent parallel inserts over same key
-              stateService.newId(session)
-                .then((id) => {
-                  params.id = id
-                  executeInsert(params)
-                    .then(() => callback(null, id))
-                    .catch((err) => {
-                      release(session, e, stateService)
-                        .then(() => callback(err))
-                        .catch(callback)
-                    })
-                })
-                .catch((err) => {
-                  release(session, e, stateService)
-                    .then(() => callback(err))
-                    .catch(callback)
-                })
-            }
-          })
-          .catch((err) => {
-            release(session, e, stateService)
-              .then(() => {
-                callback(err)
-              })
-              .catch(callback)
-          })
-      } else callback(new Error('Key not found'))
-    })
-      .catch(callback)
-  } else if (str._inputs_) {
-    // Inputs insert/update.
-    // For the moment, only insert
-    // On insert, we need to block key data to prevent parallel inserts over same key
-    stateService.newInputId(session)
-      .then((id) => {
-        let params = {
-          session: session,
-          id: id,
-          str: str,
-          period: Math.floor(data.tmp / 100000000),
-          data: data,
-          variables: variables,
-          callback: callback
-        }
-        executeInsertInput(params)
-          .then(() => callback(null, id))
-          .catch(callback)
+const put = (session, stateService, variables, str, data, extraFunction) => {
+  return new Promise((resolve, reject) => {
+    let e = str._entity_
+    if (e) {
+      let params = {
+        session: session,
+        str: str,
+        entity: e,
+        data: data,
+        variables: variables,
+        stateService: stateService,
+        extraFunction: extraFunction
+      }
+      // Create keys structure, which maps fields to values
+      let keysData = getKeys(e)
+      let specialReject = (err) => safeReject(err, reject, session, e, stateService)
+      filterBefore(params).then((rowsFiltered) => {
+        if (str._subput_) {
+          putRelated(rowsFiltered, 0, params)
+            .then(() => resolve(rowsFiltered))
+            .catch(reject)
+        } else if (keysData) {
+          searchFromKey(session, e, keysData, getUserKey(str, data), stateService, str, data, variables)
+            .then((id) => {
+              if (id) {
+                params.id = id
+                executeUpdate(params)
+                  .then((idPut) => resolve(id))
+                  .catch(specialReject)
+              } else {
+                // On insert, we need to block key data to prevent parallel inserts over same key
+                stateService.newId(session)
+                  .then((id) => {
+                    params.id = id
+                    executeInsert(params)
+                      .then(() => resolve(id))
+                      .catch(specialReject)
+                  })
+                  .catch(specialReject)
+              }
+            })
+            .catch(specialReject)
+        } else reject(new Error('Key not found'))
       })
-      .catch(callback)
-  } else callback(new Error('Type not found'))
+        .catch(reject)
+    } else if (str._inputs_) {
+      // Inputs insert/update.
+      // For the moment, only insert
+      // On insert, we need to block key data to prevent parallel inserts over same key
+      stateService.newInputId(session)
+        .then((id) => {
+          let params = {
+            session: session,
+            id: id,
+            str: str,
+            period: Math.floor(data.tmp / 100000000),
+            data: data,
+            variables: variables
+          }
+          executeInsertInput(params)
+            .then(() => resolve(id))
+            .catch(reject)
+        })
+        .catch(reject)
+    } else reject(new Error('Type not found'))
+  })
+}
+
+const getKeys = (e) => {
+  let keysData = []
+  let kDef = MODEL.ENTITIES[e].keys
+  for (let i = 0; i < kDef.length; i++) {
+    keysData.push({fields: kDef[i], values: []})
+  }
+  return keysData
+}
+
+const safeReject = (err, reject, session, e, stateService) => {
+  release(session, e, stateService)
+    .then(() => reject(err))
+    .catch(reject)
 }
 
 const filterBefore = (params) => {
@@ -137,13 +136,12 @@ const filterBefore = (params) => {
         idEntity: 'id'
       }
       // Not direct put, but a filter to put properties or relations
-      return get(params.session, params.variables, search, (err, rows) => {
-        if (err) reject(err)
-        else {
+      return get(params.session, params.variables, search)
+        .then((rows) => {
           if (!Array.isArray(rows)) rows = [rows]
           resolve(rows)
-        }
-      })
+        })
+        .catch(reject)
     } else resolve()
   })
 }
@@ -173,34 +171,36 @@ Generic delete function
 - period: It inputs, period (year-month) where input is.
 - extraFunction: Optional function to be executed after deletion.
  */
-const del = (session, id, entity, period, extraFunction, callback) => {
-  if (!id) {
-    callback(new Error('No id defined'))
-    return
-  }
-  if (typeof id === 'string') id = parseInt(id)
-  if (entity) {
-    let db = session.dbs['objects']
-    db('property_num_' + nodeId).where('entity', id).delete()
-      .then(() => db('property_str_' + nodeId).where('entity', id).delete())
-      .then(() => db('property_bin_' + nodeId).where('entity', id).delete())
-      .then(() => db('relation_' + nodeId).where('id1', id).orWhere('id2', id).delete())
-      .then(() => db('entity_' + nodeId).where('id', id).delete())
-      .then((count) => {
-        if (extraFunction) extraFunction(session, id, false, true, callback)
-        else callback(null, count)
-      })
-      .catch((err) => callback(err))
-  } else { // If no entity, it's an input
-    let db = session.dbs['inputs' + period]
-    db(`input_data_num_${nodeId}_${period}`).where('entity', id).delete()
-      .then(() => db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete())
-      .then(() => db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete())
-      .then(() => db(`input_rel_${nodeId}_${period}`).where('id1', id).orWhere('id2', id).delete())
-      .then(() => db(`input_${nodeId}_${period}`).where('id', id).delete())
-      .then((count) => callback(count))
-      .catch((err) => callback(err))
-  }
+const del = (session, id, entity, period, extraFunction) => {
+  return new Promise((resolve, reject) => {
+    if (!id) {
+      reject(new Error('No id defined'))
+      return
+    }
+    if (typeof id === 'string') id = parseInt(id)
+    if (entity) {
+      let db = session.dbs['objects']
+      db('property_num_' + nodeId).where('entity', id).delete()
+        .then(() => db('property_str_' + nodeId).where('entity', id).delete())
+        .then(() => db('property_bin_' + nodeId).where('entity', id).delete())
+        .then(() => db('relation_' + nodeId).where('id1', id).orWhere('id2', id).delete())
+        .then(() => db('entity_' + nodeId).where('id', id).delete())
+        .then((count) => {
+          if (extraFunction) extraFunction(session, id, false, true, () => resolve())
+          else resolve(count)
+        })
+        .catch(reject)
+    } else { // If no entity, it's an input
+      let db = session.dbs['inputs' + period]
+      db(`input_data_num_${nodeId}_${period}`).where('entity', id).delete()
+        .then(() => db(`input_data_str_${nodeId}_${period}`).where('entity', id).delete())
+        .then(() => db(`input_data_bin_${nodeId}_${period}`).where('entity', id).delete())
+        .then(() => db(`input_rel_${nodeId}_${period}`).where('id1', id).orWhere('id2', id).delete())
+        .then(() => db(`input_${nodeId}_${period}`).where('id', id).delete())
+        .then(resolve)
+        .catch(reject)
+    }
+  })
 }
 
 /*
@@ -290,9 +290,8 @@ const searchFromKey = (session, entity, keysData, userKey, stateService, str, da
       return
     }
     // Deny inserts or updates over this entity keys
-    stateService.blockType(session, entity, (err) => {
-      if (err) reject(err)
-      else {
+    stateService.blockType(session, entity)
+      .then(() => {
         // Now whe have the key. Do select
         let db = session.dbs['objects']
         let sentence = db.select('id').from('entity_' + nodeId)
@@ -300,7 +299,7 @@ const searchFromKey = (session, entity, keysData, userKey, stateService, str, da
           sentence.where(finalKey.fields[i], finalKey.values[i])
         }
         sentence.then((rows) => {
-          if (rows.length === 0) resolve(null, null) // Insert
+          if (rows.length === 0) resolve() // Insert
           else if (rows.length > 1) {
             let k = JSON.stringify(finalKey.fields)
             let v = JSON.stringify(finalKey.values)
@@ -319,9 +318,9 @@ const searchFromKey = (session, entity, keysData, userKey, stateService, str, da
             }) */
           }
         })
-          .catch(reject)
-      }
-    })
+        .catch(reject)
+      })
+      .catch(reject)
   })
 }
 
@@ -404,7 +403,9 @@ const executeUpdate = (params) => {
             .then(resolve)
             .catch(reject)
         })
-        .catch(reject)
+        .catch((err) => {
+          reject(err)
+        })
     }
   })
 }
@@ -413,12 +414,17 @@ const putMore = (params, n, insert) => {
   return new Promise((resolve, reject) => {
     subPuts(params)
       .then(() => {
-        if (params.extraFunction) params.extraFunction(params.session, params.id, insert, false, () => resolve())
-        else resolve(params.id)
+        if (params.extraFunction) {
+          params.extraFunction(params.session, params.id, insert, false)
+            .then((x) => {
+              resolve(x)
+            })
+            .catch(reject)
+        } else resolve(params.id)
       })
       .catch((err) => {
         let op = insert ? 'inserted' : 'updated'
-        reject((new Error(`${n} ${params.entity} ${op}, but errors found: ${err}`)))
+        reject(new Error(`${n} ${params.entity} ${op}, but errors found: ${err}`))
       })
   })
 }
@@ -683,50 +689,47 @@ const putElemRelation = (newStr, relObj, relation, modelRelation, relData, forwa
     }
     // Recursively call put
     put(params.session, params.stateService,
-      params.variables, newStr, relData, params.extraFunction,
-      (err, id) => {
-        if (err) params.callback(err)
-        else {
-          let table
-          let db = params.session.dbs['objects']
-          let r
-          if (params.entity) { // Entities
-            table = 'relation_1'
-            r = {
-              relation: relation,
-              id1: forward ? params.id : id,
-              id2: forward ? id : params.id,
-              t1: t1,
-              t2: t2,
-              ord: 0,
-              node: 1
-            }
-          } else { // Inputs
-            table = 'input_rel_1_' + params.period
-            r = {
-              relation: relation,
-              id: params.id,
-              entity: id
-            }
+      params.variables, newStr, relData, params.extraFunction)
+      .then((id) => {
+        let table
+        let db = params.session.dbs['objects']
+        let r
+        if (params.entity) { // Entities
+          table = 'relation_1'
+          r = {
+            relation: relation,
+            id1: forward ? params.id : id,
+            id2: forward ? id : params.id,
+            t1: t1,
+            t2: t2,
+            ord: 0,
+            node: 1
           }
-          // Entity is there, now we can create the relation properly
-          let s = db.from(table)
-            .where('relation', relation)
-          if (params.entity) s.where(forward ? 'id1' : 'id2', params.id) // entity
-          else s.where('id', params.id) // input
-          s.then((rows) => {
-            if (params.entity) {
-              historicModifier(rows, r, table, db, (err) => {
-                if (err) reject(err)
-                else resolve()
-              })
-            } else {
-              // TODO: Inputs relations
-            }
-          })
-            .catch((err) => reject(err))
+        } else { // Inputs
+          table = 'input_rel_1_' + params.period
+          r = {
+            relation: relation,
+            id: params.id,
+            entity: id
+          }
         }
+        // Entity is there, now we can create the relation properly
+        let s = db.from(table).where('relation', relation)
+        if (params.entity) s.where(forward ? 'id1' : 'id2', params.id) // entity
+        else s.where('id', params.id) // input
+        s.then((rows) => {
+          if (params.entity) {
+            historicModifier(rows, r, table, db, (err) => {
+              if (err) reject(err)
+              else resolve()
+            })
+          } else {
+            // TODO: Inputs relations
+          }
+        })
+        .catch(reject)
       })
+      .catch(reject)
   })
 }
 
@@ -751,6 +754,8 @@ Prepare str structure for future execution, adding _guide_ field, which will con
 - entity_fields: Field of the entity/inputs table.
 - isArray: true if the result mus be an array.
 - fields_to_remove: by default, _id_, but could also contain fields like dates to clean.
+- fields_to_parse: Some fields (for instance, multilanguage strings) are stored as a string,
+  and need to be parsed to json.
 - property_fields: List of simple properties related with entity. Each element has the form:
   {entry: <entry name>, type: <property name>, typeProperty: <num, str or bin>, isArray:{false}}
 - property_subqueries: Map of the 3 types of property subqueries: num, str and bin.
@@ -783,46 +788,48 @@ const prepareGet = (session, variables, str) => {
     fields_to_parse: []
   }
   let type = getType(str)
-  // Get information if this is a subquery from a relation
-  if (str._prefix_) {
-    str._guide_.prefix = str._prefix_
-    str._guide_.subquery = str._subquery_
-    str._guide_.link_field_1 = str._link_field_1_
-    str._guide_.link_field_2 = str._link_field_2_
-  }
   // Always a hidden id of the entity
-  str._guide_.fields_to_remove = [(str._prefix_ ? str._prefix_ : '') + '_id_']
+  str._guide_.fields_to_remove = [(str.relJoinInfo ? str.relJoinInfo.prefix : '') + '_id_']
   getFields(str, session, variables, str._inputs_)
   if (str._entity_ || str._linked_) {
-    let f = str._guide_.entity_fields
-    let e = sq => {
-      selectEntity(sq, f, type, str._filter_, str._guide_, variables)
-    }
-    joins(db, str, session, variables, e, f, type)
-    preparePropertySubquery(db, str._guide_.property_subqueries, 'str')
-    preparePropertySubquery(db, str._guide_.property_subqueries, 'num')
-    preparePropertySubquery(db, str._guide_.property_subqueries, 'bin')
-    prepareRelation(db, str._guide_.relations_forward, true)
-    prepareRelation(db, str._guide_.relations_backward, false)
+    prepareGetEntity(db, str, variables, session, type)
   } else if (str._inputs_) {
-    let f = str._guide_.entity_fields
-    // Select over INPUTS
-    let e = sq => {
-      selectInput(sq, f, type, str._filter_, str._guide_, variables)
-    }
-    joins(db, str, session, variables, e, f, type)
-    if (!variables.count) {
-      preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'str', type)
-      preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'num', type)
-      preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'bin', type)
-      prepareRelationInput(db, str._guide_.relations_forward, type)
-    }
+    prepareGetInputs(db, str, variables, session, type)
   }
+  // If this is a subquery, create variablesMapping and pass it up
   if (str._prevVarMap_) {
     str._guide_.subquery.toSQL()
     str._prevVarMap_ = str._prevVarMap_.concat(str._guide_.variablesMapping)
   }
   return true
+}
+
+const prepareGetEntity = (db, str, variables, session, type) => {
+  let f = str._guide_.entity_fields
+  let e = sq => {
+    selectEntity(sq, f, type, str._filter_, str._guide_, variables)
+  }
+  joins(db, str, session, variables, e, f, type)
+  preparePropertySubquery(db, str._guide_.property_subqueries, 'str')
+  preparePropertySubquery(db, str._guide_.property_subqueries, 'num')
+  preparePropertySubquery(db, str._guide_.property_subqueries, 'bin')
+  prepareRelation(db, str._guide_.relations_forward, true)
+  prepareRelation(db, str._guide_.relations_backward, false)
+}
+
+const prepareGetInputs = (db, str, variables, session, type) => {
+  let f = str._guide_.entity_fields
+  // Select over INPUTS
+  let e = sq => {
+    selectInput(sq, f, type, str._filter_, str._guide_, variables)
+  }
+  joins(db, str, session, variables, e, f, type)
+  if (!variables.count) {
+    preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'str', type)
+    preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'num', type)
+    preparePropertySubqueryInput(db, str._guide_.property_subqueries, 'bin', type)
+    prepareRelationInput(db, str._guide_.relations_forward, type)
+  }
 }
 
 /*
@@ -990,8 +997,9 @@ and put the result in str._guide_.statement
 - type: type of entity, or period of inputs
 */
 const joins = (db, str, session, variables, e, f, type) => {
-  let ps = str._guide_.property_fields
-  let dr = str._guide_.direct_relations
+  let g = str._guide_
+  let ps = g.property_fields
+  let dr = g.direct_relations
   if ((ps && ps.length > 0) || (dr && dr.length > 0)) {
     let last
     let lastLink
@@ -1016,34 +1024,37 @@ const joins = (db, str, session, variables, e, f, type) => {
       last = dr[i].join
       lastLink = 'jdr' + i
     }
-    if (str._guide_.subquery) {
-      if (str._guide_.direct_relations) {
-        let l1 = lastLink + str._guide_.link_field_1.substr(str._guide_.link_field_1.indexOf('.'))
-        str._guide_.subquery.join(last, l1, str._guide_.link_field_2)
-      } else str._guide_.subquery.leftJoin(last, str._guide_.link_field_1, str._guide_.link_field_2)
-    } else str._guide_.statement = db.from(last)
-  } else if (str._inputs_) str._guide_.statement = selectInput(db, f, type, str._filter_, str._guide_, variables)
+    if (g.subquery) joinDirectRelation(g, last, lastLink)
+    else g.statement = db.from(last)
+  } else if (str._inputs_) g.statement = selectInput(db, f, type, str._filter_, g, variables)
   else {
-    if (str._guide_.subquery) {
-      if (str._guide_.direct_relations) {
-        str._guide_.subquery.join(e, str._guide_.link_field_1, str._guide_.link_field_2)
-      } else str._guide_.subquery.leftJoin(e, str._guide_.link_field_1, str._guide_.link_field_2)
-    } else str._guide_.statement = selectEntity(db, f, type, str._filter_, str._guide_, variables)
+    if (g.subquery) joinDirectRelation(g, e, null)
+    else g.statement = selectEntity(db, f, type, str._filter_, g, variables)
   }
   if (str._order_) {
     for (let i = 0; i < str._order_.length; i++) {
-      str._guide_.statement.orderBy(str._order_[i].column, str._order_[i].desc ? 'desc' : 'asc')
+      g.statement.orderBy(str._order_[i].column, str._order_[i].desc ? 'desc' : 'asc')
     }
   }
-  if (!str._guide_.subquery || variables.count) {
+  if (!g.subquery || variables.count) {
     // Transform to raw for better use
-    let sql = str._guide_.statement.toSQL()
+    let sql = g.statement.toSQL()
     let sentence = sql.sql
     if (variables.count) {
       sentence = 'select count(*) n from (' + sentence + ') countsubselect'
     }
-    str._guide_.statement = db.raw(sentence, sql.bindings)
+    g.statement = db.raw(sentence, sql.bindings)
   }
+}
+
+const joinDirectRelation = (g, sentence, lastLink) => {
+  let inf = g.nextEntity.relJoinInfo
+  if (g.direct_relations) {
+    let l1
+    if (lastLink) l1 = lastLink + inf.link_field_1.substr(inf.link_field_1.indexOf('.'))
+    else l1 = inf.link_field_1
+    g.subquery.join(sentence, l1, inf.link_field_2)
+  } else g.subquery.leftJoin(sentence, inf.link_field_1, inf.link_field_2)
 }
 
 const filterTime = (join, withtime, elem, variablesMapping, beginning) => {
@@ -1066,29 +1077,31 @@ const filterTime = (join, withtime, elem, variablesMapping, beginning) => {
 }
 
 const joinProperty = (str, variables, a, i, propertyTable, e, linkField) => {
+  let g = str._guide_
+  let lf1 = g.nextEntity ? g.nextEntity.relJoinInfo.link_field_1 : null
   // Now, join with previous level
   a[i].join = sq => {
     let table
-    if (str._guide_.link_field_1 && i === 0) {
-      table = str._guide_.link_field_1.substr(0, str._guide_.link_field_1.indexOf('.'))
+    if (lf1 && i === 0) {
+      table = lf1.substr(0, lf1.indexOf('.'))
     } else table = (i === 0 ? 'e' : 'jps' + (i - 1))
     sq.from(i === 0 ? e : a[i - 1].join)
     let on = (j) => {
       // Now, the 'on' links, using index (id,relation,t1,t2)
       // First id
       let l = table + '._id_'
-      if (str._guide_.link_field_1) {
-        l = table + str._guide_.link_field_1.substr(str._guide_.link_field_1.indexOf('.'))
+      if (lf1) {
+        l = table + lf1.substr(lf1.indexOf('.'))
       }
       j.on('ps' + i + linkField, l)
       // Now, relation
       let pType = a[i].type
       j.onIn('ps' + i + '.property', [pType])
-      str._guide_.variablesMapping.push(null) // 1 position in bindings is fixed
+      g.variablesMapping.push(null) // 1 position in bindings is fixed
       if (!str._inputs_) {
         // Now date
         let withtime = MODEL.PROPERTIES[pType].time
-        filterTime(j, withtime, a[i], str._guide_.variablesMapping)
+        filterTime(j, withtime, a[i], g.variablesMapping)
       }
     }
     // If filter over property join, otherwise, left join
@@ -1096,7 +1109,7 @@ const joinProperty = (str, variables, a, i, propertyTable, e, linkField) => {
     else sq.leftJoin(propertyTable + ' as ps' + i, on)
 
     // If additional filters, put them in 'where'
-    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_, variables)
+    if (a[i].filter) addFilter(sq, a[i].filter, g, variables)
     // Select every column from previous joins
     sq.column(table + '.*')
     // Now, current relation columns. It could be just 'value' (the default)
@@ -1108,14 +1121,14 @@ const joinProperty = (str, variables, a, i, propertyTable, e, linkField) => {
       // Not just value, but we seek also t1 and t2
       if (a[i].fields.t1) {
         sq.column('ps' + i + '.t1 as ' + a[i].fields.t1)
-        str._guide_.fields_to_remove.push(a[i].fields.t1)
+        g.fields_to_remove.push(a[i].fields.t1)
       }
       if (a[i].fields.t2) {
         sq.column('ps' + i + '.t2 as ' + a[i].fields.t2)
-        str._guide_.fields_to_remove.push(a[i].fields.t2)
+        g.fields_to_remove.push(a[i].fields.t2)
       }
     } else sq.column('ps' + i + '.value as ' + a[i].entry)
-    if (a[i].filter) addFilter(sq, a[i].filter, str._guide_, variables)
+    if (a[i].filter) addFilter(sq, a[i].filter, g, variables)
     sq.as('jps' + i) // New alias for every join
   }
 }
@@ -1167,9 +1180,6 @@ Puts columns in subquery, about relation table.
 const putRelationInfo = (session, variables, db, str, info, i, subquery) => {
   if (info.nextEntity) {
     let prefix = 'r' + i + '_'
-    // Objects: we put the id for next get
-    // subquery.column('dr' + i + (info.forward ? '.id2 as ' : '.id1 as ') + prefix + 'id')
-    info.nextEntity._prefix_ = prefix
     if (info.fields.t1) {
       subquery.column('dr' + i + '.t1 as ' + prefix + info.fields.t1)
       str._guide_.fields_to_remove.push(info.fields.t1)
@@ -1178,13 +1188,17 @@ const putRelationInfo = (session, variables, db, str, info, i, subquery) => {
       subquery.column('dr' + i + '.t2 as ' + prefix + info.fields.t2)
       str._guide_.fields_to_remove.push(info.fields.t2)
     }
-    info.nextEntity._link_field_1_ = prefix + 'r.' + prefix + '_id_'
-    info.nextEntity._link_field_2_ = 'dr' + i + (info.forward ? '.id2' : '.id1')
-    info.nextEntity._subquery_ = subquery
-    info.nextEntity._prevVarMap_ = str._guide_.variablesMapping
-    info.nextEntity._prevStr_ = str
+    // We need to pass some info to relation subquery
+    info.nextEntity.relJoinInfo = {
+      prefix: prefix,
+      link_field_1: prefix + 'r.' + prefix + '_id_',
+      link_field_2: 'dr' + i + (info.forward ? '.id2' : '.id1'),
+      subquery: subquery,
+      prevVarMap: str._guide_.variablesMapping,
+      prevStr: str
+    }
     prepareGet(session, variables, info.nextEntity)
-    str._guide_.variablesMapping = info.nextEntity._prevVarMap_
+    str._guide_.variablesMapping = info.nextEntity.relJoinInfo.prevVarMap
     subquery.column(/* TODO: prefix + 'r' */ 'jps4' + '.*')
   } else {
     // One field, from the relation table
@@ -1323,53 +1337,53 @@ const setOrder = (statement, variables) => {
 Select execution
 */
 const executeSelect = (str, variables, session, callback) => {
-  setOrder(str._guide_.statement, variables)
-  // Variables substitution
-  let v = str._guide_.variablesMapping
-  let l = str._guide_.statement.bindings
-  log.trace(v)
-  log.trace(l)
-  if (v) {
-    for (let i = 0; i < l.length; i++) {
-      if (v[i] !== null) l[i] = variables[v[i]]
+  return new Promise((resolve, reject) => {
+    setOrder(str._guide_.statement, variables)
+    // Variables substitution
+    let v = str._guide_.variablesMapping
+    let l = str._guide_.statement.bindings
+    log.trace(v)
+    log.trace(l)
+    if (v) {
+      for (let i = 0; i < l.length; i++) {
+        if (v[i] !== null) l[i] = variables[v[i]]
+      }
     }
-  }
-
-  log.trace(str._guide_.statement.toSQL())
-  let result
-  str._guide_.statement
-    .then((rows) => {
-      // Pagination
-      if (variables.pageStartIndex && variables.pageSize) {
-        let l = []
-        let startIndex = parseInt(variables.pageStartIndex)
-        let size = parseInt(variables.pageSize)
-        for (let k = 0; (k < size) && (startIndex + k < rows.length); k++) {
-          l[k] = rows[startIndex + k]
+    let sql = str._guide_.statement.toSQL()
+    let result
+    str._guide_.statement
+      .then((rows) => {
+        log.trace(sql)
+        // Pagination
+        if (variables.pageStartIndex && variables.pageSize) {
+          let l = []
+          let startIndex = parseInt(variables.pageStartIndex)
+          let size = parseInt(variables.pageSize)
+          for (let k = 0; (k < size) && (startIndex + k < rows.length); k++) {
+            l[k] = rows[startIndex + k]
+          }
+          rows = l
+          // remove variables for recursive get's
+          delete variables.pageStartIndex
+          delete variables.pageSize
         }
-        rows = l
-        // remove variables for recursive get's
-        delete variables.pageStartIndex
-        delete variables.pageSize
-      }
-      result = rows
-      // Process every row in page
-      return processRow(str, rows, 0, session, variables)
-    })
-    .then(() => {
-      if (variables.count) {
-        result = result[0]
-      } else if (str._related_) {
-        result = result[0]._related_
-        // if (str._related_._relation_.charAt(0) !== '[') result = result[0]
-      } else {
-        if (!str._guide_.isArray) result = result[0]
-      }
-      callback(null, result)
-    })
-    .catch((err) => {
-      callback(err)
-    })
+        result = rows
+        // Process every row in page
+        return processRow(str, rows, 0, session, variables)
+      })
+      .then(() => {
+        if (variables.count) {
+          result = result[0]
+        } else if (str._related_) {
+          result = result[0]._related_
+          // if (str._related_._relation_.charAt(0) !== '[') result = result[0]
+        } else {
+          if (!str._guide_.isArray) result = result[0]
+        }
+        resolve(result)
+      })
+      .catch(reject)
+  })
 }
 
 /*
@@ -1442,7 +1456,7 @@ const treatRelatedObject = (dr, row) => {
   for (let i = 0; i < dr.length; i++) {
     // For every direct relation with more than 1 field
     if (dr[i].nextEntity) {
-      let prefix = dr[i].nextEntity._prefix_
+      let prefix = dr[i].nextEntity.relJoinInfo.prefix
       let o = {}
       if (dr[i].nextEntity._n_fields > 1) row[dr[i].entry] = o
       for (let p in dr[i].nextEntity) {
@@ -1474,10 +1488,8 @@ const executeInputOwner = (str, row, session, variables) => {
   return new Promise((resolve, reject) => {
     let ow = str._guide_.relation_owner
     if (ow) {
-      getNextEntity(ow, true, row, null, session, variables, (err) => {
-        if (err) reject(err)
-        else resolve()
-      })
+      getNextEntity(ow, true, row, null, session, variables)
+        .then(resolve).catch(reject)
     } else resolve()
   })
 }
@@ -1485,25 +1497,26 @@ const executeInputOwner = (str, row, session, variables) => {
 /*
 Calls get() for related entity
 */
-const getNextEntity = (info, forward, parentRow, thisRow, session, variables, callback) => {
-  // Already prepared, just substitute id (it's always the last condition)
-  let id = thisRow ? (forward ? thisRow.id2 : thisRow.id1) : parentRow._owner_
-  if (id) {
-    let s = info.nextEntity._guide_.statement
-    s.bindings[0] = id
-    // Recursively call get
-    get(session, variables, info.nextEntity, (err, r) => {
-      if (err) callback(err)
-      else {
-        let obj
-        if (Array.isArray(r)) {
-          if (r.length > 0) obj = r[0]
-        } else obj = r
-        completeRelation(obj, parentRow, info, thisRow, forward)
-        callback()
-      }
-    })
-  } else callback()
+const getNextEntity = (info, forward, parentRow, thisRow, session, variables) => {
+  return new Promise((resolve, reject) => {
+    // Already prepared, just substitute id (it's always the last condition)
+    let id = thisRow ? (forward ? thisRow.id2 : thisRow.id1) : parentRow._owner_
+    if (id) {
+      let s = info.nextEntity._guide_.statement
+      s.bindings[0] = id
+      // Recursively call get
+      get(session, variables, info.nextEntity)
+        .then((r) => {
+          let obj
+          if (Array.isArray(r)) {
+            if (r.length > 0) obj = r[0]
+          } else obj = r
+          completeRelation(obj, parentRow, info, thisRow, forward)
+          resolve()
+        })
+        .catch(reject)
+    } else resolve()
+  })
 }
 
 /*
@@ -1518,13 +1531,8 @@ const executeRelation = (str, forward, row, session, variables) => {
       ss[ss.length - 1].value = row._id_
       // log.debug(sq._statement_.toSQL())
       sq._statement_
-        .then((h) => processRelationRow(row, forward, sq, h, 0, session, variables, (err) => {
-          if (err) reject(err)
-          else resolve()
-        }))
-        .catch((err) => {
-          reject(err)
-        })
+        .then((h) => processRelationRow(row, forward, sq, h, 0, session, variables))
+        .then(resolve).catch(reject)
     } else resolve()
   })
 }
@@ -1534,35 +1542,40 @@ Process every row (h[k]) of the relation table, over an entity row (rows[i]).
 - sq is the relations descriptor, which maps relation type to information about it.
 - forward indicates the direction of the relation.
 */
-const processRelationRow = (row, forward, sq, h, k, session, variables, callback) => {
-  if (k >= h.length) callback()
-  else {
-    let info = sq[h[k].relation]
-    if (info) {
-      // Create a list or object for every relation
-      if (!row[info.entry]) {
-        if (info.isArray) row[info.entry] = []
-      }
-      if (info.fields) {
-        if (info.nextEntity) {
-          getNextEntity(info, forward, row, h[k], session, variables, (err) => {
-            if (err) callback(err)
-            else processRelationRow(row, forward, sq, h, k + 1, session, variables, callback)
-          })
-          // No entity needed, so just the relation fields
-        } else {
-          completeRelation({}, row, info, h[k], forward)
-          processRelationRow(row, forward, sq, h, k + 1, session, variables, callback)
+const processRelationRow = (row, forward, sq, h, k, session, variables) => {
+  return new Promise((resolve, reject) => {
+    if (k >= h.length) resolve()
+    else {
+      let info = sq[h[k].relation]
+      if (info) {
+        // Create a list or object for every relation
+        if (!row[info.entry]) {
+          if (info.isArray) row[info.entry] = []
         }
-        // No fields specified, we put just the id in a simple list
-      } else {
-        let d = forward ? h[k].id2 : h[k].id1
-        if (info.isArray) row[info.entry].push(d)
-        else row[info.entry] = d
-        processRelationRow(row, forward, sq, h, k + 1, session, variables, callback)
-      }
+        if (info.fields) {
+          if (info.nextEntity) {
+            getNextEntity(info, forward, row, h[k], session, variables)
+              .then(() => {
+                processRelationRow(row, forward, sq, h, k + 1, session, variables)
+              })
+              .then(resolve).catch(reject)
+            // No entity needed, so just the relation fields
+          } else {
+            completeRelation({}, row, info, h[k], forward)
+            processRelationRow(row, forward, sq, h, k + 1, session, variables)
+              .then(resolve).catch(reject)
+          }
+          // No fields specified, we put just the id in a simple list
+        } else {
+          let d = forward ? h[k].id2 : h[k].id1
+          if (info.isArray) row[info.entry].push(d)
+          else row[info.entry] = d
+          processRelationRow(row, forward, sq, h, k + 1, session, variables)
+            .then(resolve).catch(reject)
+        }
+      } else reject(new Error('Relation info not found'))
     }
-  }
+  })
 }
 
 /*

@@ -168,7 +168,7 @@ const cleanImportFiles = (fieName) => {
 //returns tru if every value in arrValues is inside the line, ex: [3,1205,E00]
 const checkValuesInsideLine = (line, arrValues) => {
   let found = true
-  arrValues.forEach((value) => { //Allways iterates all element (no break is possible)
+  arrValues.forEach((value) => { //Always iterates all element (no break is possible)
     if (line.indexOf(value) < 0) found = false
   })
   return found
