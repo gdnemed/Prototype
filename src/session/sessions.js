@@ -21,7 +21,7 @@ const getCustomersList = () => {
   for (let k in mapCustomers) {
     if (mapCustomers.hasOwnProperty(k)) {
       let c = mapCustomers[k]
-      c.apikey = k.substr(1)
+      c.apikey = k
       l.push(c)
     }
   }

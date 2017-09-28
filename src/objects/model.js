@@ -46,8 +46,8 @@ const PROPERTIES = {
   'workdir': {type: 'string'},
   'output': {type: 'boolean'},
   'period': {type: 'number'},
-  'fileName': {type: 'string'}
-
+  'fileName': {type: 'string'},
+  'deleteFile': {type: 'boolean'}
 }
 
 const INPUTS = {

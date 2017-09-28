@@ -171,7 +171,8 @@ let prepGetNode = {
     period: {_property_: 'period'},
     fileName: {_property_: 'fileName'},
     workdir: {_property_: 'workdir'},
-    output: {_property_: 'output'}
+    output: {_property_: 'output'},
+    deleteFile: {_property_: 'deleteFile'}
   }
 }
 
@@ -189,7 +190,8 @@ let prepGetServices = {
     period: {_property_: 'period'},
     fileName: {_property_: 'fileName'},
     workdir: {_property_: 'workdir'},
-    output: {_property_: 'output'}
+    output: {_property_: 'output'},
+    deleteFile: {_property_: 'deleteFile'}
   },
   _filter_: {field: 'code', variable: 'id'}
 }
@@ -204,7 +206,8 @@ let prepGetService = {
     period: {_property_: 'period'},
     fileName: {_property_: 'fileName'},
     workdir: {_property_: 'workdir'},
-    output: {_property_: 'output'}
+    output: {_property_: 'output'},
+    deleteFile: {_property_: 'deleteFile'}
   },
   _filter_: {field: 'code', variable: 'id'}
 }

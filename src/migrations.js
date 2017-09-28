@@ -184,7 +184,9 @@ const init = (type, customer, year) => {
     let dbs = {}
     migrateSection(type, customer, SECTIONS.STATE, dbs)
       .then(() => migrateSection(type, customer, SECTIONS.OBJECTS, dbs))
+      .then(() => initYear(type, customer, year - 1, dbs))
       .then(() => initYear(type, customer, year, dbs))
+      .then(() => initYear(type, customer, year + 1, dbs))
       .then(() => resolve(dbs))
       .catch((err) => reject(err))
   })
