@@ -8,6 +8,7 @@
 const moment = require('moment-timezone')
 const logger = require('./utils/log')
 const squeries = require('./objects/squeries')
+const select = require('./objects/selects')
 const CT = require('./CT')
 const utils = require('./utils/utils')
 const httpServer = require('./httpServer')
@@ -183,6 +184,7 @@ let prepGetServices = {
   _entity_: 'node',
   _related_: {
     _relation_: '[<-runsIn]',
+    id: 'code',
     dir: {_property_: 'dir'},
     period: {_property_: 'period'},
     fileName: {_property_: 'fileName'},
@@ -288,6 +290,12 @@ const init = (sessions, state, coms) => {
   return Promise.resolve()
 }
 
+const test = (req, res, session) => {
+  select.get(session, {}, req.body)
+    .then((ret) => res.status(200).jsonp(ret))
+    .catch((err) => res.status(500).end(err.stack.toString()))
+}
+
 const get = (req, res, session, str) => {
   // We add parameters from url into variables set
   if (req.params) {
@@ -367,6 +375,7 @@ const initAPI = () => {
   api.delete('/api/coms/timetypes/:id', apiCall(del, {field: 'code', variable: 'id'}, 'timetype'))
   api.post('/api/coms/clean', clean)
   api.get('/api/coms/asap', sseExpress, apiCall(register))
+  api.post('/api/test', apiCall(test))
   api.get('/api/nodes', apiCall(get, prepGetNodes))
   api.get('/api/nodes/:id', apiCall(get, prepGetNode))
   api.post('/api/nodes', apiCall(put, prepPutNode))
