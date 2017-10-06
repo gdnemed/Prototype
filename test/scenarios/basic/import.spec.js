@@ -20,10 +20,11 @@ describe('import.spec.js', () => {
       let files = fs.readdirSync(path.join(t.config.files.workdir, 'done'))
       t.expect(files.length).to.equal(0)
       // GET via api/records
-      t.sendGET('/api/coms/records').then((res) => {
+      t.sendGET('/api/coms/records?order=code').then((res) => {
         t.expect(res.status).to.equal(200)
         t.expect(res.body.length).to.equal(4)
-        // ROW 0 check
+
+        // ROW 1 check
         let rec0 = res.body[0]
         t.expectProps(rec0, {
           id: '347382',
@@ -31,7 +32,7 @@ describe('import.spec.js', () => {
           name: 'Pedro Gómez',
           language: 'es'
         })
-        // ROW 1 check
+        // ROW 2 check
         let rec1 = res.body[1]
         t.expectProps(rec1, {
           id: 'T123412',

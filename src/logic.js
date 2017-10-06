@@ -310,7 +310,8 @@ const get = (req, res, session, str) => {
   log.info(`GET ${req.url} params: ${JSON.stringify(req.query)}`)
   let cloned = JSON.parse(JSON.stringify(str))
   if (str._transform_) cloned._transform_ = str._transform_
-  squeries.get(session, req.query, cloned)
+  // squeries.get(session, req.query, cloned)
+  select.get(session, req.query, cloned)
     .then((ret) => res.status(200).jsonp(ret))
     .catch((err) => res.status(500).end(err.stack.toString()))
 }
