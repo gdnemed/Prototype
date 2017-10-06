@@ -1,9 +1,14 @@
 exports.up = function (knex) {
+  let createIndex
+
   return knex.schema
-    .createTable('settings', (table) => {
+    .hasTable('settings', (exists) => {
+      createIndex = !exists
+    })
+    .createTableIfNotExists('settings', (table) => {
       table.string('setting')
       table.string('value')
-      table.index(['setting'], 'i_setting')
+      if (createIndex) table.index(['setting'], 'i_setting')
     })
 }
 
