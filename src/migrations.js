@@ -234,7 +234,7 @@ const init = (type, customer, year) => {
 }
 
 const initYear = (type, customer, year, dbs) => {
-  log.info('info: migrations.initYear() : customer: ' + customer + ' year: ' + year)
+  log.info('info: migrations.initYear() : customer: ' + customer.name + ' year: ' + year)
   return migrateSection(type, customer, SECTIONS.INPUTS, dbs, year)
 }
 
@@ -276,7 +276,8 @@ const cleanMigrationMetadata = (customerName, section, dbs) => {
           log.trace(`${customerName} ${section} : knex_migrations table does not exists.`)
           resolve()
         }
-      }).catch((err) => reject(err))
+      })
+      .catch((err) => reject(err))
   })
 }
 
@@ -284,5 +285,6 @@ module.exports = {
   init,
   initYear,
   verifyDB,
-  connect
+  connect,
+  cleanMigrationMetadata
 }

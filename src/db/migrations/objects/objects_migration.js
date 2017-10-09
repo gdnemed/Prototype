@@ -7,11 +7,11 @@ exports.up = (knex, Promise) => {
       createIndex = !exists
     })
     .createTableIfNotExists('entity_1', (table) => {
-      table.integer('id').primary()
+      table.bigInteger('id').primary()
       table.string('type')
       table.string('name')
       table.string('name2')
-      table.string('intname')
+      table.string('intname', 4000)
       table.string('document')
       table.string('code')
       if (createIndex) {
@@ -27,11 +27,11 @@ exports.up = (knex, Promise) => {
       createIndex = !exists
     })
     .createTableIfNotExists('property_num_1', (table) => {
-      table.integer('entity')
+      table.bigInteger('entity')
       table.string('property')
-      table.integer('t1')
-      table.integer('t2')
-      table.integer('value')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
+      table.bigInteger('value')
       if (createIndex) {
         table.index(['property', 'entity', 't1', 't2'], 'i_pn_pe')
         table.index(['property', 'value', 't1', 't2'], 'i_pn_pv')
@@ -41,10 +41,10 @@ exports.up = (knex, Promise) => {
       createIndex = !exists
     })
     .createTableIfNotExists('property_str_1', (table) => {
-      table.integer('entity')
+      table.bigInteger('entity')
       table.string('property')
-      table.integer('t1')
-      table.integer('t2')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
       table.string('value')
       if (createIndex) {
         table.index(['property', 'entity', 't1', 't2'], 'i_ps_pe')
@@ -55,10 +55,10 @@ exports.up = (knex, Promise) => {
       createIndex = !exists
     })
     .createTableIfNotExists('property_bin_1', (table) => {
-      table.integer('entity')
+      table.bigInteger('entity')
       table.string('property')
-      table.integer('t1')
-      table.integer('t2')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
       table.binary('value')
       if (createIndex) {
         table.index(['property', 'entity', 't1', 't2'], 'i_pb_pe')
@@ -69,12 +69,12 @@ exports.up = (knex, Promise) => {
     })
     .createTableIfNotExists('relation_1', (table) => {
       table.string('relation')
-      table.integer('id1')
-      table.integer('id2')
-      table.integer('t1')
-      table.integer('t2')
-      table.integer('ord')
-      table.integer('node')
+      table.bigInteger('id1')
+      table.bigInteger('id2')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
+      table.bigInteger('ord')
+      table.bigInteger('node')
       if (createIndex) {
         table.index(['relation', 'id1'], 'i_r1')
         table.index(['relation', 'id2'], 'i_r2')

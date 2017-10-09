@@ -1,4 +1,33 @@
 {
-  "customers": {"123": {"name": "SPEC"}, "124": {"name": "OCTIME"}},
+  "customers": {
+    "123": {
+      "name": "SPEC",
+      "db": {
+        "client": "mssql",
+        "connection": {
+          "host": "172.18.6.201",
+          "port": "1433",
+          "user": "sa",
+          "password": "Sp3cs4",
+          "database": "lemuria_spec"
+        },
+        "useNullAsDefault": true
+      }
+    },
+    "124": {
+      "name": "OCTIME",
+      "db": {
+        "client": "mssql",
+        "connection": {
+          "host": "172.18.6.201",
+          "port": "1433",
+          "user": "sa",
+          "password": "Sp3cs4",
+          "database": "lemuria_octime"
+        },
+        "useNullAsDefault": true
+      }
+    }
+  },
   "devices": {"123": "SPEC", "1105": "SPEC", "1101": "SPEC"}
 }

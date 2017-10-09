@@ -20,6 +20,7 @@ const fs = require('fs')
 const path = require('path')
 const g = require('../src/global')
 const sessions = require('../src/session/sessions')
+const migrations = require('../src/migrations.js')
 // -------------------------------------------------------------------------------------------
 // "Lemuria" services creation. "get()" procedure using '_t' as a cache
 // -------------------------------------------------------------------------------------------
@@ -221,11 +222,17 @@ const removeExportClockingsFile = () => {
 const rollbackAndMigrateDatabases = () => {
   let kObjects = t.dbs['objects'], kInputs = t.dbs['inputs2017'], kState = t.dbs['state']
   return kObjects.migrate.rollback()
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'objects', t.dbs))
     .then(() => kInputs.migrate.rollback())
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'inputs2017', t.dbs))
     .then(() => kState.migrate.rollback())
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'state', t.dbs))
     .then(() => kObjects.migrate.latest())
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'objects', t.dbs))
     .then(() => kInputs.migrate.latest())
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'inputs2017', t.dbs))
     .then(() => kState.migrate.latest())
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'state', t.dbs))
 }
 
 const expectProps = (realObj, expectedObj) => {
