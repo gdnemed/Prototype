@@ -157,13 +157,15 @@ const timeoutBlock = (type) => {
  - session: API session
  - type: Entity type
  */
-const releaseType = (session, type, callback) => {
-  let b = typesBlocks[type]
-  if (b) {
-    clearTimeout(b.timeout)
-    delete typesBlocks[type]
-  }
-  callback()
+const releaseType = (session, type) => {
+  return new Promise((resolve, reject) => {
+    let b = typesBlocks[type]
+    if (b) {
+      clearTimeout(b.timeout)
+      delete typesBlocks[type]
+    }
+    resolve()
+  })
 }
 
 /* Get session object and calls required function. */

@@ -4,24 +4,53 @@
 
 const ENTITIES = {
   'card': {
+    keysList: [
+      {
+        fields: [{field: 'code'}]
+      }
+    ],
     keys: [['code']],
     required: ['code']
   },
   'record': {
+    keysList: [
+      {
+        fields: [{field: 'document'}]
+      },
+      {
+        fields: [{field: 'code'}]
+      }
+    ],
     keys: [['document'], ['code']],
     required: ['code', 'document', 'name'],
     related_from: {identifies: 'card'}
   },
   'timetype': {
+    keysList: [
+      {
+        fields: [{field: 'code'}]
+      }
+    ],
     keys: [['code']],
     required: ['code', 'intname']
   },
   'node': {
+    keysList: [
+      {
+        fields: [{field: 'code'}]
+      }
+    ],
     keys: [['code']],
     required: ['code'],
     related_from: {runsIn: 'service'}
   },
   'service': {
+    keysList: [
+      {
+        dependence: {from: 'node', relation: 'runsIn->'},
+        fields: [{field: 'code'}]
+      }
+    ],
     keyDependence: 'runsIn->',
     keys: [['code']],
     required: ['code']
