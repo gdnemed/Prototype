@@ -529,7 +529,7 @@ const initTerminal = (serial, customer) => {
         .then((ret) => {
           for (let i = 0; i < ret.length; i++) {
             if (ret[i].code && ret[i].code !== null) {
-              let r = {id: parseInt(ret[i].code)}
+              let r = {id: parseInt(ret[i].code), seclevel: ret[i].seclevel, pin: ret[i].pin}
               comsService.send(serial, 'record_insert', {records: [r]})
               let card = ret[i].card
               if (card) {
