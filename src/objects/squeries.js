@@ -220,10 +220,8 @@ const getUserKey = (str, data) => {
 
 const release = (session, e, stateService) => {
   return new Promise((resolve, reject) => {
-    stateService.releaseType(session, e, (error) => {
-      if (error) reject(error)
-      else resolve()
-    })
+    stateService.releaseType(session, e)
+      .then(resolve).catch(reject)
   })
 }
 

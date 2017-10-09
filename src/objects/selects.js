@@ -273,7 +273,7 @@ const setOrder = (statement, variables) => {
     } else {
       statement.sql += ' order by ' + variables.order + (variables.desc ? ' desc' : ' asc')
     }
-    // Remove order for recursiva get's
+    // Remove order for recursive get's
     delete variables.order
   }
 }
@@ -383,12 +383,9 @@ const addFilter = (db, statement, f, data) => {
     if (f.field === 'id' && typeof value === 'string') value = parseInt(value)
     if (value !== null && value !== undefined) {
       switch (f.field) {
-        case 'name':
-        case 'name2':
-        case 'intname':
-        case 'code':
-        case 'document':
-        case 'id':
+        case 'name': case 'name2': case 'intname':
+        case 'code': case 'document': case 'id':
+          // Condition over simple field
           if (f.condition) statement.where(f.field, f.condition, value)
           else statement.where(f.field, value)
           break
@@ -519,14 +516,15 @@ const includeRelatedArrays = (session, data, guide, row) => {
       .then(() => {
         addRelation(session, data, guide.relations, row, 0)
           .then(() => linkOwner(session, guide, data, row))
-          .then(resolve)
-          .catch(reject)
+          .then(resolve).catch(reject)
       })
       .catch(reject)
   })
 }
 
-/* Does a subquery over entity, with the owner property */
+/* Does a subquery over entity, with the owner property from input.
+ * This is an special treatment, since inputs and entities are
+ * related through this field. */
 const linkOwner = (session, guide, data, row) => {
   return new Promise((resolve, reject) => {
     if (guide.linkOwner) {
@@ -557,7 +555,7 @@ const linkOwner = (session, guide, data, row) => {
  - list: List of historic properties
  - n: Index into the list
  - row: parent row
- *  */
+*/
 const addHistProperty = (session, data, list, row, n) => {
   return new Promise((resolve, reject) => {
     if (n >= list.length) resolve()
@@ -576,7 +574,11 @@ const addHistProperty = (session, data, list, row, n) => {
   })
 }
 
-/* Calls get, from current id to include a complete relation into row */
+/* Calls get, from current id to include a complete relation into row
+ - list: List of historic properties
+ - n: Index into the list
+ - row: parent row
+*/
 const addRelation = (session, data, list, row, n) => {
   return new Promise((resolve, reject) => {
     if (n >= list.length) resolve()
@@ -595,6 +597,8 @@ const addRelation = (session, data, list, row, n) => {
   })
 }
 
+/* For every row in previous query, calls every get needed (for related date)
+ * and cleans result, for a nice presentation to user. */
 const processRows = (session, squery, data, guide, rows, n) => {
   return new Promise((resolve, reject) => {
     if (n >= rows.length) resolve()
@@ -624,11 +628,13 @@ const cleanResult = (row, squery, guide) => {
     let f = guide.dateFields[j]
     if (row[f] === CT.START_OF_DAYS || row[f] === CT.END_OF_DAYS) delete row[f]
   }
+  // Avoid nulls
   for (let p in row) {
     if (row.hasOwnProperty(p)) {
       if (row[p] === null || row[p] === undefined) delete row[p]
     }
   }
+  // Parse JSONs
   let r = guide.parseNeeded
   for (let j = 0; j < r.length; j++) {
     if (row[r[j]] !== undefined && row[r[j]] !== null) {
