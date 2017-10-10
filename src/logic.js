@@ -488,7 +488,11 @@ const nextVersion = (session, obj, type) => {
         if (ret.code) {
           // For TODO's: t1 and t2 should be checked against local timezone of each device!
           // TODO: Should we check valid dates of record to do delete/insert?
-          comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'record_insert' : 'record_delete', {records: [{id: code}]})
+          let record = {records: [{id: code}]}
+          if (ret.drop === CT.END_OF_TIME && ret.seclevel && ret.pin) {
+            record = {records: [{id: code, seclevel: ret.seclevel, pin: ret.pin}]}
+          }
+          comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'record_insert' : 'record_delete', record)
           cardList = ret.card
           if (cardList) {
             for (let i = 0; i < cardList.length; i++) {
