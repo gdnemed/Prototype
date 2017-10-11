@@ -138,6 +138,7 @@ const createGuide = (squery) => {
     relations: [],
     timeFields: [],
     dateFields: [],
+    numberFields: [],
     parseNeeded: [],
     isArray: false,
     directFields: false,
@@ -204,6 +205,7 @@ const processGuideField = (guide, property, val) => {
           guide.histProps.push({squery: val, visual: property})
         } else {
           let str = {real: val._property_, visual: property, fields: getDirectFields(val)}
+          if (MODEL.getTypeProperty(val._property_) === 'num') guide.numberFields.push(property)
           guide.properties.push(str)
         }
       } else if (val._relation_) {
@@ -262,6 +264,7 @@ const processSimpleField = (guide, property, val) => {
       if (guide.type === FROM_RELATION) {
         guide.entityFields.push(f)
       }
+      if (val === 'id') guide.numberFields.push(property)
   }
 }
 
@@ -284,7 +287,7 @@ const getDirectFields = (str) => {
   for (let property in str) {
     if (str.hasOwnProperty(property)) {
       if (property.charAt(0) !== '_') {
-        a.push({field: str[property], visible: property})
+        a.push({real: str[property], visual: property})
       }
     }
   }
@@ -605,6 +608,8 @@ const processRows = (session, squery, data, guide, rows, n) => {
   return new Promise((resolve, reject) => {
     if (n >= rows.length) resolve()
     else {
+      // Some DB drivers give numbers as strings. Parse hidden id
+      if (rows[n]._id_ && typeof rows[n]._id_ === 'string') rows[n]._id_ = parseInt(rows[n]._id_)
       // Now, for every row, call recursive queries and clean row from hidden fields
       includeRelatedArrays(session, data, guide, rows[n])
         .then(() => cleanResult(rows[n], squery, guide))
@@ -620,6 +625,10 @@ const cleanResult = (row, squery, guide) => {
   // If it's a property or relation simple history, push content to array
   if (!guide.directFields && (guide._property_ || guide._relation_)) {
     row = row._field_
+  }
+  for (let j = 0; j < guide.numberFields.length; j++) {
+    let f = guide.numberFields[j]
+    if (typeof row[f] === 'string') row[f] = parseInt(row[f])
   }
   // Every time or date field with extreme value should be hidden
   for (let j = 0; j < guide.timeFields.length; j++) {
