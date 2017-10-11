@@ -270,8 +270,35 @@ const cleanMigrationMetadata = (customerName, section, dbs) => {
     dbs[section].schema.hasTable('knex_migrations')
       .then((exists) => {
         if (exists) {
-          dbs[section]('knex_migrations').truncate().then(resolve())
+          dbs[section]('knex_migrations').truncate()
+            .then(resolve())
           log.trace(`${customerName} ${section} : knex_migrations table truncated.`)
+          //resolve()
+        } else {
+          log.trace(`${customerName} ${section} : knex_migrations table does not exists.`)
+          resolve()
+        }
+      })
+      .catch((err) => reject(err))
+  })
+}
+
+/*
+ *  Migration ROLLBACK process checks on db file to rollback
+ */
+const addMigrationMetadata = (customerName, section, dbs, file) => {
+  return new Promise((resolve, reject) => {
+    dbs[section].schema.hasTable('knex_migrations')
+      .then((exists) => {
+        if (exists) {
+          var rollbackRegister = {
+            batch: '1',
+            migration_time: new Date().toISOString(),
+            name: file
+          }
+          console.log('INSERT REGISTER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+          dbs[section].insert(rollbackRegister).into('knex_migrations').then(resolve())
+          log.trace(`${customerName} ${section} : knex_migrations table load with rollback file.`)
         } else {
           log.trace(`${customerName} ${section} : knex_migrations table does not exists.`)
           resolve()
@@ -286,5 +313,6 @@ module.exports = {
   initYear,
   verifyDB,
   connect,
-  cleanMigrationMetadata
+  cleanMigrationMetadata,
+  addMigrationMetadata
 }

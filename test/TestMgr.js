@@ -221,6 +221,24 @@ const removeExportClockingsFile = () => {
 // For every section (objects, settings, etc), rollback() and migration() is invoked to grant cleaned tables
 const rollbackAndMigrateDatabases = () => {
   let kObjects = t.dbs['objects'], kInputs = t.dbs['inputs2017'], kState = t.dbs['state']
+
+  return migrations.cleanMigrationMetadata('SPEC', 'objects', t.dbs)
+    .then(() => migrations.addMigrationMetadata('SPEC', 'objects', t.dbs, 'objects_migration.js'))
+    .then(() => kObjects.migrate.rollback())
+    .then(() => kObjects.migrate.latest())
+    // Cleaned OBJECTS
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'inputs2017', t.dbs))
+    .then(() => migrations.addMigrationMetadata('SPEC', 'inputs2017', t.dbs, 'inputs_migration.js'))
+    .then(() => kInputs.migrate.rollback())
+    .then(() => kInputs.migrate.latest())
+    // Cleaned INPUTS
+    .then(() => migrations.cleanMigrationMetadata('SPEC', 'state', t.dbs))
+    .then(() => migrations.addMigrationMetadata('SPEC', 'state', t.dbs, 'state_migration.js'))
+    .then(() => kState.migrate.rollback())
+    .then(() => kState.migrate.latest())
+    // Cleaned STATE
+
+  /*
   return kObjects.migrate.rollback()
     .then(() => migrations.cleanMigrationMetadata('SPEC', 'objects', t.dbs))
     .then(() => kInputs.migrate.rollback())
@@ -233,6 +251,7 @@ const rollbackAndMigrateDatabases = () => {
     .then(() => migrations.cleanMigrationMetadata('SPEC', 'inputs2017', t.dbs))
     .then(() => kState.migrate.latest())
     .then(() => migrations.cleanMigrationMetadata('SPEC', 'state', t.dbs))
+  */
 }
 
 const expectProps = (realObj, expectedObj) => {
