@@ -44,7 +44,7 @@ const get = (session, data, squery) => {
 * pushes info up. */
 const processArray = (rows) => {
   if (rows && rows.length > 0 && rows[0]._field_ !== undefined && rows[0] !== null) {
-    for (let i = 0;i < rows.length; i++) {
+    for (let i = 0; i < rows.length; i++) {
       rows[i] = rows[i]._field_
     }
   }
