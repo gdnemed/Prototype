@@ -359,16 +359,18 @@ const getRelation = (parent, guide, session) => {
   if (typeof guide.id === 'string') guide.id = parseInt(guide.id)
   let related = guide.forward ? 'id2' : 'id1'
   query.column(`${related} as _id_`)
-  let rel = MODEL.RELATIONS[guide.value]
-  selectFields(query, guide.relationFields, rel.time, guide)
+  // let rel = MODEL.RELATIONS[guide.value]
+  // selectFields(query, guide.relationFields, rel.time, guide)
   query.where(guide.forward ? 'id1' : 'id2', guide.id)
   query.whereIn('relation', [guide.value])
   // If there are fields of the related entity, join it
   if (guide.entityFields) {
     let et = 'entity_' + nodeId
     query.join(et, 'id', related)
-    selectFields(query, guide.entityFields, rel.time, guide)
+    // selectFields(query, guide.entityFields, rel.time, guide)
   }
+  let sql = query.toSQL()
+  log.trace(sql)
   return query
 }
 
@@ -394,7 +396,7 @@ const addFilter = (db, statement, f, data) => {
           let subquery = db(`property_${type}_${nodeId}`)
             .column('entity')
             .where('property', f.field)
-          if (f.condition) subquery.where(f.field, f.condition, value)
+          if (f.condition) subquery.where('value', f.condition, value)
           else subquery.where('value', value)
           statement.whereIn('id', subquery)
       }
@@ -456,12 +458,12 @@ fields, index, mandatory) => {
 const selectFields = (q, fields, time, guide) => {
   if (fields) {
     for (let i = 0; i < fields.length; i++) {
-      let f = fields[i].field
+      let f = fields[i].real
       if (f === 't1' || f === 't2') {
         if (time) guide.timeFields.push(fields[i].visible)
         else guide.dateFields.push(fields[i].visible)
       }
-      q.column(f + ' as ' + fields[i].visible)
+      q.column(f + ' as ' + fields[i].visual)
     }
   }
 }
