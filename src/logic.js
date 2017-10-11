@@ -7,8 +7,8 @@
 
 const moment = require('moment-timezone')
 const logger = require('./utils/log')
-const squeries = require('./objects/squeries')
 const select = require('./objects/selects')
+const modify = require('./objects/modify')
 const CT = require('./CT')
 const utils = require('./utils/utils')
 const httpServer = require('./httpServer')
@@ -113,12 +113,9 @@ let prepPutTimeType = {
 }
 
 let prepPutEnroll = {
-  _entity_: 'record',
-  _filter_: {field: 'document', variable: 'id'},
-  _subput_: {
-    _property_: 'enroll',
-    enroll: 't2'
-  }
+  _property_: 'enroll',
+  enroll: 't2',
+  _filter_: {entity: 'record', field: 'document', variable: 'id'}
 }
 
 let prepGetInfo = {
@@ -142,13 +139,10 @@ let prepGetInfos = {
 }
 
 let prepPutInfo = {
-  _entity_: 'record',
-  _filter_: {field: 'document', variable: 'id'},
-  _subput_: {
-    _property_: 'info',
-    value: 'value',
-    date: 't1'
-  }
+  _property_: 'info',
+  value: 'value',
+  date: 't1',
+  _filter_: {entity: 'record', field: 'document', variable: 'id'}
 }
 
 let prepGetNodes = {
@@ -299,6 +293,15 @@ const test = (req, res, session) => {
     .catch((err) => res.status(500).end(err.stack.toString()))
 }
 
+const testPut = (req, res, session) => {
+  modify.put(session, stateService, req.body.variables, req.body.squery, req.body.data, null)
+    .then((ret) => {
+      if (!Array.isArray(ret)) ret = [ret]
+      res.status(200).jsonp(ret)
+    })
+    .catch((err) => res.status(500).end(err.stack.toString()))
+}
+
 const get = (req, res, session, str) => {
   // We add parameters from url into variables set
   if (req.params) {
@@ -310,7 +313,6 @@ const get = (req, res, session, str) => {
   log.info(`GET ${req.url} params: ${JSON.stringify(req.query)}`)
   let cloned = JSON.parse(JSON.stringify(str))
   if (str._transform_) cloned._transform_ = str._transform_
-  // squeries.get(session, req.query, cloned)
   select.get(session, req.query, cloned)
     .then((ret) => res.status(200).jsonp(ret))
     .catch((err) => res.status(500).end(err.stack.toString()))
@@ -320,7 +322,7 @@ const put = (req, res, session, str) => {
   log.info(`POST ${req.url} params: ${JSON.stringify(req.params)} body: ${JSON.stringify(req.body)}`)
   let cloned = JSON.parse(JSON.stringify(str))
   if (str._transform_) cloned._transform_ = str._transform_
-  squeries.put(session,
+  modify.put(session,
     stateService,
     req.params,
     cloned, req.body, extraTreatment)
@@ -341,7 +343,7 @@ const del = (req, res, session, filter, entity) => {
     drop: {_property_: 'drop'},
     id: filter.field
   }
-  squeries.put(session, stateService, req.params, str,
+  modify.put(session, stateService, req.params, str,
     {drop: utils.now(), id: req.params[filter.variable]}, null)
     .then((rows) => {
       res.status(200).end()
@@ -380,6 +382,7 @@ const initAPI = () => {
   api.post('/api/coms/clean', clean)
   api.get('/api/coms/asap', sseExpress, apiCall(register))
   api.post('/api/test', apiCall(test))
+  api.post('/api/testPut', apiCall(testPut))
   api.get('/api/nodes', apiCall(get, prepGetNodes))
   api.get('/api/nodes/:id', apiCall(get, prepGetNode))
   api.post('/api/nodes', apiCall(put, prepPutNode))
@@ -417,7 +420,7 @@ const register = (req, res, session) => {
       res.status(500).end('id conflict')
     } else {
       let cloned = JSON.parse(JSON.stringify(prepGetNode))
-      squeries.get(session, req.query, cloned)
+      select.get(session, req.query, cloned)
         .then((ret) => res.sse('config', ret))
         .catch((err) => res.status(500).end(err.message))
     }
@@ -470,7 +473,7 @@ const nextVersion = (session, obj, type) => {
     return
   }
   // Get current object state in database
-  squeries.get(session, {id: obj[0]},
+  select.get(session, {id: obj[0]},
     {
       _entity_: 'record',
       _filter_: {field: 'id', variable: 'id'},
@@ -518,7 +521,7 @@ const initTerminal = (serial, customer) => {
   // Go to DB to get records
   sessionService.getSession(customer)
     .then((session) => {
-      squeries.get(session, {},
+      select.get(session, {},
         {
           _entity_: '[record]',
           _filter_: {field: 'drop', value: CT.END_OF_TIME},
@@ -555,7 +558,7 @@ const createClocking = (clocking, customer) => {
     sessionService.getSession(customer)
       .then((session) => {
         // Find the owner
-        squeries.get(session, {record: clocking.record},
+        select.get(session, {record: clocking.record},
           {
             _entity_: 'record',
             id: 'id',
@@ -569,7 +572,7 @@ const createClocking = (clocking, customer) => {
             }
             validate(clocking)
               .then((clocking) => {
-                squeries.put(session, stateService, {}, prepPutClocking, clocking, null)
+                modify.put(session, stateService, {}, prepPutClocking, clocking, null)
                   .then((id) => {
                     notifyMonitors(clocking, id, customer)
                     resolve(clocking)
@@ -638,7 +641,7 @@ const cleanRecords = (settings, session) => {
       id: 'id'
     }
     // First, we get every old entity
-    squeries.get(session, {}, str)
+    select.get(session, {}, str)
       .then((ret) => {
         // Now, iterate to delete them
         if (ret) delRecord(ret, session, 0).then(resolve).catch(reject)
@@ -652,7 +655,7 @@ const delRecord = (records, session, i) => {
   return new Promise((resolve, reject) => {
     if (i >= records.length) resolve()
     else {
-      squeries.del(session, records[i].id, true, null, null)
+      select.del(session, records[i].id, true, null, null)
         .then((rows) => {
           delRecord(records, session, i).then(resolve).catch(reject)
         })
