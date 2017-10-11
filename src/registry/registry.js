@@ -12,9 +12,12 @@ const defaults = require('../defaults').addDefaults()
 
 let log
 let servicesList = {}
-let beats = 0
-let heartBeatInterval = 1000
-let clientSideInterval = 1000 * 60 * 5
+let beats = 0                            // Beats counter ... remove it later!!!
+let heartBeatInterval = 1000             // Interval pulse to request status on listed services
+let clientSideInterval = 1000 * 60 * 5   // Parameter sent to the services.
+let ttl = 1000 * 60 * 5                  // Time to live of service entries in registry list.
+
+ttl = 1000 * 5 // 5 segundos  para testing
 
 const loadConfig = (cfg) => {
   if (cfg) {
@@ -25,29 +28,6 @@ const loadConfig = (cfg) => {
 
 const emptyList = () => {
   servicesList = {}
-}
-
-const logRequest = (req) => {
-  console.log('req.app >>>' + req.app)
-  console.log('req.baseUrl >>>' + req.baseUrl)
-  console.log('req.headers >>>' + JSON.stringify(req.headers))
-  console.log('req.body >>>' + JSON.stringify(req.body))
-  console.log('req.cookies >>>' + req.cookies)
-  console.log('req.fresh >>>' + req.fresh)
-  console.log('req.hostname >>>' + req.hostname)
-  console.log('req.ip >>>' + req.ip)
-  console.log('req.ips >>>' + req.ips)
-  console.log('req.originalUrl >>>' + req.originalUrl)
-  console.log('req.params >>>' + JSON.stringify(req.params))
-  console.log('req.path >>>' + req.path)
-  console.log('req.protocol >>>' + req.protocol)
-  console.log('req.query >>>' + JSON.stringify(req.query))
-  console.log('req.route >>>' + JSON.stringify(req.route))
-  console.log('req.secure >>>' + req.secure)
-  console.log('req.signedCookies >>>' + req.signedCookies)
-  console.log('req.stale >>>' + req.stale)
-  console.log('req.subdomains >>>' + req.subdomains)
-  console.log('req >>>' + req.xhr)
 }
 
 /**********************************
@@ -95,7 +75,8 @@ const checkData = (srv) => {
 
     if ((srv.address.server !== srv.requestIP) || (srv.address.port !== srv.requestPort)) {
       // What happen here? ...
-      srv.host = srv.address.server + ':' + srv.address.port
+      // srv.host = srv.address.server + ':' + srv.address.port
+      null
     }
     log.info(JSON.stringify(srv))
     resolve()
@@ -130,7 +111,6 @@ const addService = (srv) => {
   log.debug('addService: ' + JSON.stringify(srv))
 
   return new Promise((resolve, reject) => {
-
     isValidService(srv).then(() => {
       let existsHost = (!servicesList.hasOwnProperty(srv.host)) ? 0 : 1
       let severalServices = (typeof srv.service === 'string') ? 0 : 1
@@ -214,7 +194,7 @@ const getAllServices = (opts) => {
 
 const register = (req, res) => {
 
-  logRequest(req)
+  // logRequest(req)
 
   let newService = req.body
   newService.host = req.headers.host
@@ -226,7 +206,67 @@ const register = (req, res) => {
     })
 }
 
+
+
+
+const addService = (srv) => {
+  log.debug('addService: ' + JSON.stringify(srv))
+
+  return new Promise((resolve, reject) => {
+    isValidService(srv).then(() => {
+      let existsHost = (!servicesList.hasOwnProperty(srv.host)) ? 0 : 1
+      let severalServices = (typeof srv.service === 'string') ? 0 : 1
+      let finalService = {
+        'host': srv.host,
+        'reqIP': srv.requestIP,
+        'reqPort': srv.requestPort,
+        'environment': srv.environment,
+        'address': {
+          'protocol': srv.address.protocol,
+          'port': srv.address.port,
+          'server': srv.address.server
+        },
+        'version': srv.version || '1.0',
+        'time': Date.now(),
+        'load': srv.load || '50'
+      }
+
+      if (!existsHost) servicesList[srv.host] = {}
+
+      // On an IP:PORT can only be running one instance of a service.
+      if (!severalServices) {
+        servicesList[srv.host][srv.service] = finalService
+      } else {
+        for (let serviceType of srv.service) {
+          servicesList[srv.host][serviceType] = finalService
+        }
+      }
+      resolve()
+    })
+  })
+}
+
+
+
 const unRegister = (req, res) => {
+
+
+
+
+  return new Promise((resolve, reject) => {
+
+    if (!req.body.hasOwnProperty('service')) reject(new Error('Missing SERVICE property'))
+
+    let damnedService = req.body
+    damnedService.host = req.headers.host
+    damnedService.severalServices = (typeof damnedService.service === 'string') ? 0 : 1
+
+
+  })
+
+
+
+
   return res.status(200)
 }
 
@@ -266,10 +306,11 @@ const doCheck = (server, callback) => {
       output += chunk
     })
     req.on('error', (err) => {
-      //res.send('error: ' + err.message);
+      // TODO: remove HOST node
       console.log(err)
     })
     res.on('end', () =>  {
+      // TODO: update HOST data
       let obj = JSON.parse(output)
       if (callback && typeof callback === "function") {
         callback(res.statusCode, obj)
@@ -300,17 +341,46 @@ const heartBeat = () => {
 }
 
 /*
- *
+ *   Clean service list entries based on timestamp value compared to TTL.
  */
 
+const deleteHost = (host) => {
+  if (servicesList[host]) delete (servicesList[host])
+}
+
+const deleteService = (host, service) => {
+  if (servicesList[host] && servicesList[host][service]) {
+    delete (servicesList[host][service])
+    if (Object.keys(servicesList[host]).length === 0) deleteHost(host)
+  }
+}
+
+const cleanListJob = () => {
+  setTimeout(() => {
+    cleanExpiredEntries()
+    cleanListJob()
+  }, ttl)
+}
+
 const cleanExpiredEntries = () => {
+  let rightNow = Date.now()
+  log.debug('Cleaning expired entries with TTL: ' + ttl)
 
   for (const host of Object.keys(servicesList)) {
     for (const serviceType of Object.keys(servicesList[host])) {
-      null
-      //leservicesList[host][serviceType]
 
+      let expirationTime = servicesList[host][serviceType].time + ttl
+      let expirationDate = new Date(expirationTime)
+
+      if (rightNow > expirationTime) {
+        log.info('Deleting service ' + serviceType.toUpperCase() + ' at address ' + host + '. Expiration time: ' + expirationDate.toJSON() + '.')
+        //delete (servicesList[host][serviceType])
+        deleteService(host, serviceType)
+      }
     }
+
+    // Clean parent node if empty
+    //if (Object.keys(servicesList[host]).length === 0) delete (servicesList[host])
   }
 }
 
@@ -321,6 +391,7 @@ const init = () => {
     loadConfig()
     emptyList()
     heartBeat()
+    cleanListJob()
 
     //if (g.getConfig().registry_listen) {
 
@@ -339,7 +410,6 @@ const init = () => {
             .then(() => {
               log.debug('>> http server started()')
               httpServer.getApi().post('/api/nodes/register', (req, res) => register(req, res))
-              httpServer.getApi().get('/api/nodes/register', (req, res) => register(req, res))
               httpServer.getApi().post('/api/nodes/unregister', (req, res) => unRegister(req, res))
               httpServer.getApi().get('/api/nodes/check', (req, res) => responseCheckTest(req, res))
               httpServer.getApi().get('/api/services', (req, res) => register(req, res))
@@ -351,6 +421,31 @@ const init = () => {
       reject(e)
     }
   })
+}
+
+
+
+const logRequest = (req) => {
+  console.log('req.app >>>' + req.app)
+  console.log('req.baseUrl >>>' + req.baseUrl)
+  console.log('req.headers >>>' + JSON.stringify(req.headers))
+  console.log('req.body >>>' + JSON.stringify(req.body))
+  console.log('req.cookies >>>' + req.cookies)
+  console.log('req.fresh >>>' + req.fresh)
+  console.log('req.hostname >>>' + req.hostname)
+  console.log('req.ip >>>' + req.ip)
+  console.log('req.ips >>>' + req.ips)
+  console.log('req.originalUrl >>>' + req.originalUrl)
+  console.log('req.params >>>' + JSON.stringify(req.params))
+  console.log('req.path >>>' + req.path)
+  console.log('req.protocol >>>' + req.protocol)
+  console.log('req.query >>>' + JSON.stringify(req.query))
+  console.log('req.route >>>' + JSON.stringify(req.route))
+  console.log('req.secure >>>' + req.secure)
+  console.log('req.signedCookies >>>' + req.signedCookies)
+  console.log('req.stale >>>' + req.stale)
+  console.log('req.subdomains >>>' + req.subdomains)
+  console.log('req >>>' + req.xhr)
 }
 
 module.exports = {
