@@ -296,7 +296,6 @@ const addMigrationMetadata = (customerName, section, dbs, file) => {
             migration_time: new Date().toISOString(),
             name: file
           }
-          console.log('INSERT REGISTER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
           dbs[section].insert(rollbackRegister).into('knex_migrations').then(resolve())
           log.trace(`${customerName} ${section} : knex_migrations table load with rollback file.`)
         } else {
