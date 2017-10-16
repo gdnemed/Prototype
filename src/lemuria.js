@@ -59,7 +59,7 @@ const initServices = () => {
       .then(state.init)
       .then(files.init)
       .then(clockings.init)
-      //.then(() => scheduler.init(sessions))
+      .then(() => scheduler.init(sessions))
       .then(resolve)
       .catch((error) => {
         reject(new Error(`Error in services initialization: ${error}`))

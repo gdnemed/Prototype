@@ -18,9 +18,9 @@ const oneUserOneCard = {
   'name': '1U_1C Alba Maria Estany',
   'code': '0455',
   'language': 'es',
-  'validity': [{'start': '20170105', 'end': '20170622'}], //MSSQL types
+  'validity': [{'start': 20170105, 'end': 20170622}],
   'timetype_grp': [{'code': 'TT_1U_1C'}],
-  'card': [{'code': 'CARD_CODE_1U_1C', 'start': '20170105', 'end': 20170822}] //MSSQL types
+  'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20170822}]
 }
 
 const oneUser2OneCard = {
@@ -28,7 +28,7 @@ const oneUser2OneCard = {
   'name': '1U_1C José Ariño',
   'code': '0456',
   'language': 'en',
-  'validity': [{'start': '20170105', 'end': '20170622'}], //MSSQL types
+  'validity': [{'start': 20170105, 'end': 20170622}],
   'timetype_grp': [{'code': 'TT_1U2_1C'}],
   'card': [{'code': 'CARD_CODE_1U_1C', 'start': 20170105, 'end': 20170822}]
 }
@@ -280,7 +280,7 @@ describe('records.spec.js', () => {
           t.expect(res.status).to.equal(200)
           console.log(res.body)
           let rec0 = res.body[0]
-          console.log('rec0 = ' +  JSON.stringify(rec0))
+          console.log('rec0 = ' + JSON.stringify(rec0))
           t.expectProps(rec0, {
             id: oneUser2OneCard.id,
             code: oneUser2OneCard.code,
@@ -303,7 +303,7 @@ describe('records.spec.js', () => {
   // afterEach(): OPTION 1) Destroys and recreates BD from it() to other it()'s
   // -------------------------------------------------------------------------------------------
   afterEach((done) => {
-     t.rollbackAndMigrateDatabases().then(() => done())
+    t.rollbackAndMigrateDatabases().then(() => done())
   })
   // -------------------------------------------------------------------------------------------
   // afterEach(): OPTION 2) (NOT Prefereable) Does nothing, tables are not restored from it() to other it()'s

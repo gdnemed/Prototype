@@ -306,7 +306,7 @@ const get = (req, res, session, str) => {
   // We add parameters from url into variables set
   if (req.params) {
     if (!req.query) req.query = {}
-    for (var p in req.params) {
+    for (let p in req.params) {
       if (req.params.hasOwnProperty(p)) req.query[p] = req.params[p]
     }
   }
@@ -491,10 +491,12 @@ const nextVersion = (session, obj, type) => {
         if (ret.code) {
           // For TODO's: t1 and t2 should be checked against local timezone of each device!
           // TODO: Should we check valid dates of record to do delete/insert?
-          let record = {records: [{id: code}]}
-          if (ret.drop === CT.END_OF_TIME && ret.seclevel && ret.pin) {
-            record = {records: [{id: code, seclevel: ret.seclevel, pin: ret.pin}]}
+          let entry = {id: code}
+          if (ret.drop === CT.END_OF_TIME) {
+            if (ret.seclevel !== undefined) entry.seclevel = ret.seclevel
+            if (ret.pin !== undefined) entry.pin = ret.pin
           }
+          let record = {records: [entry]}
           comsService.globalSend(ret.drop === CT.END_OF_TIME ? 'record_insert' : 'record_delete', record)
           cardList = ret.card
           if (cardList) {
