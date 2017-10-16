@@ -138,6 +138,7 @@ const createGuide = (squery) => {
     relations: [],
     timeFields: [],
     dateFields: [],
+    numberFields: [],
     parseNeeded: [],
     isArray: false,
     directFields: false,
@@ -204,6 +205,7 @@ const processGuideField = (guide, property, val) => {
           guide.histProps.push({squery: val, visual: property})
         } else {
           let str = {real: val._property_, visual: property, fields: getDirectFields(val)}
+          if (MODEL.getTypeProperty(val._property_) === 'num') guide.numberFields.push(property)
           guide.properties.push(str)
         }
       } else if (val._relation_) {
@@ -262,6 +264,7 @@ const processSimpleField = (guide, property, val) => {
       if (guide.type === FROM_RELATION) {
         guide.entityFields.push(f)
       }
+      if (val === 'id') guide.numberFields.push(property)
   }
 }
 
@@ -284,7 +287,7 @@ const getDirectFields = (str) => {
   for (let property in str) {
     if (str.hasOwnProperty(property)) {
       if (property.charAt(0) !== '_') {
-        a.push({field: str[property], visible: property})
+        a.push({real: str[property], visual: property})
       }
     }
   }
@@ -359,16 +362,18 @@ const getRelation = (parent, guide, session) => {
   if (typeof guide.id === 'string') guide.id = parseInt(guide.id)
   let related = guide.forward ? 'id2' : 'id1'
   query.column(`${related} as _id_`)
-  let rel = MODEL.RELATIONS[guide.value]
-  selectFields(query, guide.relationFields, rel.time, guide)
+  // let rel = MODEL.RELATIONS[guide.value]
+  // selectFields(query, guide.relationFields, rel.time, guide)
   query.where(guide.forward ? 'id1' : 'id2', guide.id)
   query.whereIn('relation', [guide.value])
   // If there are fields of the related entity, join it
   if (guide.entityFields) {
     let et = 'entity_' + nodeId
     query.join(et, 'id', related)
-    selectFields(query, guide.entityFields, rel.time, guide)
+    // selectFields(query, guide.entityFields, rel.time, guide)
   }
+  let sql = query.toSQL()
+  log.trace(sql)
   return query
 }
 
@@ -394,7 +399,7 @@ const addFilter = (db, statement, f, data) => {
           let subquery = db(`property_${type}_${nodeId}`)
             .column('entity')
             .where('property', f.field)
-          if (f.condition) subquery.where(f.field, f.condition, value)
+          if (f.condition) subquery.where('value', f.condition, value)
           else subquery.where('value', value)
           statement.whereIn('id', subquery)
       }
@@ -456,12 +461,12 @@ fields, index, mandatory) => {
 const selectFields = (q, fields, time, guide) => {
   if (fields) {
     for (let i = 0; i < fields.length; i++) {
-      let f = fields[i].field
+      let f = fields[i].real
       if (f === 't1' || f === 't2') {
         if (time) guide.timeFields.push(fields[i].visible)
         else guide.dateFields.push(fields[i].visible)
       }
-      q.column(f + ' as ' + fields[i].visible)
+      q.column(f + ' as ' + fields[i].visual)
     }
   }
 }
@@ -603,6 +608,8 @@ const processRows = (session, squery, data, guide, rows, n) => {
   return new Promise((resolve, reject) => {
     if (n >= rows.length) resolve()
     else {
+      // Some DB drivers give numbers as strings. Parse hidden id
+      if (rows[n]._id_ && typeof rows[n]._id_ === 'string') rows[n]._id_ = parseInt(rows[n]._id_)
       // Now, for every row, call recursive queries and clean row from hidden fields
       includeRelatedArrays(session, data, guide, rows[n])
         .then(() => cleanResult(rows[n], squery, guide))
@@ -618,6 +625,10 @@ const cleanResult = (row, squery, guide) => {
   // If it's a property or relation simple history, push content to array
   if (!guide.directFields && (guide._property_ || guide._relation_)) {
     row = row._field_
+  }
+  for (let j = 0; j < guide.numberFields.length; j++) {
+    let f = guide.numberFields[j]
+    if (typeof row[f] === 'string') row[f] = parseInt(row[f])
   }
   // Every time or date field with extreme value should be hidden
   for (let j = 0; j < guide.timeFields.length; j++) {
