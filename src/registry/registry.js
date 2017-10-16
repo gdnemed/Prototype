@@ -1,6 +1,15 @@
 // -------------------------------------------------------------------------------------------
 // Registry module.
 // -Implements API calls over registry services.
+//
+//    list = {
+//      'IP:PORT': {
+//        'service1': { ... },
+//        'service2': { ... }
+//      },
+//      'IP2:PORT': { ... }
+//    }
+//
 // -------------------------------------------------------------------------------------------
 
 const http = require('http')
@@ -8,21 +17,46 @@ const https = require('https')
 const logger = require('../utils/log')
 const httpServer = require('../httpServer')
 const g = require('../global')
-const defaults = require('../defaults').addDefaults()
 
 let log
 let servicesList = {}
-let beats = 0                            // Beats counter ... remove it later!!!
 let heartBeatInterval = 1000             // Interval pulse to request status on listed services
 let clientSideInterval = 1000 * 60 * 5   // Parameter sent to the services.
 let ttl = 1000 * 60 * 5                  // Time to live of service entries in registry list.
+let forceHostClean = true                // If it's true, on heartbeat request error, clean all services entries on that host.
 
-ttl = 1000 * 5 // 5 segundos  para testing
+const serviceType = {
+  'host': '',              // IP:PORT
+  'service': '',           // Service Type
+  'environment': '',       // Service environment
+  'address': {             // Service address data
+    'protocol': '',
+    'server': '',
+    'port': ''
+  },
+  'request': {             // Request address data
+    'protocol': '',
+    'server': '',
+    'port': ''
+  },
+  'version': '',           // Service Version
+  'time': '',              // Service entry creation timestamp
+  'load': ''               // Service server workload data
+}
+
+/**********************************
+ Service Configuration
+ **********************************/
+
+const isStandalone = () => {
+  return 1
+}
 
 const loadConfig = (cfg) => {
   if (cfg) {
     heartBeatInterval = cfg.heartBeatInterval || heartBeatInterval
     clientSideInterval = cfg.clientSideInterval || clientSideInterval
+    ttl = cfg.ttl || ttl
   }
 }
 
@@ -30,298 +64,35 @@ const emptyList = () => {
   servicesList = {}
 }
 
-/**********************************
- Registry request validation
- **********************************/
-
-const isValidService = (srv) => {
-  return new Promise((resolve, reject) => {
-    // TODO: others validations ... review waterfall
-    checkData(srv)
-      .then(
-        // HTTP(s) Connection test before add register
-        checkAddress({
-          'host': srv.requestIP,
-          'port': srv.requestPort,
-          'protocol': srv.address.protocol
-        })
-          .catch((e) => {
-            log.error(e.message)
-            reject(e)
-          })
-      )
-      .then(resolve())
-      .catch((e) => {
-        log.error(e.message)
-        reject(e)
-      })
-  })
-}
-
-const checkData = (srv) => {
-  return new Promise((resolve, reject) => {
-    log.debug('checkData')
-    if (!srv.hasOwnProperty('host')) reject(new Error('Missing HOST property'))
-    if (!srv.hasOwnProperty('service')) reject(new Error('Missing SERVICE property'))
-    if (!srv.hasOwnProperty('environment')) reject(new Error('Missing ENV property'))
-    if (!srv.hasOwnProperty('address')) reject(new Error('Missing ADDRESS property'))
-    if (!srv.address.hasOwnProperty('protocol')) reject(new Error('Missing PROTOCOL property'))
-    if (!srv.address.hasOwnProperty('server')) reject(new Error('Missing SERVER property'))
-    if (!srv.address.hasOwnProperty('port')) reject(new Error('Missing PORT property'))
-
-    let pos = srv.host.lastIndexOf(':')
-    srv.requestIP = srv.host.substring(0, pos)
-    srv.requestPort = srv.host.substring(pos + 1)
-
-    if ((srv.address.server !== srv.requestIP) || (srv.address.port !== srv.requestPort)) {
-      // What happen here? ...
-      // srv.host = srv.address.server + ':' + srv.address.port
-      null
-    }
-    log.info(JSON.stringify(srv))
-    resolve()
-  })
-
-}
-
-const checkAddress = (address) => {
-  return new Promise((resolve, reject) => {
-    log.debug('checkAddress')
-
-    if (!address) reject(new Error('Missing ADDRESS to test'))
-
-    let protocol = address.protocol === 'https' ? https : http
-    protocol.get({
-      host: address.host,
-      port: address.port
-    }, (res) => {
-      resolve(res)
-    }).on('error', (err) => {
-      log.error(err.message)
-      reject(new Error('Address unreachable: ' + address.host + ':' + address.port))
-    })
-  })
-}
-
-/**********************************
- ADD Service
- **********************************/
-
-const addService = (srv) => {
-  log.debug('addService: ' + JSON.stringify(srv))
-
-  return new Promise((resolve, reject) => {
-    isValidService(srv).then(() => {
-      let existsHost = (!servicesList.hasOwnProperty(srv.host)) ? 0 : 1
-      let severalServices = (typeof srv.service === 'string') ? 0 : 1
-      let finalService = {
-        'host': srv.host,
-        'reqIP': srv.requestIP,
-        'reqPort': srv.requestPort,
-        'environment': srv.environment,
-        'address': {
-          'protocol': srv.address.protocol,
-          'port': srv.address.port,
-          'server': srv.address.server
-        },
-        'version': srv.version || '1.0',
-        'time': Date.now(),
-        'load': srv.load || '50'
-      }
-
-      if (!existsHost) servicesList[srv.host] = {}
-
-      // On an IP:PORT can only be running one instance of a service.
-      if (!severalServices) {
-        servicesList[srv.host][srv.service] = finalService
-      } else {
-        for (let serviceType of srv.service) {
-          servicesList[srv.host][serviceType] = finalService
-        }
-      }
-      resolve()
-    })
-  })
-}
-
-const findService = (srvName) => {
-  return
-}
-
-const removeService = () => {
-  return
-}
-
-const checkService = () => {
-  return
-}
-
-/*
- * Returns list of available services with the following structure:
- *   {
- *      services: {
- *         'serviceType': [{server: '127.0.0.1', port: 8081, protocol: 'https'}],
- *         ...
- *      }
- *   }
- */
-const getAllServices = (opts) => {
-
-  return new Promise((resolve, reject) => {
-
-    let currentServices = {
-      'refresh': clientSideInterval,
-      'services': {}
-    }
-
-    for (const host of Object.keys(servicesList)) {
-      for (const serviceType of Object.keys(servicesList[host])) {
-        if (!currentServices.services.hasOwnProperty(serviceType)) currentServices.services[serviceType] = []
-
-        currentServices.services[serviceType].push({
-          'host': servicesList[host][serviceType].host,
-          'environment': servicesList[host][serviceType].environment,
-          'server': servicesList[host][serviceType].address.server,
-          'port': servicesList[host][serviceType].address.port,
-          'protocol': servicesList[host][serviceType].address.protocol
-        })
-      }
-    }
-    log.info('getAllServices: ' + JSON.stringify(currentServices))
-    resolve(currentServices)
-  })
-}
-
-const register = (req, res) => {
-
-  // logRequest(req)
-
-  let newService = req.body
-  newService.host = req.headers.host
-
-  addService(newService)
-    .then(getAllServices)
-    .then((allServices) => {
-      return res.status(200).jsonp(allServices)
-    })
-}
-
-
-
-
-const addService = (srv) => {
-  log.debug('addService: ' + JSON.stringify(srv))
-
-  return new Promise((resolve, reject) => {
-    isValidService(srv).then(() => {
-      let existsHost = (!servicesList.hasOwnProperty(srv.host)) ? 0 : 1
-      let severalServices = (typeof srv.service === 'string') ? 0 : 1
-      let finalService = {
-        'host': srv.host,
-        'reqIP': srv.requestIP,
-        'reqPort': srv.requestPort,
-        'environment': srv.environment,
-        'address': {
-          'protocol': srv.address.protocol,
-          'port': srv.address.port,
-          'server': srv.address.server
-        },
-        'version': srv.version || '1.0',
-        'time': Date.now(),
-        'load': srv.load || '50'
-      }
-
-      if (!existsHost) servicesList[srv.host] = {}
-
-      // On an IP:PORT can only be running one instance of a service.
-      if (!severalServices) {
-        servicesList[srv.host][srv.service] = finalService
-      } else {
-        for (let serviceType of srv.service) {
-          servicesList[srv.host][serviceType] = finalService
-        }
-      }
-      resolve()
-    })
-  })
-}
-
-
-
-const unRegister = (req, res) => {
-
-
-
-
-  return new Promise((resolve, reject) => {
-
-    if (!req.body.hasOwnProperty('service')) reject(new Error('Missing SERVICE property'))
-
-    let damnedService = req.body
-    damnedService.host = req.headers.host
-    damnedService.severalServices = (typeof damnedService.service === 'string') ? 0 : 1
-
-
-  })
-
-
-
-
-  return res.status(200)
-}
-
+// TESTING
+// Checking heartbeat testing function
 const responseCheckTest = (req, res) => {
-  log.info('responseCheckTest')
-  let respose = {
-    'message': "Yeah... I'm still alive"
-  }
-  res.jsonp(respose)
-}
-
-const doCheck = (server, callback) => {
-  log.debug('doCheck of ' +  JSON.stringify(server))
-
-  let protocol = server.protocol === 'https' ? https : http
-  let pos = server.lastIndexOf(':')
-  let IP = server.substring(0, pos)
-  let PORT = server.substring(pos + 1)
-
-  let options = {
-    host: IP,
-    port: PORT,
-    path: '/api/nodes/check?',
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'APIKEY 123'
-    }
+  let response = {
+    'host': '127.0.0.1:8081',
+    'service': ['logic', 'com', 'test'],
+    'environment': 'dev',
+    'address': {
+      'protocol': 'http',
+      'server': '127.0.0.1',
+      'port': '8081'
+    },
+    'request': {
+      'protocol': 'http',
+      'server': '127.0.0.1',
+      'port': '8081'
+    },
+    'version': '1.1',
+    'time': '',
+    'load': '75'
   }
 
-  let req = protocol.request(options, (res) => {
-    log.info('ping ' + options.host + ':' + options.port)
-    let output = ''
-    res.setEncoding('utf8')
-
-    res.on('data', (chunk) => {
-      output += chunk
-    })
-    req.on('error', (err) => {
-      // TODO: remove HOST node
-      console.log(err)
-    })
-    res.on('end', () =>  {
-      // TODO: update HOST data
-      let obj = JSON.parse(output)
-      if (callback && typeof callback === "function") {
-        callback(res.statusCode, obj)
-      }
-    })
-  })
-
-  req.end()
-
-  //return res.status(200)
+  res.jsonp(response)
 }
+
+/*************************************************
+ Cycles && Services heartbeating
+ *************************************************/
+
 /*
  *  Make a status request to each of the registered services.
  *  Then recall the parent function to create a recursive loop.
@@ -329,31 +100,65 @@ const doCheck = (server, callback) => {
 const heartBeat = () => {
   setTimeout(() => {
     for (const host of Object.keys(servicesList)) {
-      log.info('HeartBeat: ' + beats + ' ' + host)
-      // TODO: the service must response new data, it's needed update current serviceList data !!!
-      doCheck(host)
+      log.info('Heartbeat: ' + host)
+      heartBeatCheck(host, heartBeatUpdate)
     }
-
-    log.debug('HeartBeat Serie: ' + beats + ' done.')
-    beats++
     heartBeat()
   }, heartBeatInterval)
 }
 
-/*
- *   Clean service list entries based on timestamp value compared to TTL.
- */
+const heartBeatCheck = (server, callback) => {
+  let protocol = server.protocol === 'https' ? https : http
+  let pos = server.lastIndexOf(':')
+  let IP = server.substring(0, pos)
+  let PORT = server.substring(pos + 1)
 
-const deleteHost = (host) => {
-  if (servicesList[host]) delete (servicesList[host])
-}
-
-const deleteService = (host, service) => {
-  if (servicesList[host] && servicesList[host][service]) {
-    delete (servicesList[host][service])
-    if (Object.keys(servicesList[host]).length === 0) deleteHost(host)
+  let options = {
+    'host': IP,
+    'port': PORT,
+    'path': '/api/nodes/check?',
+    'method': 'GET',
+    'headers': {
+      'Content-Type': 'application/json',
+      'Authorization': 'APIKEY 123'
+    }
   }
+
+  let req = protocol.request(options, (res) => {
+    let output = ''
+    res.setEncoding('utf8')
+
+    res.on('data', (chunk) => {
+      output += chunk
+    })
+
+    res.on('end', () => {
+      let obj = JSON.parse(output)
+      if (callback && typeof callback === 'function') {
+        callback(res.statusCode, obj)
+      }
+    })
+  })
+
+  req.on('error', (err) => {
+    log.error('Heartbeat ' + options.host + ' ERROR: ' + err + '. DELETING ENTRY !!!')
+    if (forceHostClean) {
+      deleteHost(options)
+    }
+  })
+
+  req.end()
 }
+
+const heartBeatUpdate = (status, response) => {
+  log.info('HeartBeat response: ' + status + ' ' + JSON.stringify(response))
+  response.time = Date.now()
+  updateServices(response)
+}
+
+/********************************************************
+ Clean expired entries on service list.
+ ********************************************************/
 
 const cleanListJob = () => {
   setTimeout(() => {
@@ -368,62 +173,398 @@ const cleanExpiredEntries = () => {
 
   for (const host of Object.keys(servicesList)) {
     for (const serviceType of Object.keys(servicesList[host])) {
-
       let expirationTime = servicesList[host][serviceType].time + ttl
       let expirationDate = new Date(expirationTime)
 
       if (rightNow > expirationTime) {
-        log.info('Deleting service ' + serviceType.toUpperCase() + ' at address ' + host + '. Expiration time: ' + expirationDate.toJSON() + '.')
-        //delete (servicesList[host][serviceType])
-        deleteService(host, serviceType)
+        log.info('Deleting outdated service ' + serviceType.toUpperCase() + ' at address ' + host + '. Expiration time: ' + expirationDate.toJSON() + '.')
+        deleteService(servicesList[host][serviceType], serviceType)
       }
     }
-
-    // Clean parent node if empty
-    //if (Object.keys(servicesList[host]).length === 0) delete (servicesList[host])
   }
 }
 
+/**********************************
+ Registry actions
+ **********************************/
+
+const listAll = (req, res) => {
+  log.debug('New list request.')
+  getAllServices(true)
+    .then((allServices) => {
+      return res.status(200).jsonp(allServices)
+    })
+}
+
+const register = (req, res) => {
+  log.debug('New register request.')
+  addServiceEntry(req)
+    .then(getAllServices)
+    .then((allServices) => {
+      return res.status(200).jsonp(allServices)
+    })
+}
+
+const unRegister = (req, res) => {
+  log.debug('New unregister request.')
+  removeServiceEntry(req)
+    .then(getAllServices)
+    .then((allServices) => {
+      return res.status(200).jsonp(allServices)
+    })
+}
+
+const removeServiceEntry = (req) => {
+  log.debug('removeService')
+
+  return new Promise((resolve, reject) => {
+    checkRequestData(req)
+      .then((serviceEntry) => {
+        deleteServices(serviceEntry)
+      })
+      .then(resolve)
+      .catch((e) => {
+        log.error(e.message)
+        reject(e)
+      })
+  })
+}
+
+const addServiceEntry = (req) => {
+  log.debug('addService')
+
+  return new Promise((resolve, reject) => {
+    checkRequestData(req)
+      .then((serviceEntry) => {
+        checkServiceAddress(serviceEntry)
+          .then((serviceEntry) => {
+            addServices(serviceEntry)
+          })
+          .then(resolve)
+          .catch((e) => {
+            log.error(e.message)
+            reject(e)
+          })
+      })
+      .catch((e) => {
+        log.error(e.message)
+        reject(e)
+      })
+  })
+}
+
+const checkRequestData = (req) => {
+  return new Promise((resolve, reject) => {
+    log.debug('checking request data...')
+
+    if ((!req.body.hasOwnProperty('services')) && (!req.body.hasOwnProperty('service'))) reject(new Error('Missing SERVICE(s) property'))
+    if (!req.body.hasOwnProperty('environment')) reject(new Error('Missing ENV property'))
+    if (!req.body.hasOwnProperty('address')) reject(new Error('Missing ADDRESS property'))
+    if (!req.body.address.hasOwnProperty('protocol')) reject(new Error('Missing PROTOCOL property'))
+    if (!req.body.address.hasOwnProperty('server')) reject(new Error('Missing SERVER property'))
+    if (!req.body.address.hasOwnProperty('port')) reject(new Error('Missing PORT property'))
+
+    let serviceEntry = Object.assign({}, serviceType)
+
+    serviceEntry.service = req.body.services || req.body.service
+    serviceEntry.environment = req.body.environment || 'dev'
+    serviceEntry.version = req.body.version || '1.0'
+    serviceEntry.time = Date.now()
+    serviceEntry.load = req.body.load || '50'
+    serviceEntry.address.protocol = req.body.address.protocol
+    serviceEntry.address.server = req.body.address.server
+    serviceEntry.address.port = req.body.address.port
+
+    // Request data
+    serviceEntry.host = req.headers.host || (serviceEntry.address.server + ':' + serviceEntry.address.port)
+    let pos = serviceEntry.host.lastIndexOf(':')
+    serviceEntry.request.protocol = req.protocol || serviceEntry.address.protocol
+    serviceEntry.request.server = req.headers.host.substring(0, pos)
+    serviceEntry.request.port = req.headers.host.substring(pos + 1)
+
+    if ((serviceEntry.address.server !== serviceEntry.request.server) ||
+      (serviceEntry.address.port !== serviceEntry.request.port)) {
+      log.warn('Service and request addresses are different!')
+    }
+
+    log.info(JSON.stringify(serviceEntry))
+    resolve(serviceEntry)
+  })
+}
+
+const checkServiceAddress = (service) => {
+  return new Promise((resolve, reject) => {
+    log.debug('check request address...')
+
+    if (!service) reject(new Error('Missing service object to test'))
+
+    let protocol = service.request.protocol === 'https' ? https : http
+    protocol.get({
+      host: service.request.server,
+      port: service.request.port
+    }, (res) => {
+      resolve(service)
+    }).on('error', (err) => {
+      log.error(err.message)
+      reject(new Error('Address unreachable: ' + service.request.server + ':' + service.request.server))
+    })
+  })
+}
+
+/************************************************************
+ Service List Operations
+ ************************************************************/
+/*
+ * Returns list of available services with the following structure:
+ *   {
+ *      services: {
+ *         'serviceType': [{server: '127.0.0.1', port: 8081, protocol: 'https'}],
+ *         ...
+ *      }
+ *   }
+ */
+
+const getAllServices = (detailed) => {
+  return new Promise((resolve, reject) => {
+    let currentServices = {
+      'refresh': clientSideInterval,
+      'services': listServices(detailed)
+    }
+    resolve(currentServices)
+  })
+}
+
+const listServices = (detailed) => {
+  let list = {}
+
+  for (const host of Object.keys(servicesList)) {
+    for (const serviceType of Object.keys(servicesList[host])) {
+      if (!list.hasOwnProperty(serviceType)) list[serviceType] = []
+
+      let data = {
+        'host': servicesList[host][serviceType].host,
+        'environment': servicesList[host][serviceType].environment,
+        'server': servicesList[host][serviceType].address.server,
+        'port': servicesList[host][serviceType].address.port,
+        'protocol': servicesList[host][serviceType].address.protocol
+      }
+
+      if (detailed) {
+        data.version = servicesList[host][serviceType].version
+        data.time = servicesList[host][serviceType].time
+        data.load = servicesList[host][serviceType].load
+      }
+
+      list[serviceType].push(data)
+    }
+  }
+
+  return list
+}
+
+/*
+ *  Atomic and batch operations on Services List
+ *  The service object sended on request can contain an array or a string.
+ *  Functions must be able to use both types of data
+ *
+ */
+
+/// ////////////////////
+//
+// Host Operations
+//
+/// ////////////////////
+
+const existsHost = (service) => {
+  return servicesList.hasOwnProperty(service.host)
+}
+
+const addHost = (service) => {
+  if (!existsHost(service)) servicesList[service.host] = {}
+}
+
+const deleteHost = (service) => {
+  if (existsHost(service)) delete (servicesList[service.host])
+}
+
+const updateHost = (service) => {
+  updateServices(service)
+}
+
+/// ////////////////////
+//
+//  Service Atomic Operations
+//
+/// ////////////////////
+
+const existService = (host, service) => {
+  if (servicesList.hasOwnProperty(host)) {
+    return servicesList[host].hasOwnProperty(service)
+  } else {
+    return false
+  }
+}
+
+const addService = (service, forceType) => {
+  log.debug('addService on ' + service.host + '. Type: ' + service.service + ' Forced: ' + forceType)
+
+  let o = Object.assign({}, service)
+
+  if (forceType) {
+    o.service = forceType
+  }
+
+  addHost(o)
+  servicesList[o.host][o.service] = o
+}
+
+const deleteService = (service, forceType) => {
+  log.warn('deleteService on ' + service.host + '. Type: ' + service.service + '. Forced: ' + forceType)
+
+  let o = Object.assign({}, service)
+
+  if (forceType) o.service = forceType
+
+  if (existService(o.host, o.service)) {
+    delete (servicesList[o.host][o.service])
+
+    if (Object.keys(servicesList[o.host]).length === 0) deleteHost(o.host)
+  }
+}
+
+const updateService = (service, forceType) => {
+  log.debug('updateService on ' + service.host + '. Type: ' + service.service + '. Forced: ' + forceType)
+
+  let o = Object.assign({}, service)
+  let previousService = {}
+
+  if (forceType) {
+    o.service = forceType
+  }
+
+  if (!existService(o.host, o.service)) {
+    addService(service, o.service)
+  } else {
+    previousService = Object.assign({}, servicesList[o.host][o.service])
+    servicesList[o.host][o.service] = Object.assign({}, previousService, o)
+  }
+}
+
+/// ////////////////////
+//
+// Service Batch Operations
+//
+/// ////////////////////
+
+const existServices = (service) => {
+  let severalServices = (typeof service.service === 'string') ? 0 : 1
+  let existServices = true
+
+  // On an IP:PORT can only be running one instance of a service.
+  if (!severalServices) {
+    existServices = existService(service.host, service.service)
+  } else {
+    for (let serviceType of service.service) {
+      existServices = existService(service.host, serviceType)
+
+      if (!existServices) break  // all or none
+    }
+  }
+
+  return existServices
+}
+
+const addServices = (service) => {
+  let severalServices = (typeof service.service === 'string') ? 0 : 1
+
+  // On an IP:PORT can only be running one instance of a service.
+  if (!severalServices) {
+    addService(service, service.service)
+  } else {
+    for (let serviceType of service.service) {
+      addService(service, serviceType)
+    }
+  }
+}
+
+const deleteServices = (service) => {
+  let severalServices = (typeof service.service === 'string') ? 0 : 1
+
+  if (!severalServices) {
+    deleteService(service, service.service)
+  } else {
+    for (let serviceType of service.service) {
+      deleteService(service, serviceType)
+    }
+  }
+}
+
+const updateServices = (service) => {
+  let severalServices = (typeof service.service === 'string') ? 0 : 1
+
+  if (!severalServices) {
+    updateService(service, service.service)
+  } else {
+    for (let serviceType of service.service) {
+      updateService(service, serviceType)
+    }
+  }
+}
+
+/**********************************
+ Service Init
+ **********************************/
+
 const init = () => {
   return new Promise((resolve, reject) => {
+    ttl = 1000 * 15                             // 15 segundos  TESTING
+    heartBeatInterval = 1000 * 10               // 10 segundos  TESTING
     log = logger.getLogger('registry')
     log.debug('init()')
-    loadConfig()
-    emptyList()
-    heartBeat()
-    cleanListJob()
 
-    //if (g.getConfig().registry_listen) {
+    if (isStandalone) {
+      log.info('INIT as STANDALONE Service')
 
-    try {
+      const defaults = require('../defaults').addDefaults()
+
       if (process.argv.indexOf('--home') !== -1) {
         process.env.HOME = process.argv[process.argv.indexOf('--home') + 1]
-        log.debug('Service Register init at ' + process.env.HOME)
+        log.debug('Service REGISTRY init at ' + process.env.HOME)
       } else {
         process.exit()
       }
 
-      // TODO: Standalone vs Monolithic bootstrap
-      if (true) {
-        g.init().then(() => {
-          httpServer.init()
-            .then(() => {
-              log.debug('>> http server started()')
-              httpServer.getApi().post('/api/nodes/register', (req, res) => register(req, res))
-              httpServer.getApi().post('/api/nodes/unregister', (req, res) => unRegister(req, res))
-              httpServer.getApi().get('/api/nodes/check', (req, res) => responseCheckTest(req, res))
-              httpServer.getApi().get('/api/services', (req, res) => register(req, res))
-              resolve()
-            })
-        })
-      } else resolve()
-    } catch (e) {
-      reject(e)
+      g.init().then(() => {
+        httpServer.init()
+          .then(() => {
+            log.debug('>> http server started()')
+            httpServer.getApi().post('/api/nodes/register', (req, res) => register(req, res))
+            httpServer.getApi().delete('/api/nodes/unregister', (req, res) => unRegister(req, res))
+            httpServer.getApi().get('/api/nodes/services', (req, res) => listAll(req, res))
+            httpServer.getApi().get('/api/nodes/check', (req, res) => responseCheckTest(req, res))
+          })
+          .then(() => {
+            loadConfig()
+            emptyList()
+            heartBeat()
+            cleanListJob()
+            resolve()
+          })
+      })
+    } else {
+      log.info('INIT as module of MONOLITHIC app')
+      loadConfig()
+      emptyList()
+      heartBeat()
+      cleanListJob()
+      httpServer.getApi().post('/api/nodes/register', (req, res) => register(req, res))
+      httpServer.getApi().delete('/api/nodes/unregister', (req, res) => unRegister(req, res))
+      httpServer.getApi().get('/api/nodes/services', (req, res) => listAll(req, res))
+      httpServer.getApi().get('/api/nodes/check', (req, res) => responseCheckTest(req, res))
+      resolve()
     }
   })
 }
-
-
 
 const logRequest = (req) => {
   console.log('req.app >>>' + req.app)
@@ -452,4 +593,5 @@ module.exports = {
   init
 }
 
-init()
+// TESTING
+if (isStandalone) init()
