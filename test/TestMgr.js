@@ -80,7 +80,7 @@ const startTerminalEmulator = () => {
   console.log('>> TestMgr: startTerminalEmulator')
   return new Promise((resolve, reject) => {
     if (!_terminalInitialized) {
-      terminal.init('/test/emulators') //SubPath is needed, because cwd where all testa are executed is  /LEMURIA/Prototype/
+      terminal.init('/test/emulators') // SubPath is needed, because cwd where all testa are executed is  /LEMURIA/Prototype/
       console.log('TestMgr: terminal init() was called')
       _terminalInitialized = true
       resolve()
@@ -165,25 +165,25 @@ const cleanImportFiles = (fieName) => {
   })
 }
 
-//Given a line of an exported file, ex: 3,"1205","3057323748",20170906,123733,"N",0,"E00",0
-//returns tru if every value in arrValues is inside the line, ex: [3,1205,E00]
+// Given a line of an exported file, ex: 3,"1205","3057323748",20170906,123733,"N",0,"E00",0
+// returns tru if every value in arrValues is inside the line, ex: [3,1205,E00]
 const checkValuesInsideLine = (line, arrValues) => {
   let found = true
-  arrValues.forEach((value) => { //Always iterates all element (no break is possible)
+  arrValues.forEach((value) => { // Always iterates all element (no break is possible)
     if (line.indexOf(value) < 0) found = false
   })
   return found
 }
 
-//Given the contents of a csv file (export), checks if it contains a line (separator is \r\n) with values contained in arrValues
-//Example: if "arrValues" == [3,1205,E00]
+// Given the contents of a csv file (export), checks if it contains a line (separator is \r\n) with values contained in arrValues
+// Example: if "arrValues" == [3,1205,E00]
 //         a line inside 'content' containing =>  3,"1205","3057323748",20170906,123733,"N",0,"E00",0 will return true
 const checkCSVExport = (content, arrValues) => {
   let arLines = content.split('\r\n')
   const containsValues = (line) => line && checkValuesInsideLine(line, arrValues)
   let arFiltered = arLines.filter(containsValues)
   let found = arFiltered && arFiltered.length > 0
-  if (!found) console.log("CHECK ERROR: TestMgr =>  values [ " + arrValues.toString() + " ] not found inside file")
+  if (!found) console.log('CHECK ERROR: TestMgr =>  values [ ' + arrValues.toString() + ' ] not found inside file')
   return found
 }
 
@@ -198,16 +198,18 @@ const verifyExportClockings = (arrValues) => {
   return new Promise((resolve, reject) => {
     try {
       fs.readFile(getExportClockingsFileName(), 'utf8', (err, contents) => {
-        if (err && (err.code !== 'ENOENT')) reject()
+        if (err && (err.code !== 'ENOENT')) reject(err)
         else if (contents && checkCSVExport(contents, arrValues)) resolve()
-        reject()
+        reject(err)
       })
-    } catch (err) {reject(err)}
+    } catch (err) {
+      reject(err)
+    }
   })
 }
 
-//Removes the 'exports' file (whose name & dir) appears i config.json
-//Removes Sync (no extra syncronization is required)
+// Removes the 'exports' file (whose name & dir) appears i config.json
+// Removes Sync (no extra syncronization is required)
 const removeExportClockingsFile = () => {
   let exportClkFileName = getExportClockingsFileName()
   if (fs.existsSync(exportClkFileName)) {
@@ -220,7 +222,9 @@ const removeExportClockingsFile = () => {
 // -------------------------------------------------------------------------------------------
 // For every section (objects, settings, etc), rollback() and migration() is invoked to grant cleaned tables
 const rollbackAndMigrateDatabases = () => {
-  let kObjects = t.dbs['objects'], kInputs = t.dbs['inputs2017'], kState = t.dbs['state']
+  let kObjects = t.dbs['objects']
+  let kInputs = t.dbs['inputs2017']
+  let kState = t.dbs['state']
 
   return migrations.cleanMigrationMetadata('SPEC', 'objects', t.dbs)
     .then(() => migrations.addMigrationMetadata('SPEC', 'objects', t.dbs, 'objects_migration.js'))
@@ -237,21 +241,6 @@ const rollbackAndMigrateDatabases = () => {
     .then(() => kState.migrate.rollback())
     .then(() => kState.migrate.latest())
     // Cleaned STATE
-
-  /*
-  return kObjects.migrate.rollback()
-    .then(() => migrations.cleanMigrationMetadata('SPEC', 'objects', t.dbs))
-    .then(() => kInputs.migrate.rollback())
-    .then(() => migrations.cleanMigrationMetadata('SPEC', 'inputs2017', t.dbs))
-    .then(() => kState.migrate.rollback())
-    .then(() => migrations.cleanMigrationMetadata('SPEC', 'state', t.dbs))
-    .then(() => kObjects.migrate.latest())
-    .then(() => migrations.cleanMigrationMetadata('SPEC', 'objects', t.dbs))
-    .then(() => kInputs.migrate.latest())
-    .then(() => migrations.cleanMigrationMetadata('SPEC', 'inputs2017', t.dbs))
-    .then(() => kState.migrate.latest())
-    .then(() => migrations.cleanMigrationMetadata('SPEC', 'state', t.dbs))
-  */
 }
 
 const expectProps = (realObj, expectedObj) => {
@@ -312,11 +301,9 @@ const sendPOST = (route, data, sync = true) => {
   }
 }
 
-
 const sendDELETE = (route, data) => {
   return chai.request(t.lemuriaAPI).delete(route).set('Authorization', 'APIKEY 123').send(data)
 }
-
 
 // Holds references to everything that a 'spec' or 'test' file can need, i.e dbs, config, lemuriaAPI, etc
 let t = {
@@ -334,8 +321,8 @@ let t = {
   handleFileImport,
   cleanImportFiles,
   terminalEmulatorSendGET,
-  CORRECT_CLOCKING: 'E00', //Code for a correct clocking
-  INCORRECT_CLOCKING: 'E02' //Code for an incorrect clocking
+  CORRECT_CLOCKING: 'E00', // Code for a correct clocking
+  INCORRECT_CLOCKING: 'E02' // Code for an incorrect clocking
 }
 
 module.exports = {
