@@ -49,7 +49,7 @@ const serviceType = {
  **********************************/
 
 const isStandalone = () => {
-  return 1
+  return 0
 }
 
 const loadConfig = (cfg) => {
@@ -86,7 +86,8 @@ const responseCheckTest = (req, res) => {
     'load': '75'
   }
 
-  res.jsonp(response)
+  // res.jsonp(response)
+  res.jsonp({'service': []})
 }
 
 /*************************************************
@@ -517,12 +518,12 @@ const updateServices = (service) => {
 
 const init = () => {
   return new Promise((resolve, reject) => {
-    ttl = 1000 * 15                             // 15 segundos  TESTING
+    ttl = 1000 * 60 * 15                        // 15 min TESTING
     heartBeatInterval = 1000 * 10               // 10 segundos  TESTING
     log = logger.getLogger('registry')
     log.debug('init()')
 
-    if (isStandalone) {
+    if (isStandalone > 0) {
       log.info('INIT as STANDALONE Service')
 
       const defaults = require('../defaults').addDefaults()
@@ -594,4 +595,4 @@ module.exports = {
 }
 
 // TESTING
-if (isStandalone) init()
+// if (isStandalone) init()

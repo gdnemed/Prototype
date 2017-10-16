@@ -17,6 +17,7 @@ const logic = require('./logic')
 const scheduler = require('./tasks/scheduler')
 const sessions = require('./session/sessions')
 const globalServer = require('./global/globalServer')
+const registry = require('./registry/registry')
 
 let log
 
@@ -32,12 +33,28 @@ const init = () => {
       g.init()
         .then(httpServer.init)
         .then(globalServer.init)
+        .then(registry.init) // JDS
         .then(sessions.init)
         .then(initServices)
         .then(() => {
           log.info('>> Services started. Application ready...')
           resolve()
         })
+        // INIT JDS
+        .then(() => {
+          log.info('>> Add STATE to REGISTRY...')
+          g.hardCodedAddState()
+        })
+        .then(() => {
+          log.info('>> Call REGISTRY...')
+          g.callRegistry()
+        })
+        .then(() => {
+          log.info('>> Invoke STATE METHOD SETTINGS...')
+          let result = g.invokeService('state', 'settings', null, null)
+          console.log('INVOKED METHOD RESULT === ' + JSON.stringify(result))
+        })
+        // END JDS
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: `)
           log.error(err)

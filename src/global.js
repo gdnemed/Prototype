@@ -102,11 +102,212 @@ const init = () => {
     initConfiguration()
       .then(() => {
         initEvents()
+        addLocalService('global') // JDS
         resolve()
       })
       .catch(reject)
   })
 }
+
+/// /////////////////////
+/// Services
+/// /////////////////////
+
+let appServices = {
+  local: [],
+  remote: {}
+}
+
+const callRegistry = () => {
+  // TODO: this well done...
+  let options = {
+    'method': 'GET',
+    'url': 'http://127.0.0.1:8081/api/nodes/services',
+    'headers': {
+      'Authorization': 'APIKEY 123' // + apiKey
+    },
+    'body': {
+    },
+    'encoding': 'utf8',
+    'json': true
+  }
+
+  request(options, (err, res, body) => {
+    if (err) {
+      log.error('Service REGISTRY on 127.0.0.1:8081: ' + err)
+    } else {
+      log.info('Service REGISTRY response === ' + JSON.stringify(body))
+      addRemoteServices(body.services)
+    }
+  })
+}
+
+const hardCodedAddState = () => {
+  // TODO: this well done...
+  let options = {
+    'method': 'POST',
+    'url': 'http://127.0.0.1:8081/api/nodes/register',
+    'headers': {
+      'Authorization': 'APIKEY 123' // + apiKey
+    },
+    'body': {
+      'service': ['state'],
+      'address': {
+        'protocol': 'http',
+        'port': '8081',
+        'server': '127.0.0.1'
+      },
+      'environment': 'dev',
+      'version': '1.0',
+      'time': '',
+      'load': '50'
+    },
+    'encoding': 'utf8',
+    'json': true
+  }
+
+  request(options, (err, res, body) => {
+    if (err) {
+      log.error('Service REGISTRY -> STATE: ' + err)
+    } else {
+      log.info('Service REGISTRY -> STATE response === ' + JSON.stringify(body))
+      addRemoteServices(body.services)
+    }
+  })
+}
+
+const addLocalService = (serviceName) => {
+  if (!appServices.local.includes(serviceName)) appServices.local.push(serviceName)
+
+  log.info('UPDATED appServices: ' + JSON.stringify(appServices))
+}
+
+const addRemoteServices = (serviceList) => {
+  if (serviceList) appServices.remote = serviceList
+
+  log.info('UPDATED appServices: ' + JSON.stringify(appServices))
+}
+
+const isLocalService = (serviceName) => {
+  return appServices.local.includes(serviceName)
+}
+
+const loadBalancer = (serviceArray, avoidHost) => {
+  let _bestUrl = null
+  // TODO: a real balancer...
+  if (serviceArray.length > 0) _bestUrl = serviceArray[0].host
+  return _bestUrl
+}
+
+const getUrlService = (serviceName, avoidHost) => {
+  let _url = null
+  if (appServices.remote.hasOwnProperty(serviceName)) {
+    _url = loadBalancer(appServices.remote[serviceName], avoidHost)
+  }
+  return _url
+}
+
+const getMethodRoute = (serviceName, methodName) => {
+  let methodRoute
+
+  if (serviceName === 'state') {
+    switch (methodName) {
+      case 'newId':
+        methodRoute = '/api/state/?????'
+        break
+      case 'newInputId':
+        methodRoute = '/api/state/?????'
+        break
+      case 'blockType':
+        methodRoute = '/api/state/?????'
+        break
+      case 'releaseType':
+        methodRoute = '/api/state/?????'
+        break
+      case 'settings':
+        methodRoute = '/api/state/settings'
+        break
+      default:
+        throw new Error('Invalid method name: ' + serviceName + '.' + methodName)
+    }
+  } else if (serviceName === 'coms') {
+
+  } else if (serviceName === 'foo') {
+
+  } else {
+    throw new Error('Invalid service name: ' + serviceName)
+  }
+
+  return methodRoute
+}
+
+const invokeService = (service, methodName, session, parameters) => {
+  // TODO: static methods as promise?
+  if (isLocalService(service)) {
+    switch (service) {
+      case 'state':
+        // return state[methodName](session, parameters)
+        return null
+      case 'otherService':
+        return null
+      default:
+        throw new Error('Invoked service method does not exists: ' + service + '.' + methodName)
+    }
+  } else {
+    let route = getMethodRoute(service, methodName)
+
+    return new Promise((resolve, reject) => {
+      let result, error
+      let done = false
+      let attemptedUrls = []  // List of requested hosts to resolve invoke method
+      let hostUrl = getUrlService(service, attemptedUrls)
+      attemptedUrls.push(hostUrl)
+
+      // Loop on available type services
+      while (!done) {
+        // Get host and log usage.
+        hostUrl = getUrlService(service, attemptedUrls)
+        if (attemptedUrls.includes(hostUrl)) break
+        attemptedUrls.push(hostUrl)
+
+        let options = {
+          'method': 'GET',
+          'url': hostUrl + route,
+          'headers': {
+            'Authorization': 'APIKEY 123' // + apiKey
+          },
+          'body': {
+            'data': parameters,
+            'session': session
+          },
+          'encoding': 'utf8',
+          'json': true
+        }
+
+        request(options, (err, res, body) => {
+          if (err) {
+            log.error('Service ' + service.toUpperCase() + ' on  host ' + hostUrl + ': ' + err)
+            error = err
+          } else {
+            result = JSON.parse(body)
+            done = true
+          }
+        })
+        // Keeps looping
+      }
+
+      if (done) {
+        resolve(result)
+      } else {
+        reject(error)
+      }
+    })
+  }
+}
+
+/// /////////////////////
+/// END
+/// /////////////////////
 
 module.exports = {
   init,
@@ -114,5 +315,12 @@ module.exports = {
   EVT,
   getEventEmitter: () => _evtEmitter,
   // Config
-  getConfig: () => _cfg
+  getConfig: () => _cfg,
+  /// Services
+  addLocalService,
+  addRemoteServices,
+  getUrlService,
+  invokeService,
+  callRegistry,
+  hardCodedAddState
 }
