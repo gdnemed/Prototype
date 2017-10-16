@@ -32,13 +32,13 @@ const checkTable = (db, name, f) => {
 
 const upMonth = (knex, month) => {
   const createTableInputs = () => checkTable(knex, 'input_1_' + month, (table) => {
-    table.integer('id').primary()
-    table.integer('tmp')
-    table.integer('gmt') // TODO: veure table.timestamp
-    table.integer('reception')
-    table.integer('owner')
-    table.integer('result')
-    table.integer('source')
+    table.bigInteger('id').primary()
+    table.bigInteger('tmp')
+    table.bigInteger('gmt') // TODO: veure table.timestamp
+    table.bigInteger('reception')
+    table.bigInteger('owner')
+    table.bigInteger('result')
+    table.bigInteger('source')
     table.string('serial')
     table.index(['id'], 'i_input_id_' + month)
     table.index(['tmp'], 'i_input_tmp_' + month)
@@ -46,7 +46,7 @@ const upMonth = (knex, month) => {
     table.index(['owner', 'tmp'], 'i_input_otmp_' + month)
   })
   const createTableStrInputs = () => checkTable(knex, 'input_data_str_1_' + month, (table) => {
-    table.integer('id')
+    table.bigInteger('id')
     table.string('property')
     table.string('value')
     table.index(['id', 'property'], 'i_input_s_' + month)
@@ -54,23 +54,23 @@ const upMonth = (knex, month) => {
   })
   // (id integer, property integer, value integer)
   const createTableNumInputs = () => checkTable(knex, 'input_data_num_1_' + month, (table) => {
-    table.integer('id')
+    table.bigInteger('id')
     table.string('property')
-    table.integer('value')
+    table.bigInteger('value')
     table.index(['id', 'property'], 'i_input_n_' + month)
   })
   // (id integer, property integer, value blob)
   const createTableBinInputs = () => checkTable(knex, 'input_data_bin_1_' + month, (table) => {
-    table.integer('id')
+    table.bigInteger('id')
     table.string('property')
     table.binary('value')
     table.index(['id', 'property'], 'i_input_b_' + month)
   })
   // (id integer, relation integer, entity integer)
   const createTableRelationInputs = () => checkTable(knex, 'input_rel_1_' + month, (table) => {
-    table.integer('id')
-    table.integer('relation')
-    table.integer('entity')
+    table.bigInteger('id')
+    table.bigInteger('relation')
+    table.bigInteger('entity')
     table.index(['relation', 'id'], 'i_input_r_' + month)
     table.index(['relation', 'entity'], 'i_input_rinv_' + month)
   })

@@ -280,6 +280,7 @@ describe('records.spec.js', () => {
           t.expect(res.status).to.equal(200)
           console.log(res.body)
           let rec0 = res.body[0]
+          console.log('rec0 = ' + JSON.stringify(rec0))
           t.expectProps(rec0, {
             id: oneUser2OneCard.id,
             code: oneUser2OneCard.code,

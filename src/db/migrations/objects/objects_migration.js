@@ -1,57 +1,84 @@
 exports.up = (knex, Promise) => {
+  let createIndex
+
   return knex.schema
   // TODO: include 'nodeId' & indexes
-    .createTable('entity_1', (table) => {
-      table.integer('id').primary()
+    .hasTable('entity_1', (exists) => {
+      createIndex = !exists
+    })
+    .createTableIfNotExists('entity_1', (table) => {
+      table.bigInteger('id').primary()
       table.string('type')
       table.string('name')
       table.string('name2')
-      table.string('intname')
+      table.string('intname', 4000)
       table.string('document')
       table.string('code')
-      table.index(['id'], 'id')
-      table.index(['type', 'name'], 'i_tname')
-      table.index(['type', 'name2'], 'i_tname2')
-      table.index(['type', 'name', 'name2'], 'i_tnamec')
-      table.index(['type', 'code'], 'i_tcode')
-      table.index(['type', 'document'], 'i_tdocument')
+      if (createIndex) {
+        table.index(['id'], 'id')
+        table.index(['type', 'name'], 'i_tname')
+        table.index(['type', 'name2'], 'i_tname2')
+        table.index(['type', 'name', 'name2'], 'i_tnamec')
+        table.index(['type', 'code'], 'i_tcode')
+        table.index(['type', 'document'], 'i_tdocument')
+      }
     })
-    .createTable('property_num_1', (table) => {
-      table.integer('entity')
-      table.string('property')
-      table.integer('t1')
-      table.integer('t2')
-      table.integer('value')
-      table.index(['property', 'entity', 't1', 't2'], 'i_pn_pe')
-      table.index(['property', 'value', 't1', 't2'], 'i_pn_pv')
+    .hasTable('property_num_1', (exists) => {
+      createIndex = !exists
     })
-    .createTable('property_str_1', (table) => {
-      table.integer('entity')
+    .createTableIfNotExists('property_num_1', (table) => {
+      table.bigInteger('entity')
       table.string('property')
-      table.integer('t1')
-      table.integer('t2')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
+      table.bigInteger('value')
+      if (createIndex) {
+        table.index(['property', 'entity', 't1', 't2'], 'i_pn_pe')
+        table.index(['property', 'value', 't1', 't2'], 'i_pn_pv')
+      }
+    })
+    .hasTable('property_str_1', (exists) => {
+      createIndex = !exists
+    })
+    .createTableIfNotExists('property_str_1', (table) => {
+      table.bigInteger('entity')
+      table.string('property')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
       table.string('value')
-      table.index(['property', 'entity', 't1', 't2'], 'i_ps_pe')
-      table.index(['property', 'value', 't1', 't2'], 'i_ps_pv')
+      if (createIndex) {
+        table.index(['property', 'entity', 't1', 't2'], 'i_ps_pe')
+        table.index(['property', 'value', 't1', 't2'], 'i_ps_pv')
+      }
     })
-    .createTable('property_bin_1', (table) => {
-      table.integer('entity')
+    .hasTable('property_bin_1', (exists) => {
+      createIndex = !exists
+    })
+    .createTableIfNotExists('property_bin_1', (table) => {
+      table.bigInteger('entity')
       table.string('property')
-      table.integer('t1')
-      table.integer('t2')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
       table.binary('value')
-      table.index(['property', 'entity', 't1', 't2'], 'i_pb_pe')
+      if (createIndex) {
+        table.index(['property', 'entity', 't1', 't2'], 'i_pb_pe')
+      }
     })
-    .createTable('relation_1', (table) => {
+    .hasTable('relation_1', (exists) => {
+      createIndex = !exists
+    })
+    .createTableIfNotExists('relation_1', (table) => {
       table.string('relation')
-      table.integer('id1')
-      table.integer('id2')
-      table.integer('t1')
-      table.integer('t2')
-      table.integer('ord')
-      table.integer('node')
-      table.index(['relation', 'id1'], 'i_r1')
-      table.index(['relation', 'id2'], 'i_r2')
+      table.bigInteger('id1')
+      table.bigInteger('id2')
+      table.bigInteger('t1')
+      table.bigInteger('t2')
+      table.bigInteger('ord')
+      table.bigInteger('node')
+      if (createIndex) {
+        table.index(['relation', 'id1'], 'i_r1')
+        table.index(['relation', 'id2'], 'i_r2')
+      }
     })
 }
 

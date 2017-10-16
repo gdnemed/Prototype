@@ -259,12 +259,17 @@ const processSimpleField = (guide, property, val) => {
       }
       if (time) guide.timeFields.push(property)
       else guide.dateFields.push(property)
+      guide.numberFields.push(property)
       break
     default:
       if (guide.type === FROM_RELATION) {
         guide.entityFields.push(f)
       }
-      if (val === 'id') guide.numberFields.push(property)
+      switch (val) {
+        case 'id': case 'result': case 'source': case 'owner':
+        case 'tmp': case 'gmt': case 'reception':
+          guide.numberFields.push(property)
+      }
   }
 }
 

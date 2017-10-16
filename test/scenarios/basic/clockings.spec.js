@@ -26,6 +26,14 @@ describe('clockings.spec.js', () => {
   it('After posting a record {User,Card}, a simulated cloking of "Card" via terminal emulator creates an input that is checked via /api/coms/clockings', (done) => {
     t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
+        // Needed to synchronize info terminal & database
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            resolve(res)
+          }, 1500)
+        })
+      })
+      .then((res) => {
         t.expect(res.status).to.equal(200)
         // An user and a card is the only content in table 'entity_1'
         t.getCollection('objects', 'entity_1').then((collection) => {

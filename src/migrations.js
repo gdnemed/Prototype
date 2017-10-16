@@ -61,14 +61,21 @@ const getDirForSqliteDB = (customerName) => {
 }
 
 // Executes the migration for the section, returning the implicit Promise of knex.migrate()
-const migrateSection = (dbType, customerName, section, dbs, year) => {
+const migrateSection = (dbType, customer, section, dbs, year) => {
   return new Promise((resolve, reject) => {
-    connect(dbType, true, customerName, section, dbs, year)
+    connect(dbType, true, customer, section, dbs, year)
       .then((sec) => {
         log.debug(`Invoking knex.migrate.latest() for ${sec}`)
         dbs[sec].migrate.latest()
           .then((result) => {
             log.trace(`${sec} migration done: ${result}`)
+            // resolve()
+          })
+          .then(() => {
+            log.trace(`${sec} post-migration cleaning metadata ...`)
+            cleanMigrationMetadata(customer.name, sec, dbs)
+          })
+          .then(() => {
             resolve()
           })
           .catch(reject)
@@ -77,11 +84,13 @@ const migrateSection = (dbType, customerName, section, dbs, year) => {
   })
 }
 
-const connect = (dbType, createIfNotExists, customerName, section, dbs, year) => {
+const connect = (dbType, createIfNotExists, customer, section, dbs, year) => {
   return new Promise((resolve, reject) => {
     try {
       // Base object for composing other specific objects via "object.assing"
       let baseMigration
+
+      /*
       switch (dbType) {
         case 'sqlite3':
           baseMigration = {
@@ -155,6 +164,38 @@ const connect = (dbType, createIfNotExists, customerName, section, dbs, year) =>
         migrations: {directory: `${__dirname}/db/migrations/${section}`}
       })
       let sec = year ? section + year : section
+      */
+
+      if (!customer.hasOwnProperty('db')) {
+        reject(new Error('There is no connection data for the current customer.'))
+      }
+      baseMigration = customer.db
+      baseMigration.customer = customer.name
+
+      if (year) {
+        yearMigration = '' + year
+        baseMigration.year = yearMigration
+      }
+      let inputsSuffix = ''
+      if (section === 'inputs') {
+        inputsSuffix = '_' + yearMigration.substring(0, 4)
+        baseMigration.months = {}
+      }
+
+      // Set config connection data.
+      let cfg = Object.assign({}, baseMigration)
+      cfg.migrations = {}
+      cfg.migrations.directory = `${__dirname}/db/migrations/${section}`
+
+      if (cfg.client === 'sqlite3') {
+        if (!cfg.hasOwnProperty('connection')) {
+          cfg.connection = {}
+        }
+        cfg.connection.filename = `${getDirForSqliteDB(customer.name)}M_${section}${inputsSuffix}.db`
+      }
+
+      let sec = year ? section + year : section
+
       if (!createIfNotExists && baseMigration.client === 'sqlite3') {
         fs.access(cfg.connection.filename, fs.constants.R_OK | fs.constants.W_OK, (err) => {
           if (err) resolve(null)
@@ -179,7 +220,7 @@ const init = (type, customer, year) => {
   // A way to do this is creating a new Promise and resolve() or reject() it depending on the case
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
-    log.info('info: migrations.init() : customer: ' + customer + ' type: ' + type)
+    log.info('info: migrations.init() : customer: ' + customer.name + ' type: ' + type)
     // Object that holds a reference to every section knex object
     let dbs = {}
     migrateSection(type, customer, SECTIONS.STATE, dbs)
@@ -193,7 +234,7 @@ const init = (type, customer, year) => {
 }
 
 const initYear = (type, customer, year, dbs) => {
-  log.info('info: migrations.initYear() : customer: ' + customer + ' year: ' + year)
+  log.info('info: migrations.initYear() : customer: ' + customer.name + ' year: ' + year)
   return migrateSection(type, customer, SECTIONS.INPUTS, dbs, year)
 }
 
@@ -220,9 +261,57 @@ const verifyDB = (dbs) => {
   })
 }
 
+/*
+ *  Migration process checks on db if there is any import file that doesn't exists on current
+ *  working directory. We must clean table after migration process to manage different sections.
+ */
+const cleanMigrationMetadata = (customerName, section, dbs) => {
+  return new Promise((resolve, reject) => {
+    dbs[section].schema.hasTable('knex_migrations')
+      .then((exists) => {
+        if (exists) {
+          dbs[section]('knex_migrations').truncate()
+            .then(resolve())
+          log.trace(`${customerName} ${section} : knex_migrations table truncated.`)
+          //resolve()
+        } else {
+          log.trace(`${customerName} ${section} : knex_migrations table does not exists.`)
+          resolve()
+        }
+      })
+      .catch((err) => reject(err))
+  })
+}
+
+/*
+ *  Migration ROLLBACK process checks on db file to rollback
+ */
+const addMigrationMetadata = (customerName, section, dbs, file) => {
+  return new Promise((resolve, reject) => {
+    dbs[section].schema.hasTable('knex_migrations')
+      .then((exists) => {
+        if (exists) {
+          var rollbackRegister = {
+            batch: '1',
+            migration_time: new Date().toISOString(),
+            name: file
+          }
+          dbs[section].insert(rollbackRegister).into('knex_migrations').then(resolve())
+          log.trace(`${customerName} ${section} : knex_migrations table load with rollback file.`)
+        } else {
+          log.trace(`${customerName} ${section} : knex_migrations table does not exists.`)
+          resolve()
+        }
+      })
+      .catch((err) => reject(err))
+  })
+}
+
 module.exports = {
   init,
   initYear,
   verifyDB,
-  connect
+  connect,
+  cleanMigrationMetadata,
+  addMigrationMetadata
 }

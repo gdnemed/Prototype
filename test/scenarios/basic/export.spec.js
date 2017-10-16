@@ -39,6 +39,14 @@ describe('export.spec.js', () => {
 
     t.sendPOST('/api/coms/records', oneUserOneCardExport)
       .then((res) => {
+        // Needed to synchronize info terminal & database
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            resolve(res)
+          }, 1500)
+        })
+      })
+      .then((res) => {
         t.expect(res.status).to.equal(200)
         // An user and a card is the only content in table 'entity_1'
         t.getCollection('objects', 'entity_1').then((collection) => {
