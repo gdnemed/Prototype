@@ -5,5 +5,6 @@
   "db": {"dir": "$LEMURIA_DIR_DB$"},
   "globalDB": "local",
   "node_id": 1,
-  "localServices": "$LEMURIA_BOOT_SERVICES$"
+  "localServices": "$LEMURIA_BOOT_SERVICES$",
+  "registry_url": "$LEMURIA_REGISTRY_URL$"
 }

@@ -9,6 +9,16 @@ if (process.argv.indexOf('--home') !== -1) {
   process.exit()
 }
 
+if (process.argv.indexOf('--ip') !== -1) {
+  process.env.LEMURIA_HOST_SERVER = process.argv[process.argv.indexOf('--ip') + 1]
+  console.log('Lemuria IP at ' + process.env.LEMURIA_HOST_SERVER)
+}
+
+if (process.argv.indexOf('--port') !== -1) {
+  process.env.LEMURIA_PORT_API = process.argv[process.argv.indexOf('--port') + 1]
+  console.log('Lemuria PORT at ' + process.env.LEMURIA_PORT_API)
+}
+
 if (process.argv.indexOf('--registry') !== -1) {
   process.env.LEMURIA_REGISTRY_URL = process.argv[process.argv.indexOf('--registry') + 1]
   console.log('Lemuria REGISTRY service at ' + process.env.LEMURIA_REGISTRY_URL)

@@ -182,7 +182,8 @@ const init = () => {
     let bootServices = g.getBootServices()
     let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
 
-    // if (g.getConfig().api_listen) {
+    bootUpService = 1 // TESTING
+
     if (bootUpService) {
       log = logger.getLogger('state')
       log.debug('>> state init()')
@@ -192,10 +193,11 @@ const init = () => {
       }))
       .then(() => {
         g.addLocalService('state')
-
-        httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
-        httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
-        resolve()
+        g.registerRemoteService('state').then(() => {
+          httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
+          httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
+          resolve()
+        })
       })
       .catch(reject)
     } else resolve()

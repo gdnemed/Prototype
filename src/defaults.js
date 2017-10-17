@@ -10,7 +10,7 @@ const addDefaults = () => {
     LEMURIA_PERIOD_CLOCKINGS: 1,
     LEMURIA_FILE_CLOCKINGS: 'clk.csv',
     LEMURIA_PORT_API_EMULATOR: 8099,
-    LEMURIA_REGISTRY_URL: '',
+    LEMURIA_REGISTRY_URL: '127.0.0.1:8081',
     LEMURIA_BOOT_SERVICES: ''
   }
   for (let p in defaults) {

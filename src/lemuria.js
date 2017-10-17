@@ -56,23 +56,38 @@ const init = () => {
           resolve()
         })
         // INIT JDS
+        /*
         .then(() => {
           log.info('(1) >> Add STATE to REGISTRY...')
-          g.hardCodedAddState()
+          //g.hardCodedAddState()
+
+          let _cfg = g.getConfig()
+
+          let serviceParams = {
+            'service': 'state',
+            'protocol': 'http',
+            'port': _cfg.api_listen.port || '8081',
+            'server': _cfg.logic.host || '127.0.0.1'
+          }
+          g.registerRemoteService(serviceParams).then(() => {
+            log.info('(2) >> Call REGISTRY...')
+            g.callRegistry()
+          })
+          resolve()
         })
+        */
         .then(() => {
-          log.info('(2) >> Call REGISTRY...')
+          log.info('(END) >> Call REGISTRY...')
           g.callRegistry()
         })
         .then(() => {
           setTimeout(() => {
-            log.info('(3) >> Invoke STATE METHOD SETTINGS...')
-
+            log.info('(TEST) >> Invoke STATE METHOD SETTINGS...')
             sessions.getSession('SPEC')
               .then((mySession) => {
                 g.invokeService('state', 'settings', mySession, {'setting1': 'settingValue1', 'setting2': 'settingValue2'})
                   .then((result) => {
-                    console.log('(4) >> INVOKED METHOD RESULT === ' + JSON.stringify(result))
+                    console.log('(TEST) >> INVOKED METHOD RESULT === ' + JSON.stringify(result))
                   })
               })
           }, 1500)

@@ -18,5 +18,6 @@
 			"dir":"test/export_clockings",
 			"period": 0,
 			"fileName": "export_clockings.txt"
-		}
+		},
+	    "localServices": ""
 }

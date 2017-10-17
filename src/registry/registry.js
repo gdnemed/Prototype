@@ -521,11 +521,11 @@ const updateServices = (service) => {
 const init = () => {
   return new Promise((resolve, reject) => {
     let bootServices = g.getBootServices()
-    let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
-    console.log('REGISTRY bootServices: ' + bootServices)
-    console.log('REGISTRY bootUpService: ' + bootUpService)
+    let bootUpService = (bootServices.length === 0) || (bootServices.includes('registry')) ? 1 : 0
 
     if (bootUpService) {
+      ttl = 1000 * 60 * 15                        // 15 min TESTING
+      heartBeatInterval = 1000 * 10               // 10 segundos  TESTING
       g.addLocalService('registry')
       log = logger.getLogger('registry')
       log.debug('>> registry init()')
@@ -533,6 +533,10 @@ const init = () => {
       httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
       httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
       httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
+      loadConfig()
+      emptyList()
+      heartBeat()
+      cleanListJob()
       resolve()
     } else resolve()
   })

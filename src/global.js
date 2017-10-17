@@ -130,9 +130,11 @@ const getBootServices = () => {
 
 const callRegistry = () => {
   // TODO: this well done...
+  if (!_cfg.hasOwnProperty('registry_url')) throw new Error ('REGISTRY_URL environment variable is not setted.')
+
   let options = {
     'method': 'GET',
-    'url': 'http://127.0.0.1:8081/api/registry/services',
+    'url': 'http://' + _cfg.registry_url + '/api/registry/services',
     'headers': {
       'Authorization': 'APIKEY 123' // + apiKey
     },
@@ -154,9 +156,11 @@ const callRegistry = () => {
 
 const hardCodedAddState = () => {
   // TODO: this well done...
+  if (!_cfg.hasOwnProperty('registry_url')) throw new Error ('REGISTRY_URL environment variable is not setted.')
+
   let options = {
     'method': 'POST',
-    'url': 'http://127.0.0.1:8081/api/registry/register',
+    'url': 'http://' + _cfg.registry_url + '/api/registry/register',
     'headers': {
       'Authorization': 'APIKEY 123' // + apiKey
     },
@@ -184,6 +188,50 @@ const hardCodedAddState = () => {
       addRemoteServices(body.services)
     }
   })
+}
+
+const registerRemoteService = (serviceType) => {
+  return new Promise((resolve, reject) => {
+    log.info('registerRemoteService ' + serviceType)
+
+    if (appServices.local.includes('registry')) resolve() // On same IP:PORT no need to register
+
+    if (!_cfg.hasOwnProperty('registry_url')) throw new Error ('REGISTRY_URL environment variable is not setted.')
+
+    let options = {
+      'method': 'POST',
+      'url': 'http://' + _cfg.registry_url + '/api/registry/register',
+      'headers': {
+        'Authorization': 'APIKEY 123' // + apiKey
+      },
+      'body': {
+        'service': serviceType,
+        'address': {
+          'protocol': 'http',
+          'port': _cfg.api_listen.port || '8081',
+          'server': _cfg.logic.host || '127.0.0.1'
+        },
+        'environment': 'dev',
+        'version': '1.0',
+        'time': '',
+        'load': '50'
+      },
+      'encoding': 'utf8',
+      'json': true
+    }
+
+    request(options, (err, res, body) => {
+      if (err) {
+        log.error('Service REGISTRY -> STATE: ' + err)
+        reject(err)
+      } else {
+        log.info('Service REGISTRY -> STATE response === ' + JSON.stringify(body))
+        addRemoteServices(body.services)
+        resolve(body)
+      }
+    })
+  })
+
 }
 
 const addLocalService = (serviceName) => {
@@ -365,5 +413,6 @@ module.exports = {
   invokeService,
   callRegistry,
   hardCodedAddState,
-  getBootServices
+  getBootServices,
+  registerRemoteService
 }
