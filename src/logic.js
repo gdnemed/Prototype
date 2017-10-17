@@ -383,7 +383,6 @@ const initAPI = () => {
   api.get('/api/coms/asap', sseExpress, apiCall(register))
   api.post('/api/test', apiCall(test))
   api.post('/api/testPut', apiCall(testPut))
-  /* JDS revisar confictos de rutas con el nuevo servicio
   api.get('/api/nodes', apiCall(get, prepGetNodes))
   api.get('/api/nodes/:id', apiCall(get, prepGetNode))
   api.post('/api/nodes', apiCall(put, prepPutNode))
@@ -392,7 +391,6 @@ const initAPI = () => {
   api.get('/api/nodes/:id/services/:svc', apiCall(get, prepGetService))
   api.post('/api/nodes/:id/services', apiCall(put, prepPutService))
   api.post('/api/nodes/:id/services/:svc', apiCall(put, prepPutService))
-  */
 }
 
 let monitors = {}

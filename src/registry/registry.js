@@ -501,13 +501,15 @@ const deleteServices = (service) => {
 }
 
 const updateServices = (service) => {
-  let severalServices = (typeof service.service === 'string') ? 0 : 1
+  if (service.hasOwnProperty('service')) {
+    let severalServices = (typeof service.service === 'string') ? 0 : 1
 
-  if (!severalServices) {
-    updateService(service, service.service)
-  } else {
-    for (let serviceType of service.service) {
-      updateService(service, serviceType)
+    if (!severalServices) {
+      updateService(service, service.service)
+    } else {
+      for (let serviceType of service.service) {
+        updateService(service, serviceType)
+      }
     }
   }
 }
@@ -517,6 +519,26 @@ const updateServices = (service) => {
  **********************************/
 
 const init = () => {
+  return new Promise((resolve, reject) => {
+    let bootServices = g.getBootServices()
+    let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
+    console.log('REGISTRY bootServices: ' + bootServices)
+    console.log('REGISTRY bootUpService: ' + bootUpService)
+
+    if (bootUpService) {
+      g.addLocalService('registry')
+      log = logger.getLogger('registry')
+      log.debug('>> registry init()')
+      httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
+      httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
+      httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
+      httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
+      resolve()
+    } else resolve()
+  })
+}
+
+const initOLD = () => {
   return new Promise((resolve, reject) => {
     ttl = 1000 * 60 * 15                        // 15 min TESTING
     heartBeatInterval = 1000 * 10               // 10 segundos  TESTING
@@ -539,10 +561,10 @@ const init = () => {
         httpServer.init()
           .then(() => {
             log.debug('>> http server started()')
-            httpServer.getApi().post('/api/nodes/register', (req, res) => register(req, res))
-            httpServer.getApi().delete('/api/nodes/unregister', (req, res) => unRegister(req, res))
-            httpServer.getApi().get('/api/nodes/services', (req, res) => listAll(req, res))
-            httpServer.getApi().get('/api/nodes/check', (req, res) => responseCheckTest(req, res))
+            httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
+            httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
+            httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
+            httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
           })
           .then(() => {
             loadConfig()
@@ -558,10 +580,10 @@ const init = () => {
       emptyList()
       heartBeat()
       cleanListJob()
-      httpServer.getApi().post('/api/nodes/register', (req, res) => register(req, res))
-      httpServer.getApi().delete('/api/nodes/unregister', (req, res) => unRegister(req, res))
-      httpServer.getApi().get('/api/nodes/services', (req, res) => listAll(req, res))
-      httpServer.getApi().get('/api/nodes/check', (req, res) => responseCheckTest(req, res))
+      httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
+      httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
+      httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
+      httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
       resolve()
     }
   })

@@ -179,7 +179,11 @@ const apiCall = (req, res, f) => {
 
 const init = () => {
   return new Promise((resolve, reject) => {
-    if (g.getConfig().api_listen) {
+    let bootServices = g.getBootServices()
+    let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
+
+    // if (g.getConfig().api_listen) {
+    if (bootUpService) {
       log = logger.getLogger('state')
       log.debug('>> state init()')
       // Get inputs id for every customer
@@ -187,6 +191,8 @@ const init = () => {
         return initInputsId({name: c.name, dbs: sessions.getDatabases(c.name)})
       }))
       .then(() => {
+        g.addLocalService('state')
+
         httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
         httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
         resolve()

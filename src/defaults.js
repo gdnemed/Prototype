@@ -9,9 +9,11 @@ const addDefaults = () => {
     LEMURIA_DIR_WORK: '.',
     LEMURIA_PERIOD_CLOCKINGS: 1,
     LEMURIA_FILE_CLOCKINGS: 'clk.csv',
-    LEMURIA_PORT_API_EMULATOR: 8099
+    LEMURIA_PORT_API_EMULATOR: 8099,
+    LEMURIA_REGISTRY_URL: '',
+    LEMURIA_BOOT_SERVICES: ''
   }
-  for (var p in defaults) {
+  for (let p in defaults) {
     if (defaults.hasOwnProperty(p)) {
       process.env[p] = process.env[p] || defaults[p]
     }

@@ -8,6 +8,7 @@ const logger = require('./utils/log')
 const fs = require('fs')
 
 let log
+let invokeLocal
 
 // -------------------------------------------------------------------------------------------
 // EVENTS
@@ -95,13 +96,14 @@ const applyEnvVars = (str) => {
   return str
 }
 
-const init = () => {
+const init = (invokeLocalFunction) => {
   log = logger.getLogger('global')
   log.debug('>> global.init()')
   return new Promise((resolve, reject) => {
     initConfiguration()
       .then(() => {
         initEvents()
+        invokeLocal = invokeLocalFunction
         addLocalService('global') // JDS
         resolve()
       })
@@ -118,11 +120,19 @@ let appServices = {
   remote: {}
 }
 
+const getBootServices = () => {
+  let bootServices = _cfg.localServices.split(',')
+
+  if (bootServices[0] === '' && bootServices.length === 1) bootServices = []
+
+  return bootServices
+}
+
 const callRegistry = () => {
   // TODO: this well done...
   let options = {
     'method': 'GET',
-    'url': 'http://127.0.0.1:8081/api/nodes/services',
+    'url': 'http://127.0.0.1:8081/api/registry/services',
     'headers': {
       'Authorization': 'APIKEY 123' // + apiKey
     },
@@ -146,7 +156,7 @@ const hardCodedAddState = () => {
   // TODO: this well done...
   let options = {
     'method': 'POST',
-    'url': 'http://127.0.0.1:8081/api/nodes/register',
+    'url': 'http://127.0.0.1:8081/api/registry/register',
     'headers': {
       'Authorization': 'APIKEY 123' // + apiKey
     },
@@ -195,7 +205,7 @@ const isLocalService = (serviceName) => {
 const loadBalancer = (serviceArray, avoidHost) => {
   let _bestUrl = null
   // TODO: a real balancer...
-  if (serviceArray.length > 0) _bestUrl = serviceArray[0].host
+  if (serviceArray.length > 0) _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].host
   return _bestUrl
 }
 
@@ -208,24 +218,32 @@ const getUrlService = (serviceName, avoidHost) => {
 }
 
 const getMethodRoute = (serviceName, methodName) => {
-  let methodRoute
+  let foo = {
+    'route': '',
+    'method': ''
+  }
 
   if (serviceName === 'state') {
     switch (methodName) {
       case 'newId':
-        methodRoute = '/api/state/?????'
+        foo.method = 'GET'
+        foo.route = '/api/state/?????'
         break
       case 'newInputId':
-        methodRoute = '/api/state/?????'
+        foo.method = 'GET'
+        foo.route = '/api/state/?????'
         break
       case 'blockType':
-        methodRoute = '/api/state/?????'
+        foo.method = 'GET'
+        foo.route = '/api/state/?????'
         break
       case 'releaseType':
-        methodRoute = '/api/state/?????'
+        foo.method = 'GET'
+        foo.route = '/api/state/?????'
         break
       case 'settings':
-        methodRoute = '/api/state/settings'
+        foo.method = 'GET'
+        foo.route = '/api/state/settings'
         break
       default:
         throw new Error('Invalid method name: ' + serviceName + '.' + methodName)
@@ -238,71 +256,95 @@ const getMethodRoute = (serviceName, methodName) => {
     throw new Error('Invalid service name: ' + serviceName)
   }
 
-  return methodRoute
+  return foo
 }
 
+/*
+ *  All service calls are executed using this method.
+ *  Depending on whether the service is available locally, or if it is an external service,
+ *  this function will call the corresponding endPoint by returning a promise with the result.
+ */
 const invokeService = (service, methodName, session, parameters) => {
-  // TODO: static methods as promise?
-  if (isLocalService(service)) {
-    switch (service) {
-      case 'state':
-        // return state[methodName](session, parameters)
-        return null
-      case 'otherService':
-        return null
-      default:
-        throw new Error('Invoked service method does not exists: ' + service + '.' + methodName)
-    }
-  } else {
-    let route = getMethodRoute(service, methodName)
+  return new Promise((resolve, reject) => {
+    if (isLocalService(service)) {
+      log.trace('invokeService ' + service.toUpperCase() + '.' + methodName.toUpperCase() + ' as LOCAL service.')
 
-    return new Promise((resolve, reject) => {
-      let result, error
-      let done = false
-      let attemptedUrls = []  // List of requested hosts to resolve invoke method
-      let hostUrl = getUrlService(service, attemptedUrls)
-      attemptedUrls.push(hostUrl)
-
-      // Loop on available type services
-      while (!done) {
-        // Get host and log usage.
-        hostUrl = getUrlService(service, attemptedUrls)
-        if (attemptedUrls.includes(hostUrl)) break
-        attemptedUrls.push(hostUrl)
-
-        let options = {
-          'method': 'GET',
-          'url': hostUrl + route,
-          'headers': {
-            'Authorization': 'APIKEY 123' // + apiKey
-          },
-          'body': {
-            'data': parameters,
-            'session': session
-          },
-          'encoding': 'utf8',
-          'json': true
-        }
-
-        request(options, (err, res, body) => {
-          if (err) {
-            log.error('Service ' + service.toUpperCase() + ' on  host ' + hostUrl + ': ' + err)
-            error = err
-          } else {
-            result = JSON.parse(body)
-            done = true
-          }
+      invokeLocal(service, methodName, session, parameters)
+        .then((result) => {
+          resolve(result)
         })
-        // Keeps looping
-      }
+    } else {
+      log.trace('invokeService ' + service.toUpperCase() + '.' + methodName.toUpperCase() + ' as REMOTE service.')
 
-      if (done) {
-        resolve(result)
-      } else {
-        reject(error)
+      let error = {}; let done = false; let attempts = 0; let hostUrl = ''
+      let attemptedUrls = []  // List of requested hosts to resolve invoke method
+      let param = getMethodRoute(service, methodName)
+
+      /*
+       *  Function requests a resource to the first service on list that respond properly.
+       */
+      const resilientInvoke = (done, attempts) => {
+        return new Promise((resolve, reject) => {  // outer promise
+          // Inner promise to iterate host services response on error
+          if (!done) new Promise((resolve, reject) => {  // inner promise
+            attempts++
+            log.debug('resilientInvoke START attempt(' + attempts + ')')
+
+            hostUrl = getUrlService(service, attemptedUrls)
+            if (attemptedUrls.includes(hostUrl)) {
+              log.debug('resilientInvoke REJECT(' + attempts + ') all host services.')
+              reject(new Error('No service has responded to the request.'))  // inner promise
+            }
+            attemptedUrls.push(hostUrl)
+
+            let options = {
+              'method': param.method,
+              'url': hostUrl + param.route,
+              'headers': {
+                'Authorization': 'APIKEY 123' // + apiKey
+              },
+              'body': {
+                'data': parameters,
+                'session': session
+              },
+              'encoding': 'utf8',
+              'json': true
+            }
+
+            request(options, (err, res, body) => {
+              if (err) {
+                log.error('resilientInvoke CALL ' + service.toUpperCase() + ' on host ' + hostUrl + ' - attempt(' + attempts + ') ERROR: ' + err)
+                error = err
+                resolve(error)  // inner promise
+              } else {
+                log.debug('resilientInvoke CALL ' + service.toUpperCase() + ' on host ' + hostUrl + ' - attempt(' + attempts + ') RESULT: ' + JSON.stringify(body))
+                done = true
+                resolve(body)  // inner promise
+              }
+            })
+          })
+          .then((data) => {
+            log.debug('resilientInvoke ENDS attempt(' + attempts + ')')
+
+            if (done) {
+              resolve(data) // outer promise
+            } else {
+              resilientInvoke(done, attempts)
+            }
+          })
+          .catch((e) => {
+            log.error('resilientInvoke ' + service.toUpperCase() + ' ERROR: ' + JSON.stringify(e))
+          })
+        })
       }
-    })
-  }
+      // Ends function forceInvoke
+      resilientInvoke(done, attempts).then((result) => {
+        resolve(result) // main promise
+      })
+    }
+  // Ends main promise
+  })
+  // Ends if
 }
 
 /// /////////////////////
@@ -322,5 +364,6 @@ module.exports = {
   getUrlService,
   invokeService,
   callRegistry,
-  hardCodedAddState
+  hardCodedAddState,
+  getBootServices
 }

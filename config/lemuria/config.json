@@ -1,8 +1,9 @@
 {
-		"api_listen":{"host":"","port": "$LEMURIA_PORT_API$"},
-		"logic":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
-		"coms_listen":{"host":"","port": $LEMURIA_PORT_COMS$},
-		"db": {"dir": "$LEMURIA_DIR_DB$"},
-		"globalDB": "local",
-		"node_id":1
+  "api_listen":{"host":"","port": "$LEMURIA_PORT_API$"},
+  "logic":{"host":"$LEMURIA_HOST_SERVER$","port": $LEMURIA_PORT_SERVER$},
+  "coms_listen":{"host":"","port": $LEMURIA_PORT_COMS$},
+  "db": {"dir": "$LEMURIA_DIR_DB$"},
+  "globalDB": "local",
+  "node_id": 1,
+  "localServices": "$LEMURIA_BOOT_SERVICES$"
 }

@@ -21,6 +21,21 @@ const registry = require('./registry/registry')
 
 let log
 
+const invokeLocal = (service, methodName, session, parameters) => {
+  return new Promise((resolve, reject) => {
+    log.debug('LEMURIA invokeLocal: ' + service + '.' + methodName)
+    let fName
+    switch (service) {
+      case 'state':
+        fName = (methodName === 'settings') ? 'postSettings' : methodName
+        resolve(state[fName](session, parameters))
+        break
+      default:
+        reject(new Error('Invoked service method does not exists: ' + service + '.' + methodName))
+    }
+  })
+}
+
 const init = () => {
   // logger initialization
   log = logger.getLogger('Main')
@@ -30,7 +45,7 @@ const init = () => {
     if ((!startService && !endService) || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
       console.log('Starting lemuria as application')
       // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
-      g.init()
+      g.init(invokeLocal)
         .then(httpServer.init)
         .then(globalServer.init)
         .then(registry.init) // JDS
@@ -42,17 +57,25 @@ const init = () => {
         })
         // INIT JDS
         .then(() => {
-          log.info('>> Add STATE to REGISTRY...')
+          log.info('(1) >> Add STATE to REGISTRY...')
           g.hardCodedAddState()
         })
         .then(() => {
-          log.info('>> Call REGISTRY...')
+          log.info('(2) >> Call REGISTRY...')
           g.callRegistry()
         })
         .then(() => {
-          log.info('>> Invoke STATE METHOD SETTINGS...')
-          let result = g.invokeService('state', 'settings', null, null)
-          console.log('INVOKED METHOD RESULT === ' + JSON.stringify(result))
+          setTimeout(() => {
+            log.info('(3) >> Invoke STATE METHOD SETTINGS...')
+
+            sessions.getSession('SPEC')
+              .then((mySession) => {
+                g.invokeService('state', 'settings', mySession, {'setting1': 'settingValue1', 'setting2': 'settingValue2'})
+                  .then((result) => {
+                    console.log('(4) >> INVOKED METHOD RESULT === ' + JSON.stringify(result))
+                  })
+              })
+          }, 1500)
         })
         // END JDS
         .catch((err) => {
