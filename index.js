@@ -9,4 +9,14 @@ if (process.argv.indexOf('--home') !== -1) {
   process.exit()
 }
 
+if (process.argv.indexOf('--registry') !== -1) {
+  process.env.LEMURIA_REGISTRY_URL = process.argv[process.argv.indexOf('--registry') + 1]
+  console.log('Lemuria REGISTRY service at ' + process.env.LEMURIA_REGISTRY_URL)
+}
+
+if (process.argv.indexOf('--bootUp') !== -1) {
+  process.env.LEMURIA_BOOT_SERVICES = process.argv[process.argv.indexOf('--bootUp') + 1]
+  console.log('Lemuria LEMURIA_BOOT_SERVICES: ' + process.env.LEMURIA_BOOT_SERVICES)
+}
+
 module.exports = require('./src/lemuria')
