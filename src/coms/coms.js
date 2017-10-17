@@ -25,6 +25,25 @@ Communications initialization.
 -logic: Logic module.
 */
 const init = (logic, sessions) => {
+
+  let bootServices = g.getBootServices()
+  let bootUpService = (bootServices.length === 0) || (bootServices.includes('registry')) ? 1 : 0
+
+  if (bootUpService) {
+    log = logger.getLogger('coms')
+    log.debug('>> coms.init()')
+
+    idsense = require('./idsense')
+    logicService = logic
+    sessionsService = sessions
+    net.createServer(listenFunction).listen(listen.port, listen.host)
+    log.info('coms listening at ' + listen.host + ':' + listen.port)
+    setInterval(refreshClocks, 60000)
+    return Promise.resolve()
+  } else {
+    return Promise.resolve()
+  }
+  /*
   let listen = g.getConfig().coms_listen
   if (!listen) return Promise.resolve()
   else {
@@ -39,6 +58,7 @@ const init = (logic, sessions) => {
     setInterval(refreshClocks, 60000)
     return Promise.resolve()
   }
+  */
 }
 
 const listenFunction = (socket) => {
