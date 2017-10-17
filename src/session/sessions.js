@@ -37,7 +37,7 @@ const initializeCustomer = (customersList, i) => {
     else {
       _customers[customersList[i].name] = {apikey: customersList[i].apikey}
       let year = new Date().getFullYear()
-      migrations.init('sqlite3', customersList[i], year)
+      migrations.init(customersList[i], year)
         .then((dbs) => {
           _customers[customersList[i].name].dbs = dbs
           log.debug('DB ' + customersList[i].name)
