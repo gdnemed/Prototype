@@ -173,7 +173,7 @@ const registerHostedServices = () => {
   return new Promise((resolve, reject) => {
     log.info('Registering services booted.')
     if (_cfg.hasOwnProperty('registry_url') && _cfg.registry_url.length > 0) {
-      let bootedServices = appServices.local // getBootServices()
+      let bootedServices = appServices.local
 
       if (bootedServices.includes('registry')) {
         // Don't send registry to registry
@@ -244,8 +244,6 @@ const loadBalancer = (serviceArray, avoidHost) => {
   let _bestUrl = null
   // TODO: a real balancer...
   // if (serviceArray.length > 0) _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].host
-
-  console.log('serviceArray[0] >>>>>>>>' + serviceArray[0])
   if (serviceArray.length > 0) {
     _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].server + ':' + serviceArray[0].port
   }
@@ -329,14 +327,12 @@ const invokeService = (service, methodName, session, parameters) => {
       // Define type of params
       let paramType = (typeof parameters)
 
-      console.log('paramType >>>>> ' + paramType)
-
       if (paramType === 'function') reject(new Error('Type function parameter on invoke request.'))  // main promise
 
       // null && undefined
-      //if (paramType === 'undefined') {
-      //  parameters = '' // ¿ Es necesario hacer esto ?
-      //}
+      if (paramType === 'undefined') {
+        parameters = '' // ¿ Es necesario hacer esto ?
+      }
 
       /*
        *  Function requests a resource to the first service on list that respond properly.
@@ -356,8 +352,10 @@ const invokeService = (service, methodName, session, parameters) => {
             attemptedUrls.push(hostUrl)
 
             // TODO: no tengo APIKEY en session
-            console.log('hostUrl !!!!!!!!!!!!!!!!!! -> ' + hostUrl)
-            console.log('SESSION !!!!!!!!!!!!!!!!!! -> ' + JSON.stringify(session))
+            log.info('********** INVOKED METHOD DATA SENDED ************')
+            log.info('dataType -> ' + paramType)
+            log.info('data     -> ' + JSON.stringify(parameters))
+            log.info('sessin   -> ' + JSON.stringify(session))
 
             let options = {
               'method': param.method,
@@ -366,7 +364,7 @@ const invokeService = (service, methodName, session, parameters) => {
                 'Authorization': 'APIKEY 123' // + apiKey
               },
               'body': {
-                'typeData': paramType,
+                'dataType': paramType,
                 'data': parameters,
                 'session': session
               },
@@ -388,13 +386,12 @@ const invokeService = (service, methodName, session, parameters) => {
           })
           .then((invokeResult) => {
             log.debug('resilientInvoke ENDS attempt(' + attempts + ')')
-
-            console.log('invokeResult === ' + JSON.stringify(invokeResult))
+            log.info('********** INVOKED METHOD DATA RECEIVED ************')
+            log.info('dataType -> ' + invokeResult.dataType)
+            log.info('data     -> ' + JSON.stringify(invokeResult.data))
 
             if (done) {
-              // Cast result type
               let functionResult
-
               switch (invokeResult.dataType) {
                 case 'undefined':
                   functionResult = null

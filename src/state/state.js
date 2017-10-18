@@ -181,8 +181,9 @@ const apiCall = (req, res, f) => {
 
 const invokeWrapper = (req, res, f) => {
   sessions.manageSession(req, res, (req, res, session) => {
-    console.log('req.body.dataType --> ' + req.body.dataType)
-    console.log('req.body.data --> ' + JSON.stringify(req.body.data))
+    log.info('*******  INVOKE WRAPPER RECEIVED **************')
+    log.info('dataType -> ' + req.body.dataType)
+    log.info('data     -> ' + JSON.stringify(req.body.data))
 
     let param
 
@@ -203,6 +204,8 @@ const invokeWrapper = (req, res, f) => {
           'dataType': (typeof result),
           'data': result
         }
+        log.info('*******  INVOKE WRAPPER SENDED **************')
+        log.info('response -> ' + JSON.stringify(response))
         res.status(200).send(response)
       })
       .catch((err) => res.status(500).end(err.message))
