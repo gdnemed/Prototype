@@ -622,7 +622,9 @@ Deletes every entity with drop property too old.
 const clean = (req, res) => {
   sessionService.manageSession(req, res,
     (req, res, session) => {
-      stateService.getSettings(session)
+
+      // stateService.getSettings(session)
+      g.invokeService('state', 'getSettings', session)
         .then((settings) => {
         // Just return OK and start clean process
           res.status(200).end()

@@ -172,7 +172,25 @@ const releaseType = (session, type) => {
 const apiCall = (req, res, f) => {
   sessions.manageSession(req, res, (req, res, session) => {
     f(session, req.body)
-      .then((result) => res.status(200).jsonp(result))
+      .then((result) => {
+        res.status(200).jsonp(result)
+      })
+      .catch((err) => res.status(500).end(err.message))
+  })
+}
+
+const invokeWrapper = (req, res, f) => {
+  sessions.manageSession(req, res, (req, res, session) => {
+    console.log('req.body.dataType --> ' + req.body.dataType)
+    console.log('req.body.data --> ' + req.body.data)
+    f(session, req.body)
+      .then((result) => {
+        let response = {
+          'dataType': (typeof result),
+          'data': result
+        }
+        res.status(200).send(response)
+      })
       .catch((err) => res.status(500).end(err.message))
   })
 }
@@ -193,13 +211,12 @@ const init = () => {
       }))
       .then(() => {
         g.addLocalService('state').then(() => {
-          httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
+          httpServer.getApi().post('/api/state/settings', (req, res) => /*apiCall*/ invokeWrapper(req, res, postSettings))
           httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
+          httpServer.getApi().post('/api/state/newId', (req, res) => invokeWrapper(req, res, newId))
+          httpServer.getApi().get('/api/state/newInputId', (req, res) => invokeWrapper(req, res, newInputId))
           resolve()
         })
-        /*g.registerRemoteService('state').then(() => {
-
-        })*/
       })
       .catch(reject)
     } else resolve()

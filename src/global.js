@@ -183,7 +183,7 @@ const registerHostedServices = () => {
           'address': {
             'protocol': 'http',
             'port': _cfg.api_listen.port || '8081',
-            'server': _cfg.logic.host || '127.0.0.1'
+            'server': _cfg.api_listen.host || '127.0.0.1'
           },
           'environment': process.env.NODE_ENV || 'dev',
           'version': '1.0',
@@ -212,7 +212,6 @@ const registerHostedServices = () => {
 }
 
 const addLocalService = (serviceName) => {
-  log.info('Adding local service ' + serviceName.toUpperCase() + '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
   return new Promise((resolve, reject) => {
     if (!appServices.local.includes(serviceName)) appServices.local.push(serviceName)
     log.info('UPDATED appServices: ' + JSON.stringify(appServices))
@@ -308,6 +307,16 @@ const invokeService = (service, methodName, session, parameters) => {
       let attemptedUrls = []  // List of requested hosts to resolve invoke method
       let param = getMethodRoute(service, methodName)
 
+      // Define type of params
+      let paramType = (typeof parameters)
+
+      if (paramType === 'function') reject(new Error('Type function parameter on invoke request.'))  // main promise
+
+      // null && undefined
+      if (paramType === 'undefined') {
+        parameters = '' // ¿ Es necesario hacer esto ?
+      }
+
       /*
        *  Function requests a resource to the first service on list that respond properly.
        */
@@ -325,6 +334,9 @@ const invokeService = (service, methodName, session, parameters) => {
             }
             attemptedUrls.push(hostUrl)
 
+            // TODO: no tengo APIKEY en session
+            console.log('SESSION !!!!!!!!!!!!!!!!!! -> ' + JSON.stringify(session))
+
             let options = {
               'method': param.method,
               'url': hostUrl + param.route,
@@ -332,6 +344,7 @@ const invokeService = (service, methodName, session, parameters) => {
                 'Authorization': 'APIKEY 123' // + apiKey
               },
               'body': {
+                'typeData': paramType,
                 'data': parameters,
                 'session': session
               },

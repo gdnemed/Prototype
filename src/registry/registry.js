@@ -524,8 +524,8 @@ const init = () => {
     let bootUpService = (bootServices.length === 0) || (bootServices.includes('registry')) ? 1 : 0
 
     if (bootUpService) {
-      ttl = 1000 * 60 * 15                        // 15 min TESTING
-      heartBeatInterval = 1000 * 10               // 10 segundos  TESTING
+      ttl = 1000 * 60 * 60                        // TESTING
+      heartBeatInterval = 1000 * 60 * 60          // TESTING
       log = logger.getLogger('registry')
       log.debug('>> registry init()')
       g.addLocalService('registry').then(() => {

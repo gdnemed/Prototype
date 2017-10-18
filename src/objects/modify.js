@@ -3,6 +3,7 @@
 // -------------------------------------------------------------------------------------------
 const MODEL = require('./model')
 const recursive = require('./recursive')
+const g = require('../global')
 // let log = require('../utils/log').getLogger('db')
 
 let nodeId = 1
@@ -96,7 +97,8 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
       let entity = squery._entity_
       let insert, e
       // We must block any modification over this type, until we finish
-      stateService.blockType(session, entity)
+      // stateService.blockType(session, entity)
+      g.invokeService('state', 'blockType', session, entity)
       // Search for entities with same key values
         .then(() => {
           searchEntity(session, keys, squery, data, variables)
@@ -109,7 +111,8 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
             .then((sentence) => { return sentence }) // Execute it
             .then((result) => {
               // Once the entity is inserted, we can release blocking
-              stateService.releaseType(session, entity)
+              // stateService.releaseType(session, entity)
+              g.invokeService('state', 'releaseType', session, entity)
                 .then(() => subPuts(session, stateService, variables, squery, data, e.id))
                 .then(() => {
                   // Extra treatment, if needed
@@ -122,7 +125,8 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
             })
             .catch((err) => {
               // If execution went wrong, release blocking and reject
-              stateService.releaseType(session, entity)
+              // stateService.releaseType(session, entity)
+              g.invokeService('state', 'releaseType', session, entity)
                 .then(() => reject(err)).catch(() => reject(err))
             })
         })
@@ -166,7 +170,9 @@ const getSentenceEntity = (session, stateService, squery, e, id, variables) => {
         reject(new Error(`No definition for ${squery._entity_}`))
         return
       }
-      stateService.newId(session)
+
+      //stateService.newId(session)
+      g.invokeService('state', 'newId', session)
         .then((id) => {
           e.id = id
           sentence = db.insert(e).into('entity_1')
@@ -320,7 +326,8 @@ variables, squery, data, id, l, n) => {
 /* Inserts a new input. */
 const putInput = (session, stateService, variables, squery, data, extraFunction) => {
   return new Promise((resolve, reject) => {
-    stateService.newInputId(session)
+    // stateService.newInputId(session)
+    g.invokeService('state', 'newInputId', session)
       .then((id) => {
         let period = Math.floor(data.tmp / 100000000)
         // We pass every data to a new object d
