@@ -263,23 +263,24 @@ const getMethodRoute = (serviceName, methodName) => {
     'method': ''
   }
 
+  console.log('getMethodRoute ' + serviceName + '.' + methodName)
   if (serviceName === 'state') {
     switch (methodName) {
       case 'newId':
         foo.method = 'GET'
-        foo.route = '/api/state/?????'
+        foo.route = '/api/state/newId'
         break
       case 'newInputId':
         foo.method = 'GET'
-        foo.route = '/api/state/?????'
+        foo.route = '/api/state/newInputId'
         break
       case 'blockType':
         foo.method = 'GET'
-        foo.route = '/api/state/?????'
+        foo.route = '/api/state/blockType'
         break
       case 'releaseType':
         foo.method = 'GET'
-        foo.route = '/api/state/?????'
+        foo.route = '/api/state/releaseType'
         break
       case 'settings':
         foo.method = 'GET'
@@ -348,6 +349,7 @@ const invokeService = (service, methodName, session, parameters) => {
             attemptedUrls.push(hostUrl)
 
             // TODO: no tengo APIKEY en session
+            console.log('hostUrl !!!!!!!!!!!!!!!!!! -> ' + hostUrl)
             console.log('SESSION !!!!!!!!!!!!!!!!!! -> ' + JSON.stringify(session))
 
             let options = {
