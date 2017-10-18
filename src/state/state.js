@@ -212,7 +212,7 @@ const init = () => {
       .then(() => {
         g.addLocalService('state').then(() => {
           httpServer.getApi().post('/api/state/settings', (req, res) => /*apiCall*/ invokeWrapper(req, res, postSettings))
-          httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
+          httpServer.getApi().get('/api/state/settings', (req, res) => /*apiCall*/ invokeWrapper(req, res, getSettings))
           httpServer.getApi().post('/api/state/newId', (req, res) => invokeWrapper(req, res, newId))
           httpServer.getApi().get('/api/state/newInputId', (req, res) => invokeWrapper(req, res, newInputId))
           resolve()
