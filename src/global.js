@@ -171,9 +171,6 @@ const registerHostedServices = () => {
           bootedServices.splice(index, 1)
         }
       }
-      let strServices = '['.concat(bootedServices.toString(), ']')
-
-      console.log('strServices >>>>>>>>' + strServices )
 
       let options = {
         'method': 'POST',
@@ -182,7 +179,7 @@ const registerHostedServices = () => {
           'Authorization': 'APIKEY 123' // + apiKey
         },
         'body': {
-          'service': strServices,
+          'service': bootedServices,
           'address': {
             'protocol': 'http',
             'port': _cfg.api_listen.port || '8081',
