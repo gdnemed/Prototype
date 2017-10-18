@@ -109,10 +109,16 @@ const heartBeat = () => {
 }
 
 const heartBeatCheck = (server, callback) => {
+  /*
   let protocol = server.protocol === 'https' ? https : http
   let pos = server.lastIndexOf(':')
   let IP = server.substring(0, pos)
   let PORT = server.substring(pos + 1)
+  */
+
+  let protocol = server.address.protocol === 'https' ? https : http
+  let IP = server.address.server
+  let PORT = server.address.port
 
   let options = {
     'host': IP,
