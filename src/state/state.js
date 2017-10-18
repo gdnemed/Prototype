@@ -182,7 +182,7 @@ const init = () => {
     let bootServices = g.getBootServices()
     let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
 
-    bootUpService = 1 // TESTING
+    //bootUpService = 1 // TESTING
 
     if (bootUpService) {
       log = logger.getLogger('state')

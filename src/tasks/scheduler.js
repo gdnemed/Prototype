@@ -17,8 +17,10 @@ let programmedTasks = {
 }
 
 const init = (sessions) => {
-  remoteService = g.getConfig().logic
-  if (remoteService) {
+  // remoteService = g.getConfig().logic
+  let bootServices = g.getBootServices()
+  let bootUpService = (bootServices.length === 0) || (bootServices.includes('scheduler')) ? 1 : 0
+  if (bootUpService) {
     log = logger.getLogger('scheduler')
     log.debug('>> scheduler.init()')
     sessionsService = sessions
