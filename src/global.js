@@ -155,9 +155,11 @@ const getServicesRegistry = () => {
       request(options, (err, res, body) => {
         if (err) {
           log.error('REGISTRY service response: ' + err)
+          reject(err)
         } else {
           log.info('REGISTRY service response: ' + JSON.stringify(body))
           addRemoteServices(body.services)
+          resolve()
         }
       })
     } else {
