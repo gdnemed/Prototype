@@ -78,6 +78,7 @@ const init = () => {
             else {
               mapDevices = JSON.parse(response.body)
               initializeCustomer(getCustomersList(), 0)
+                .then(g.addLocalService('sessions'))
                 .then(resolve)
                 .catch(reject)
             }

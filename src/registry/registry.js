@@ -526,94 +526,21 @@ const init = () => {
     if (bootUpService) {
       ttl = 1000 * 60 * 15                        // 15 min TESTING
       heartBeatInterval = 1000 * 10               // 10 segundos  TESTING
-      g.addLocalService('registry')
       log = logger.getLogger('registry')
       log.debug('>> registry init()')
-      httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
-      httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
-      httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
-      httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
-      loadConfig()
-      emptyList()
-      heartBeat()
-      cleanListJob()
-      resolve()
+      g.addLocalService('registry').then(() => {
+        httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
+        httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
+        httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
+        httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
+        loadConfig()
+        emptyList()
+        heartBeat()
+        cleanListJob()
+        resolve()
+      })
     } else resolve()
   })
-}
-
-const initOLD = () => {
-  return new Promise((resolve, reject) => {
-    ttl = 1000 * 60 * 15                        // 15 min TESTING
-    heartBeatInterval = 1000 * 10               // 10 segundos  TESTING
-    log = logger.getLogger('registry')
-    log.debug('init()')
-
-    if (isStandalone > 0) {
-      log.info('INIT as STANDALONE Service')
-
-      const defaults = require('../defaults').addDefaults()
-
-      if (process.argv.indexOf('--home') !== -1) {
-        process.env.HOME = process.argv[process.argv.indexOf('--home') + 1]
-        log.debug('Service REGISTRY init at ' + process.env.HOME)
-      } else {
-        process.exit()
-      }
-
-      g.init().then(() => {
-        httpServer.init()
-          .then(() => {
-            log.debug('>> http server started()')
-            httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
-            httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
-            httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
-            httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
-          })
-          .then(() => {
-            loadConfig()
-            emptyList()
-            heartBeat()
-            cleanListJob()
-            resolve()
-          })
-      })
-    } else {
-      log.info('INIT as module of MONOLITHIC app')
-      loadConfig()
-      emptyList()
-      heartBeat()
-      cleanListJob()
-      httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
-      httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
-      httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
-      httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
-      resolve()
-    }
-  })
-}
-
-const logRequest = (req) => {
-  console.log('req.app >>>' + req.app)
-  console.log('req.baseUrl >>>' + req.baseUrl)
-  console.log('req.headers >>>' + JSON.stringify(req.headers))
-  console.log('req.body >>>' + JSON.stringify(req.body))
-  console.log('req.cookies >>>' + req.cookies)
-  console.log('req.fresh >>>' + req.fresh)
-  console.log('req.hostname >>>' + req.hostname)
-  console.log('req.ip >>>' + req.ip)
-  console.log('req.ips >>>' + req.ips)
-  console.log('req.originalUrl >>>' + req.originalUrl)
-  console.log('req.params >>>' + JSON.stringify(req.params))
-  console.log('req.path >>>' + req.path)
-  console.log('req.protocol >>>' + req.protocol)
-  console.log('req.query >>>' + JSON.stringify(req.query))
-  console.log('req.route >>>' + JSON.stringify(req.route))
-  console.log('req.secure >>>' + req.secure)
-  console.log('req.signedCookies >>>' + req.signedCookies)
-  console.log('req.stale >>>' + req.stale)
-  console.log('req.subdomains >>>' + req.subdomains)
-  console.log('req >>>' + req.xhr)
 }
 
 module.exports = {

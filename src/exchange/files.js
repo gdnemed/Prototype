@@ -43,7 +43,10 @@ const init = () => {
     watch('per', processRecord, 'records', 'records', 'records')
     watch('tty', processTtype, 'timetypes', 'timetypes', 'timetypes')
     watch('inf', processInfo, 'infos', 'records/@/info', 'records/@/info')
-    return Promise.resolve()
+    g.addLocalService('files').then(() => {
+      return Promise.resolve()
+    })
+    // return Promise.resolve()
   }
 }
 

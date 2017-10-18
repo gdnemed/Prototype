@@ -29,7 +29,9 @@ const init = (logic, sessions) => {
   let bootServices = g.getBootServices()
   let bootUpService = (bootServices.length === 0) || (bootServices.includes('registry')) ? 1 : 0
 
-  if (bootUpService) {
+  let listen = g.getConfig().coms_listen
+
+  if (bootUpService && listen) {
     log = logger.getLogger('coms')
     log.debug('>> coms.init()')
 

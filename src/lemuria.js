@@ -48,7 +48,7 @@ const init = () => {
       g.init(invokeLocal)
         .then(httpServer.init)
         .then(globalServer.init)
-        .then(registry.init) // JDS
+        .then(registry.init)
         .then(sessions.init)
         .then(initServices)
         .then(() => {
@@ -56,31 +56,14 @@ const init = () => {
           resolve()
         })
         // INIT JDS
-        /*
         .then(() => {
-          log.info('(1) >> Add STATE to REGISTRY...')
-          //g.hardCodedAddState()
-
-          let _cfg = g.getConfig()
-
-          let serviceParams = {
-            'service': 'state',
-            'protocol': 'http',
-            'port': _cfg.api_listen.port || '8081',
-            'server': _cfg.logic.host || '127.0.0.1'
-          }
-          g.registerRemoteService(serviceParams).then(() => {
-            log.info('(2) >> Call REGISTRY...')
-            g.callRegistry()
+          log.info('>> Updating services registration...')
+          g.registerHostedServices().then(() => {
+            g.getServicesRegistry()
           })
-          resolve()
-        })
-        */
-        .then(() => {
-          log.info('(END) >> Call REGISTRY...')
-          g.callRegistry()
         })
         .then(() => {
+          // TEST
           setTimeout(() => {
             log.info('(TEST) >> Invoke STATE METHOD SETTINGS...')
             sessions.getSession('SPEC')

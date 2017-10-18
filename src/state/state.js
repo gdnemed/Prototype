@@ -192,12 +192,14 @@ const init = () => {
         return initInputsId({name: c.name, dbs: sessions.getDatabases(c.name)})
       }))
       .then(() => {
-        g.addLocalService('state')
-        g.registerRemoteService('state').then(() => {
+        g.addLocalService('state').then(() => {
           httpServer.getApi().post('/api/state/settings', (req, res) => apiCall(req, res, postSettings))
           httpServer.getApi().get('/api/state/settings', (req, res) => apiCall(req, res, getSettings))
           resolve()
         })
+        /*g.registerRemoteService('state').then(() => {
+
+        })*/
       })
       .catch(reject)
     } else resolve()
