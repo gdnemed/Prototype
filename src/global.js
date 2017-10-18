@@ -128,6 +128,15 @@ const getBootServices = () => {
   return bootServices
 }
 
+const initJobReloadServicesList = () => {
+  setTimeout(() => {
+    log.info('initJobReloadServicesList RELOAD')
+    getServicesRegistry().then(() => {
+      initJobReloadServicesList()
+    })
+  }, 5000)
+}
+
 const getServicesRegistry = () => {
   return new Promise((resolve, reject) => {
     if (_cfg.hasOwnProperty('registry_url') && _cfg.registry_url.length > 0) {
@@ -232,13 +241,17 @@ const isLocalService = (serviceName) => {
 const loadBalancer = (serviceArray, avoidHost) => {
   let _bestUrl = null
   // TODO: a real balancer...
-  if (serviceArray.length > 0) _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].host
+  // if (serviceArray.length > 0) _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].host
+
+  if (serviceArray.length > 0) _bestUrl = serviceArray[0].address.protocol + '://' + serviceArray[0].address.server + serviceArray[0].address.port
+
   return _bestUrl
 }
 
 const getUrlService = (serviceName, avoidHost) => {
   let _url = null
   if (appServices.remote.hasOwnProperty(serviceName)) {
+    console.log('appServices.remote[serviceName]  ' + JSON.stringify(appServices.remote[serviceName]))
     _url = loadBalancer(appServices.remote[serviceName], avoidHost)
   }
   return _url
@@ -421,5 +434,6 @@ module.exports = {
   invokeService,
   getServicesRegistry,
   getBootServices,
-  registerHostedServices
+  registerHostedServices,
+  initJobReloadServicesList
 }

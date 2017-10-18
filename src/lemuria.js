@@ -63,6 +63,10 @@ const init = () => {
           })
         })
         .then(() => {
+          g.initJobReloadServicesList()
+        })
+        /*
+        .then(() => {
           // TEST
           setTimeout(() => {
             log.info('(TEST) >> Invoke STATE METHOD SETTINGS...')
@@ -75,6 +79,7 @@ const init = () => {
               })
           }, 1500)
         })
+        */
         // END JDS
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: `)
