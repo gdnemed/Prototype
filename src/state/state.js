@@ -89,8 +89,8 @@ const initInputsId = (session) => {
 const postSettings = (session, settings) => {
   return new Promise((resolve, reject) => {
     let db = session.dbs['state']
-    var l = []
-    for (var property in settings) {
+    let l = []
+    for (let property in settings) {
       if (settings.hasOwnProperty(property)) { l.push({setting: property, value: settings[property]}) }
     }
     Promise.all(l.map((x) => putSettingItem(db, x)))
@@ -104,7 +104,7 @@ const getSettings = (session) => {
     let db = session.dbs['state']
     db.select('setting', 'value').from('settings').then((rows) => {
       let ret = {}
-      for (var i = 0; i < rows.length; i++) ret[rows[i].setting] = rows[i].value
+      for (let i = 0; i < rows.length; i++) ret[rows[i].setting] = rows[i].value
       resolve(ret)
     })
       .catch(reject)
@@ -113,8 +113,8 @@ const getSettings = (session) => {
 
 function putSettingItem (db, elem) {
   return new Promise((resolve, reject) => {
-    var setting = elem.setting
-    var value = elem.value
+    let setting = elem.setting
+    let value = elem.value
     db.select('value').from('settings').where('setting', setting)
       .then((rows) => {
         if (rows == null || rows.length === 0) {
@@ -180,6 +180,37 @@ const apiCall = (req, res, f) => {
   })
 }
 
+const init = () => {
+  return new Promise((resolve, reject) => {
+    let bootServices = g.getBootServices()
+    let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
+
+    if (bootUpService) {
+      log = logger.getLogger('state')
+      log.debug('>> state init()')
+      // Get inputs id for every customer
+      Promise.all(sessions.getCustomersList().map((c) => {
+        return initInputsId({name: c.name, dbs: sessions.getDatabases(c.name)})
+      }))
+      .then(() => {
+        g.addLocalService('state').then(() => {
+          httpServer.getApi().post('/api/state/settings', (req, res) => /* apiCall */ invokeWrapper(req, res, postSettings))
+          httpServer.getApi().get('/api/state/settings', (req, res) => /* apiCall */ invokeWrapper(req, res, getSettings))
+          httpServer.getApi().get('/api/state/newId', (req, res) => invokeWrapper(req, res, newId))
+          httpServer.getApi().get('/api/state/newInputId', (req, res) => invokeWrapper(req, res, newInputId))
+          httpServer.getApi().get('/api/state/blockType', (req, res) => invokeWrapper(req, res, blockType))
+          httpServer.getApi().get('/api/state/releaseType', (req, res) => invokeWrapper(req, res, releaseType))
+          resolve()
+        })
+      })
+      .catch(reject)
+    } else resolve()
+  })
+}
+
+/*
+ *  Wrapper to manage remote service request data types
+ */
 const invokeWrapper = (req, res, f) => {
   sessions.manageSession(req, res, (req, res, session) => {
     log.info('*******  INVOKE WRAPPER RECEIVED **************')
@@ -210,36 +241,6 @@ const invokeWrapper = (req, res, f) => {
         res.status(200).send(response)
       })
       .catch((err) => res.status(500).end(err.message))
-  })
-}
-
-const init = () => {
-  return new Promise((resolve, reject) => {
-    let bootServices = g.getBootServices()
-    let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
-
-    //bootUpService = 1 // TESTING
-
-    if (bootUpService) {
-      log = logger.getLogger('state')
-      log.debug('>> state init()')
-      // Get inputs id for every customer
-      Promise.all(sessions.getCustomersList().map((c) => {
-        return initInputsId({name: c.name, dbs: sessions.getDatabases(c.name)})
-      }))
-      .then(() => {
-        g.addLocalService('state').then(() => {
-          httpServer.getApi().post('/api/state/settings', (req, res) => /*apiCall*/ invokeWrapper(req, res, postSettings))
-          httpServer.getApi().get('/api/state/settings', (req, res) => /*apiCall*/ invokeWrapper(req, res, getSettings))
-          httpServer.getApi().get('/api/state/newId', (req, res) => invokeWrapper(req, res, newId))
-          httpServer.getApi().get('/api/state/newInputId', (req, res) => invokeWrapper(req, res, newInputId))
-          httpServer.getApi().get('/api/state/blockType', (req, res) => invokeWrapper(req, res, blockType))
-          httpServer.getApi().get('/api/state/releaseType', (req, res) => invokeWrapper(req, res, releaseType))
-          resolve()
-        })
-      })
-      .catch(reject)
-    } else resolve()
   })
 }
 

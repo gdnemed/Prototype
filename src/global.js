@@ -105,7 +105,7 @@ const init = (invokeLocalFunction) => {
         initEvents()
         invokeLocal = invokeLocalFunction
         addLocalService('global').then(resolve())
-        //resolve()
+        // resolve()
       })
       .catch(reject)
   })
@@ -115,26 +115,30 @@ const init = (invokeLocalFunction) => {
 /// Services
 /// /////////////////////
 
+let taskTimeInterval = 1000 * 5
 let appServices = {
   local: [],
   remote: {}
 }
 
+/*
+ *  List of booted services on the current node process.
+ */
 const getBootServices = () => {
   let bootServices = _cfg.localServices.split(',')
-
   if (bootServices[0] === '' && bootServices.length === 1) bootServices = []
-
   return bootServices
 }
 
+/*
+ *  Refresh remote services list task.
+ */
 const initJobReloadServicesList = () => {
   setTimeout(() => {
-    log.info('initJobReloadServicesList RELOAD')
     getServicesRegistry().then(() => {
       initJobReloadServicesList()
     })
-  }, 5000)
+  }, taskTimeInterval)
 }
 
 const getServicesRegistry = () => {
@@ -157,7 +161,6 @@ const getServicesRegistry = () => {
           log.error('REGISTRY service response: ' + err)
           reject(err)
         } else {
-          log.info('REGISTRY service response: ' + JSON.stringify(body))
           addRemoteServices(body.services)
           resolve()
         }
@@ -175,13 +178,15 @@ const registerHostedServices = () => {
     if (_cfg.hasOwnProperty('registry_url') && _cfg.registry_url.length > 0) {
       let bootedServices = appServices.local
 
+      // The registration service is not registered. ^^
       if (bootedServices.includes('registry')) {
-        // Don't send registry to registry
         let index = bootedServices.indexOf('registry')
         if (index !== -1) {
           bootedServices.splice(index, 1)
         }
       }
+
+      // TODO: generic API_KEY , needed?
 
       let options = {
         'method': 'POST',
@@ -210,7 +215,6 @@ const registerHostedServices = () => {
           log.error('REGISTRY service response: ' + err)
           reject(err)
         } else {
-          //log.info('REGISTRY service response: ' + JSON.stringify(body))
           addRemoteServices(body.services)
           resolve(body)
         }
@@ -224,16 +228,16 @@ const registerHostedServices = () => {
 
 const addLocalService = (serviceName) => {
   return new Promise((resolve, reject) => {
-    if (!appServices.local.includes(serviceName)) appServices.local.push(serviceName)
-    //log.info('UPDATED appServices: ' + JSON.stringify(appServices))
+    if (!appServices.local.includes(serviceName)) {
+      appServices.local.push(serviceName)
+    }
     resolve()
   })
 }
 
 const addRemoteServices = (serviceList) => {
   if (serviceList) appServices.remote = serviceList
-
-  log.info('UPDATED appServices: ' + JSON.stringify(appServices))
+  log.info('Updated remote services on this instance.')
 }
 
 const isLocalService = (serviceName) => {
@@ -247,7 +251,6 @@ const loadBalancer = (serviceArray, avoidHost) => {
   if (serviceArray.length > 0) {
     _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].server + ':' + serviceArray[0].port
   }
-
   return _bestUrl
 }
 
@@ -260,13 +263,14 @@ const getUrlService = (serviceName, avoidHost) => {
   return _url
 }
 
+/*
+ *  Returns an object with the correct route and operation on the REST request.
+ */
 const getMethodRoute = (serviceName, methodName) => {
   let foo = {
     'route': '',
     'method': ''
   }
-
-  console.log('getMethodRoute ' + serviceName + '.' + methodName)
   if (serviceName === 'state') {
     switch (methodName) {
       case 'newId':
@@ -292,8 +296,6 @@ const getMethodRoute = (serviceName, methodName) => {
       default:
         throw new Error('Invalid method name: ' + serviceName + '.' + methodName)
     }
-  } else if (serviceName === 'coms') {
-
   } else if (serviceName === 'foo') {
 
   } else {
@@ -331,7 +333,7 @@ const invokeService = (service, methodName, session, parameters) => {
 
       // null && undefined
       if (paramType === 'undefined') {
-        parameters = '' // ¿ Es necesario hacer esto ?
+        parameters = ''
       }
 
       /*
@@ -435,8 +437,6 @@ module.exports = {
   getConfig: () => _cfg,
   /// Services
   addLocalService,
-  addRemoteServices,
-  getUrlService,
   invokeService,
   getServicesRegistry,
   getBootServices,

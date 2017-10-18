@@ -20,7 +20,7 @@ const g = require('../global')
 
 let log
 let servicesList = {}
-let heartBeatInterval = 1000             // Interval pulse to request status on listed services
+let heartBeatInterval = 1000 * 60 * 5    // Interval pulse to request status on listed services
 let clientSideInterval = 1000 * 60 * 5   // Parameter sent to the services.
 let ttl = 1000 * 60 * 5                  // Time to live of service entries in registry list.
 let forceHostClean = true                // If it's true, on heartbeat request error, clean all services entries on that host.
@@ -34,11 +34,6 @@ const serviceType = {
     'server': '',
     'port': ''
   },
-  'request': {             // Request address data
-    'protocol': '',
-    'server': '',
-    'port': ''
-  },
   'version': '',           // Service Version
   'time': '',              // Service entry creation timestamp
   'load': ''               // Service server workload data
@@ -47,10 +42,6 @@ const serviceType = {
 /**********************************
  Service Configuration
  **********************************/
-
-const isStandalone = () => {
-  return 0
-}
 
 const loadConfig = (cfg) => {
   if (cfg) {
@@ -109,15 +100,6 @@ const heartBeat = () => {
 }
 
 const heartBeatCheck = (server, callback) => {
-  /*
-  let protocol = server.protocol === 'https' ? https : http
-  let pos = server.lastIndexOf(':')
-  let IP = server.substring(0, pos)
-  let PORT = server.substring(pos + 1)
-  */
-
-  /** OJO se me ha quedado pillado en la request con una IP errónea... setear timeout **/
-
   let protocol = server.address.protocol === 'https' ? https : http
   let IP = server.address.server
   let PORT = server.address.port
@@ -198,7 +180,6 @@ const cleanExpiredEntries = () => {
  **********************************/
 
 const listAll = (req, res) => {
-  log.debug('New list request.')
   getAllServices(true)
     .then((allServices) => {
       return res.status(200).jsonp(allServices)
@@ -284,22 +265,8 @@ const checkRequestData = (req) => {
     serviceEntry.address.server = req.body.address.server
     serviceEntry.address.port = req.body.address.port
 
-    // OOOOOOOOOOJOOOOOOOOOOOOOOOO Revisar el caso extraño de levantar dos servicios en la misma maquina mismo puerto...
-    console.log('REGISTRY req.headers.host >>>> ' + req.headers.host)
-
     // Request data
-    serviceEntry.host = /*req.headers.host || */ (serviceEntry.address.server + ':' + serviceEntry.address.port)
-
-    console.log('serviceEntry.host' + serviceEntry.host)
-    let pos = serviceEntry.host.lastIndexOf(':')
-    serviceEntry.request.protocol = req.protocol || serviceEntry.address.protocol
-    serviceEntry.request.server = req.headers.host.substring(0, pos)
-    serviceEntry.request.port = req.headers.host.substring(pos + 1)
-
-    if ((serviceEntry.address.server !== serviceEntry.request.server) ||
-      (serviceEntry.address.port !== serviceEntry.request.port)) {
-      log.warn('Service and request addresses are different!')
-    }
+    serviceEntry.host = serviceEntry.address.server + ':' + serviceEntry.address.port
 
     log.info(JSON.stringify(serviceEntry))
     resolve(serviceEntry)
@@ -312,17 +279,15 @@ const checkServiceAddress = (service) => {
 
     if (!service) reject(new Error('Missing service object to test'))
 
-    let protocol = service.request.protocol === 'https' ? https : http
+    let protocol = service.address.protocol === 'https' ? https : http
     protocol.get({
-      /*host: service.request.server,
-      port: service.request.port*/
       host: service.address.server,
       port: service.address.port
     }, (res) => {
       resolve(service)
     }).on('error', (err) => {
       log.error(err.message)
-      reject(new Error('Address unreachable: ' + service.request.server + ':' + service.request.server))
+      reject(new Error('Address unreachable: ' + service.address.server + ':' + service.address.server))
     })
   })
 }
@@ -374,7 +339,6 @@ const listServices = (detailed) => {
       list[serviceType].push(data)
     }
   }
-
   return list
 }
 
@@ -403,10 +367,6 @@ const deleteHost = (service) => {
   if (existsHost(service)) delete (servicesList[service.host])
 }
 
-const updateHost = (service) => {
-  updateServices(service)
-}
-
 /// ////////////////////
 //
 //  Service Atomic Operations
@@ -429,7 +389,6 @@ const addService = (service, forceType) => {
   if (forceType) {
     o.service = forceType
   }
-
   addHost(o)
   servicesList[o.host][o.service] = o
 }
@@ -539,8 +498,10 @@ const init = () => {
     let bootUpService = (bootServices.length === 0) || (bootServices.includes('registry')) ? 1 : 0
 
     if (bootUpService) {
-      ttl = 1000 * 60 * 60                        // TESTING
-      heartBeatInterval = 1000 * 60 * 60          // TESTING
+      // TESTING force parameters
+      // ttl = 1000 * 60 * 60
+      // heartBeatInterval = 1000 * 60 * 60
+
       log = logger.getLogger('registry')
       log.debug('>> registry init()')
       g.addLocalService('registry').then(() => {
@@ -561,6 +522,3 @@ const init = () => {
 module.exports = {
   init
 }
-
-// TESTING
-// if (isStandalone) init()

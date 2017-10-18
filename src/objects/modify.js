@@ -97,7 +97,6 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
       let entity = squery._entity_
       let insert, e
       // We must block any modification over this type, until we finish
-      // stateService.blockType(session, entity)
       g.invokeService('state', 'blockType', session, entity)
       // Search for entities with same key values
         .then(() => {
@@ -111,7 +110,6 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
             .then((sentence) => { return sentence }) // Execute it
             .then((result) => {
               // Once the entity is inserted, we can release blocking
-              // stateService.releaseType(session, entity)
               g.invokeService('state', 'releaseType', session, entity)
                 .then(() => subPuts(session, stateService, variables, squery, data, e.id))
                 .then(() => {
@@ -125,7 +123,6 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
             })
             .catch((err) => {
               // If execution went wrong, release blocking and reject
-              // stateService.releaseType(session, entity)
               g.invokeService('state', 'releaseType', session, entity)
                 .then(() => reject(err)).catch(() => reject(err))
             })
@@ -171,7 +168,6 @@ const getSentenceEntity = (session, stateService, squery, e, id, variables) => {
         return
       }
 
-      //stateService.newId(session)
       g.invokeService('state', 'newId', session)
         .then((id) => {
           e.id = id
@@ -187,7 +183,7 @@ const getSentenceEntity = (session, stateService, squery, e, id, variables) => {
  * data in 'data' and 'variables', and converting JSONs if needed. */
 const getProperFields = (squery, entity, data, variables) => {
   let d = entity ? {type: entity} : {}
-  for (var p in squery) {
+  for (let p in squery) {
     if (squery.hasOwnProperty(p) &&
       p.charAt(0) !== '_' &&
       typeof squery[p] === 'string') {
@@ -244,7 +240,7 @@ const getKeys = (squery, variables, data) => {
 
 /* Finds an entry within a structure, which data is f */
 const findEntry = (squery, f) => {
-  for (var p in squery) {
+  for (let p in squery) {
     if (squery.hasOwnProperty(p)) {
       if (squery[p] === f) return p
     }
@@ -293,7 +289,7 @@ const subPuts = (session, stateService, variables, squery, data, id) => {
   return new Promise((resolve, reject) => {
     // We create a temporal list for sequential execution
     let l = []
-    for (var p in squery) {
+    for (let p in squery) {
       if (squery.hasOwnProperty(p) &&
         (p === '_subput_' || data.hasOwnProperty(p)) &&
         (squery[p]._property_ || squery[p]._relation_)) l.push(p)

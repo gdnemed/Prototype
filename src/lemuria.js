@@ -55,32 +55,16 @@ const init = () => {
           log.info('>> Services started. Application ready...')
           resolve()
         })
-        // INIT JDS
         .then(() => {
           log.info('>> Updating services registration...')
           g.registerHostedServices().then(() => {
-            g.getServicesRegistry()
+            g.getServicesRegistry().then(resolve())
           })
         })
         .then(() => {
           g.initJobReloadServicesList()
+          resolve()
         })
-        /*
-        .then(() => {
-          // TEST
-          setTimeout(() => {
-            log.info('(TEST) >> Invoke STATE METHOD SETTINGS...')
-            sessions.getSession('SPEC')
-              .then((mySession) => {
-                g.invokeService('state', 'settings', mySession, {'setting1': 'settingValue1', 'setting2': 'settingValue2'})
-                  .then((result) => {
-                    console.log('(TEST) >> INVOKED METHOD RESULT === ' + JSON.stringify(result))
-                  })
-              })
-          }, 1500)
-        })
-        */
-        // END JDS
         .catch((err) => {
           log.error(`ERROR: cannot start Lemuria: `)
           log.error(err)

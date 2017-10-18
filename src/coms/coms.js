@@ -25,7 +25,6 @@ Communications initialization.
 -logic: Logic module.
 */
 const init = (logic, sessions) => {
-
   let bootServices = g.getBootServices()
   let bootUpService = (bootServices.length === 0) || (bootServices.includes('coms')) ? 1 : 0
 

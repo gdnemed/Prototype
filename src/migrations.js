@@ -49,8 +49,6 @@ const getDirForSqliteDB = (customerName) => {
   // Development or production modes
   let dir = g.getConfig().db.dir
   let sqlitePath = dir + '/' + customerName + '/'
-
-  console.log('DIR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' +sqlitePath)
   try {
     if (!fs.existsSync(sqlitePath)) {
       log.debug(`Creating directory for SQlite db : ${sqlitePath}`)
@@ -275,7 +273,6 @@ const cleanMigrationMetadata = (customerName, section, dbs) => {
           dbs[section]('knex_migrations').truncate()
             .then(resolve())
           log.trace(`${customerName} ${section} : knex_migrations table truncated.`)
-          //resolve()
         } else {
           log.trace(`${customerName} ${section} : knex_migrations table does not exists.`)
           resolve()
@@ -293,7 +290,7 @@ const addMigrationMetadata = (customerName, section, dbs, file) => {
     dbs[section].schema.hasTable('knex_migrations')
       .then((exists) => {
         if (exists) {
-          var rollbackRegister = {
+          let rollbackRegister = {
             batch: '1',
             migration_time: new Date().toISOString(),
             name: file
