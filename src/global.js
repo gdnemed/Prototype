@@ -210,7 +210,7 @@ const registerHostedServices = () => {
           log.error('REGISTRY service response: ' + err)
           reject(err)
         } else {
-          log.info('REGISTRY service response: ' + JSON.stringify(body))
+          //log.info('REGISTRY service response: ' + JSON.stringify(body))
           addRemoteServices(body.services)
           resolve(body)
         }
@@ -225,7 +225,7 @@ const registerHostedServices = () => {
 const addLocalService = (serviceName) => {
   return new Promise((resolve, reject) => {
     if (!appServices.local.includes(serviceName)) appServices.local.push(serviceName)
-    log.info('UPDATED appServices: ' + JSON.stringify(appServices))
+    //log.info('UPDATED appServices: ' + JSON.stringify(appServices))
     resolve()
   })
 }

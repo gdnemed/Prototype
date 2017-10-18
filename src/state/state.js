@@ -78,6 +78,7 @@ const initInputsId = (session) => {
     }))
       .then(() => {
         inputSequences[session.name] = max + 1
+        log.info(`Last input id on ${session.name}: ${inputSequences[session.name]}`)
         resolve()
       })
       .catch(reject)
