@@ -276,6 +276,9 @@ const checkRequestData = (req) => {
     serviceEntry.address.server = req.body.address.server
     serviceEntry.address.port = req.body.address.port
 
+
+    console.log('REGISTRY req.headers.host >>>> ' + req.headers.host)
+
     // Request data
     serviceEntry.host = req.headers.host || (serviceEntry.address.server + ':' + serviceEntry.address.port)
     let pos = serviceEntry.host.lastIndexOf(':')
