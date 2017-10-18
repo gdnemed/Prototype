@@ -364,11 +364,26 @@ const invokeService = (service, methodName, session, parameters) => {
               }
             })
           })
-          .then((data) => {
+          .then((invokeResult) => {
             log.debug('resilientInvoke ENDS attempt(' + attempts + ')')
 
+            console.log('invokeResult === ' + JSON.stringify(invokeResult))
+
             if (done) {
-              resolve(data) // outer promise
+              // Cast result type
+              let functionResult
+
+              switch (invokeResult.dataType) {
+                case 'undefined':
+                  functionResult = null
+                  break
+                case 'number':
+                  functionResult = parseInt(invokeResult.data)
+                  break
+                default:
+                  functionResult = invokeResult.data  // string or object
+              }
+              resolve(functionResult) // outer promise
             } else {
               resilientInvoke(done, attempts)
             }

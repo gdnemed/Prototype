@@ -182,8 +182,22 @@ const apiCall = (req, res, f) => {
 const invokeWrapper = (req, res, f) => {
   sessions.manageSession(req, res, (req, res, session) => {
     console.log('req.body.dataType --> ' + req.body.dataType)
-    console.log('req.body.data --> ' + req.body.data)
-    f(session, req.body)
+    console.log('req.body.data --> ' + JSON.stringify(req.body.data))
+
+    let param
+
+    switch (req.body.dataType) {
+      case 'undefined':
+        param = null
+        break
+      case 'number':
+        param = parseInt(req.body.data)
+        break
+      default:
+        param = req.body.data  // string or object
+    }
+
+    f(session, param)
       .then((result) => {
         let response = {
           'dataType': (typeof result),
