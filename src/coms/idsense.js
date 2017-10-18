@@ -21,7 +21,8 @@ const receive = (data, socket, logicService) => {
     pushQueue(socket)
   } else {
     switch (data.cmd) {
-      case 4:newClocking(data, socket, logicService)
+      case 4: newClocking(data, socket, logicService); break
+      case 20: receiveConfig(data, socket, logicService); break
     }
   }
 }
@@ -44,6 +45,7 @@ const sendQueueItem = (socket, command, data) => {
     case 'record_delete_complete':data.cmd = 7; break
     case 'card_delete':data.cmd = 8; break
     case 'record_delete':data.cmd = 9; break
+    case 'read_config_file':data.cmd = 20; break
     default:log.error('Command not found: ' + command)
       return
   }
@@ -91,6 +93,10 @@ const newClocking = (data, socket, logicService) => {
       log.error(err.message)
       nack(data, socket, 0)
     })
+}
+
+const receiveConfig = (data, socket, logicService) => {
+  // TODO: Hay que hacer algo?
 }
 
 module.exports = {

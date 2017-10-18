@@ -61,9 +61,9 @@ const getDirForSqliteDB = (customerName) => {
 }
 
 // Executes the migration for the section, returning the implicit Promise of knex.migrate()
-const migrateSection = (dbType, customer, section, dbs, year) => {
+const migrateSection = (customer, section, dbs, year) => {
   return new Promise((resolve, reject) => {
-    connect(dbType, true, customer, section, dbs, year)
+    connect(true, customer, section, dbs, year)
       .then((sec) => {
         log.debug(`Invoking knex.migrate.latest() for ${sec}`)
         dbs[sec].migrate.latest()
@@ -84,7 +84,7 @@ const migrateSection = (dbType, customer, section, dbs, year) => {
   })
 }
 
-const connect = (dbType, createIfNotExists, customer, section, dbs, year) => {
+const connect = (createIfNotExists, customer, section, dbs, year) => {
   return new Promise((resolve, reject) => {
     try {
       // Base object for composing other specific objects via "object.assing"
@@ -167,9 +167,14 @@ const connect = (dbType, createIfNotExists, customer, section, dbs, year) => {
       */
 
       if (!customer.hasOwnProperty('db')) {
-        reject(new Error('There is no connection data for the current customer.'))
+        reject(new Error('There is db entry for ' + customer.name))
+        return
       }
-      baseMigration = customer.db
+      baseMigration = customer.db[section]
+      if (!baseMigration) {
+        reject(new Error('There is no connection data for ' + section + ' in ' + customer.name))
+        return
+      }
       baseMigration.customer = customer.name
 
       if (year) {
@@ -214,28 +219,28 @@ const connect = (dbType, createIfNotExists, customer, section, dbs, year) => {
 
 // Executes the migration for all sections and returns a promise with the  'dbs' object
 // If an error occurs in some process,
-const init = (type, customer, year) => {
+const init = (customer, year) => {
   // migrateSection() already returns a promise that refers to the result of "migrateSection()" invocation
   // But we want "init()" to return a promise with another value (the "dbs" object holding the N knex references)
   // A way to do this is creating a new Promise and resolve() or reject() it depending on the case
   // see => https://www.promisejs.org
   return new Promise((resolve, reject) => {
-    log.info('info: migrations.init() : customer: ' + customer.name + ' type: ' + type)
+    log.info('info: migrations.init() : customer: ' + customer.name)
     // Object that holds a reference to every section knex object
     let dbs = {}
-    migrateSection(type, customer, SECTIONS.STATE, dbs)
-      .then(() => migrateSection(type, customer, SECTIONS.OBJECTS, dbs))
-      .then(() => initYear(type, customer, year - 1, dbs))
-      .then(() => initYear(type, customer, year, dbs))
-      .then(() => initYear(type, customer, year + 1, dbs))
+    migrateSection(customer, SECTIONS.STATE, dbs)
+      .then(() => migrateSection(customer, SECTIONS.OBJECTS, dbs))
+      .then(() => initYear(customer, year - 1, dbs))
+      .then(() => initYear(customer, year, dbs))
+      .then(() => initYear(customer, year + 1, dbs))
       .then(() => resolve(dbs))
       .catch((err) => reject(err))
   })
 }
 
-const initYear = (type, customer, year, dbs) => {
+const initYear = (customer, year, dbs) => {
   log.info('info: migrations.initYear() : customer: ' + customer.name + ' year: ' + year)
-  return migrateSection(type, customer, SECTIONS.INPUTS, dbs, year)
+  return migrateSection(customer, SECTIONS.INPUTS, dbs, year)
 }
 
 // debug: verifies that each knex object for each db exists

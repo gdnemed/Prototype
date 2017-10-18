@@ -479,6 +479,8 @@ const nextVersion = (session, obj, type) => {
       _filter_: {field: 'id', variable: 'id'},
       code: 'code',
       version: {_property_: 'revision'},
+      seclevel: {_property_: 'seclevel'},
+      pin: {_property_: 'pin'},
       drop: {_property_: 'drop'},
       card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
     })
@@ -533,6 +535,8 @@ const initTerminal = (serial, customer) => {
           _filter_: {field: 'drop', value: CT.END_OF_TIME},
           code: 'code',
           drop: {_property_: 'drop'},
+          seclevel: {_property_: 'seclevel'},
+          pin: {_property_: 'pin'},
           card: {_relation_: '[<-identifies]', code: 'code', start: 't1', end: 't2'}
         })
         .then((ret) => {
@@ -549,6 +553,8 @@ const initTerminal = (serial, customer) => {
               }
             }
           }
+          // ask terminal for readers configuration
+          comsService.send(serial, 'read_config_file', {})
         })
         .catch((err) => log.error(err))
     })

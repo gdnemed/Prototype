@@ -3,15 +3,35 @@
     "123": {
       "name": "SPEC",
       "db": {
-        "client": "sqlite3",
-        "useNullAsDefault": true
+        "state": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        },
+        "objects": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        },
+        "inputs": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        }
       }
     },
     "124": {
       "name": "OCTIME",
       "db": {
-        "client": "sqlite3",
-        "useNullAsDefault": true
+        "state": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        },
+        "objects": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        },
+        "inputs": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        }
       }
     }
   },

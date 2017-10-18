@@ -68,7 +68,7 @@ const PROPERTIES = {
   'card': {type: 'string'},
   'record': {type: 'string'},
   'seclevel': {type: 'number', time: false},
-  'pin': {type: 'string', time: false},
+  'pin': {type: 'number', time: false},
   'host': {type: 'string'},
   'port': {type: 'number'},
   'dir': {type: 'string'},
