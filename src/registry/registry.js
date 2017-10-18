@@ -125,7 +125,7 @@ const heartBeatCheck = (server, callback) => {
   let options = {
     'host': IP,
     'port': PORT,
-    'path': '/api/nodes/check?',
+    'path': '/api/nodes/check',
     'method': 'GET',
     'headers': {
       'Content-Type': 'application/json',
@@ -550,8 +550,8 @@ const init = () => {
         httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
         loadConfig()
         emptyList()
-        heartBeat()
-        cleanListJob()
+        //heartBeat()
+        //cleanListJob()
         resolve()
       })
     } else resolve()
