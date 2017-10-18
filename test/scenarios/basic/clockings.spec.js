@@ -30,7 +30,7 @@ describe('clockings.spec.js', () => {
         return new Promise((resolve, reject) => {
           setTimeout(() => {
             resolve(res)
-          }, 1500)
+          }, 2500)
         })
       })
       .then((res) => {
