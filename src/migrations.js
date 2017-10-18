@@ -49,6 +49,8 @@ const getDirForSqliteDB = (customerName) => {
   // Development or production modes
   let dir = g.getConfig().db.dir
   let sqlitePath = dir + '/' + customerName + '/'
+
+  console.log('DIR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' +sqlitePath)
   try {
     if (!fs.existsSync(sqlitePath)) {
       log.debug(`Creating directory for SQlite db : ${sqlitePath}`)
