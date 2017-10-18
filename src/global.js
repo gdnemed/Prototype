@@ -363,12 +363,11 @@ const invokeService = (service, methodName, session, parameters) => {
               'method': param.method,
               'url': hostUrl + param.route,
               'headers': {
-                'Authorization': 'APIKEY 123' // + apiKey
+                'Authorization': 'APIKEY ' + session.apikey
               },
               'body': {
                 'dataType': paramType,
-                'data': parameters,
-                'session': session
+                'data': parameters
               },
               'encoding': 'utf8',
               'json': true

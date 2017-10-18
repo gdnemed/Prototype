@@ -100,6 +100,7 @@ const getSession = (customerName) => {
   let session = {
     name: customerName,
     dbs: _customers[customerName].dbs,
+    apikey: _customers[customerName].apikey,
     now: parseInt(now),
     today: parseInt(now.substring(0, 8))
   }
