@@ -116,6 +116,8 @@ const heartBeatCheck = (server, callback) => {
   let PORT = server.substring(pos + 1)
   */
 
+  /** OJO se me ha quedado pillado en la request con una IP errónea... setear timeout **/
+
   let protocol = server.address.protocol === 'https' ? https : http
   let IP = server.address.server
   let PORT = server.address.port
