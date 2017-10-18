@@ -276,11 +276,11 @@ const checkRequestData = (req) => {
     serviceEntry.address.server = req.body.address.server
     serviceEntry.address.port = req.body.address.port
 
-
+    // OOOOOOOOOOJOOOOOOOOOOOOOOOO Revisar el caso extraño de levantar dos servicios en la misma maquina mismo puerto...
     console.log('REGISTRY req.headers.host >>>> ' + req.headers.host)
 
     // Request data
-    serviceEntry.host = req.headers.host || (serviceEntry.address.server + ':' + serviceEntry.address.port)
+    serviceEntry.host = /*req.headers.host || */ (serviceEntry.address.server + ':' + serviceEntry.address.port)
     let pos = serviceEntry.host.lastIndexOf(':')
     serviceEntry.request.protocol = req.protocol || serviceEntry.address.protocol
     serviceEntry.request.server = req.headers.host.substring(0, pos)
