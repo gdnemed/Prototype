@@ -281,6 +281,8 @@ const checkRequestData = (req) => {
 
     // Request data
     serviceEntry.host = /*req.headers.host || */ (serviceEntry.address.server + ':' + serviceEntry.address.port)
+
+    console.log('serviceEntry.host' + serviceEntry.host)
     let pos = serviceEntry.host.lastIndexOf(':')
     serviceEntry.request.protocol = req.protocol || serviceEntry.address.protocol
     serviceEntry.request.server = req.headers.host.substring(0, pos)
@@ -304,8 +306,10 @@ const checkServiceAddress = (service) => {
 
     let protocol = service.request.protocol === 'https' ? https : http
     protocol.get({
-      host: service.request.server,
-      port: service.request.port
+      /*host: service.request.server,
+      port: service.request.port*/
+      host: service.address.server,
+      port: service.address.port
     }, (res) => {
       resolve(service)
     }).on('error', (err) => {
