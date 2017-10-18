@@ -245,7 +245,10 @@ const loadBalancer = (serviceArray, avoidHost) => {
   // TODO: a real balancer...
   // if (serviceArray.length > 0) _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].host
 
-  if (serviceArray.length > 0) _bestUrl = serviceArray[0].address.protocol + '://' + serviceArray[0].address.server + serviceArray[0].address.port
+  console.log('serviceArray[0] >>>>>>>>' + serviceArray[0])
+  if (serviceArray.length > 0) {
+    _bestUrl = serviceArray[0].address.protocol + '://' + serviceArray[0].address.server + ':' + serviceArray[0].address.port
+  }
 
   return _bestUrl
 }
@@ -326,12 +329,14 @@ const invokeService = (service, methodName, session, parameters) => {
       // Define type of params
       let paramType = (typeof parameters)
 
+      console.log('paramType >>>>> ' + paramType)
+
       if (paramType === 'function') reject(new Error('Type function parameter on invoke request.'))  // main promise
 
       // null && undefined
-      if (paramType === 'undefined') {
-        parameters = '' // ¿ Es necesario hacer esto ?
-      }
+      //if (paramType === 'undefined') {
+      //  parameters = '' // ¿ Es necesario hacer esto ?
+      //}
 
       /*
        *  Function requests a resource to the first service on list that respond properly.
