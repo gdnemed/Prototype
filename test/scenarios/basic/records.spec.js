@@ -39,7 +39,7 @@ const oneUserWithSecLevelAndPIN = {
   'code': '0456',
   'language': 'en',
   'seclevel': 2,
-  'pin': '1234',
+  'pin': 1234,
   'validity': [{'start': 20170105, 'end': 20180622}]
 }
 
