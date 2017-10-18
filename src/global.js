@@ -247,7 +247,7 @@ const loadBalancer = (serviceArray, avoidHost) => {
 
   console.log('serviceArray[0] >>>>>>>>' + serviceArray[0])
   if (serviceArray.length > 0) {
-    _bestUrl = serviceArray[0].address.protocol + '://' + serviceArray[0].address.server + ':' + serviceArray[0].address.port
+    _bestUrl = serviceArray[0].protocol + '://' + serviceArray[0].server + ':' + serviceArray[0].port
   }
 
   return _bestUrl
