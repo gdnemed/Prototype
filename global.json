@@ -37,24 +37,25 @@
           },
           "useNullAsDefault": true
         }
-      },
-      "124": {
-        "name": "OCTIME",
-        "db": {
-          "state": {
-            "client": "sqlite3",
-            "useNullAsDefault": true
-          },
-          "objects": {
-            "client": "sqlite3",
-            "useNullAsDefault": true
-          },
-          "inputs": {
-            "client": "sqlite3",
-            "useNullAsDefault": true
-          }
-        }
       }
     },
-    "devices": {"123": "SPEC", "1105": "SPEC", "1101": "SPEC"}
-  }
+    "124": {
+      "name": "OCTIME",
+      "db": {
+        "state": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        },
+        "objects": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        },
+        "inputs": {
+          "client": "sqlite3",
+          "useNullAsDefault": true
+        }
+      }
+    }
+  },
+  "devices": {"123": "SPEC", "1105": "SPEC", "1101": "SPEC"}
+}
