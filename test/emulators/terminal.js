@@ -20,28 +20,11 @@ let buffer
 let mapClockings = {}
 let cfg
 
-const loadTerminalJsonFile = (path) => {
-  let fileName = path + 'terminal.json'
-  try {
-    console.log(`Using terminal.json file ${fileName}`)
-    return fs.readFileSync(fileName, 'utf8')
-  } catch (err) {
-    console.log(`File not found ${fileName}`)
+const init = (apiPort, comsHost, comsPort) => {
+  cfg = {
+    server: {port: comsPort, host: comsHost},
+    api: {host: '', port: apiPort}
   }
-}
-
-const init = () => {
-  let fileContents
-  // If a spcecific 'terminal.json' file exists in HOME dir (directory of a specific configuration), loads it
-  // Otherwise, the default, located at "test/emulators/" must be loaded
-  if (!process.env.HOME || !(fileContents = loadTerminalJsonFile(process.env.HOME + '/'))) {
-    fileContents = loadTerminalJsonFile(process.cwd() + '/test/emulators/')
-  }
-  if (!fileContents) {
-    console.log('ERROR: cannot start terminalEmulator: terminal.json not found')
-    process.exit()
-  }
-  cfg = JSON.parse(applyEnvVars(fileContents))
   client.connect(cfg.server.port, cfg.server.host, function () {
     console.log('Connected')
     let bin = Buffer.from('c8f6', 'hex')
@@ -122,17 +105,6 @@ const init = () => {
   initAPIserver()
 }
 
-const applyEnvVars = (str) => {
-  const REGEXP_VAR = /\$[A-Za-z_][A-Za-z_0-9]*\$/g
-  let getValForKey = (key) => {
-    let newVal = process.env[key.replace(/\$/g, '')]
-    if (newVal !== undefined) return newVal
-    else return key
-  }
-  str = str.replace(REGEXP_VAR, getValForKey)
-  return str
-}
-
 const send = (data, seq) => {
   console.log(data)
   let m = msgpack.encode(data)
@@ -172,8 +144,11 @@ const initAPIserver = () => {
   api.get('/clocking/:card', getClocking)
   // Run http server
   let server = api.listen(cfg.api.port, (err) => {
-    let address = server.address()
-    console.log('>> Terminal emulator API listening at port ' + address.port)
+    if (err) console.log(err)
+    else {
+      let address = server.address()
+      console.log('>> Terminal emulator API listening at port ' + address.port)
+    }
   })
 }
 
@@ -197,7 +172,3 @@ module.exports = {
   init
 }
 
-// Start Lemuria when not testing (tests start Lemuria by themselves)
-if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test') {
-  init()
-}

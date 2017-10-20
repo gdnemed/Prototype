@@ -9,15 +9,15 @@
 		"node_id":1,
 		"server":{"host":"127.0.0.1","port": 7081},
 		"files":{
-			"dir":"test/exchange_workdir/remote",
-			"workdir": "test/exchange_workdir",
-			"sources":"test/exchange_sources",
+			"dir":"exchange_workdir/remote",
+			"workdir": "exchange_workdir",
+			"sources":"exchange_sources",
 			"output": true
 		},
 		"clockings":{
-			"dir":"test/export_clockings",
+			"dir":"export_clockings",
 			"period": 0,
 			"fileName": "export_clockings.txt"
 		},
-	    "localServices": ""
+	    "localServices": "registry,global,logic,coms,state"
 }

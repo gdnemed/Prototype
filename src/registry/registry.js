@@ -19,7 +19,7 @@ const httpServer = require('../httpServer')
 const g = require('../global')
 
 let log
-let servicesList = {}
+let nodesList = {}
 let heartBeatInterval = 1000 * 60 * 5    // Interval pulse to request status on listed services
 let clientSideInterval = 1000 * 60 * 5   // Parameter sent to the services.
 let ttl = 1000 * 60 * 5                  // Time to live of service entries in registry list.
@@ -52,33 +52,7 @@ const loadConfig = (cfg) => {
 }
 
 const emptyList = () => {
-  servicesList = {}
-}
-
-// TESTING
-// Checking heartbeat testing function
-const responseCheckTest = (req, res) => {
-  let response = {
-    'host': '127.0.0.1:8081',
-    'service': ['logic', 'com', 'test'],
-    'environment': 'dev',
-    'address': {
-      'protocol': 'http',
-      'server': '127.0.0.1',
-      'port': '8081'
-    },
-    'request': {
-      'protocol': 'http',
-      'server': '127.0.0.1',
-      'port': '8081'
-    },
-    'version': '1.1',
-    'time': '',
-    'load': '75'
-  }
-
-  // res.jsonp(response)
-  res.jsonp({'service': []})
+  nodesList = {}
 }
 
 /*************************************************
@@ -91,23 +65,23 @@ const responseCheckTest = (req, res) => {
  */
 const heartBeat = () => {
   setTimeout(() => {
-    for (const host of Object.keys(servicesList)) {
+    for (const host of Object.keys(nodesList)) {
       log.info('Heartbeat: ' + host)
-      heartBeatCheck(host, heartBeatUpdate)
+      heartBeatCheck(nodesList[host])
     }
     heartBeat()
   }, heartBeatInterval)
 }
 
-const heartBeatCheck = (server, callback) => {
-  let protocol = server.address.protocol === 'https' ? https : http
-  let IP = server.address.server
-  let PORT = server.address.port
+const heartBeatCheck = (node) => {
+  let protocol = node.address.protocol === 'https' ? https : http
+  let IP = node.address.server
+  let PORT = node.address.port
 
   let options = {
     'host': IP,
     'port': PORT,
-    'path': '/api/nodes/check',
+    'path': '/api/registry/check',
     'method': 'GET',
     'headers': {
       'Content-Type': 'application/json',
@@ -124,27 +98,20 @@ const heartBeatCheck = (server, callback) => {
     })
 
     res.on('end', () => {
-      let obj = JSON.parse(output)
-      if (callback && typeof callback === 'function') {
-        callback(res.statusCode, obj)
-      }
+      // let obj = JSON.parse(output)
+      log.info('HeartBeat ok for ' + node.host)
+      node.time = Date.now()
     })
   })
 
   req.on('error', (err) => {
     log.error('Heartbeat ' + options.host + ' ERROR: ' + err + '. DELETING ENTRY !!!')
     if (forceHostClean) {
-      deleteHost(options)
+      deleteNode(options.host)
     }
   })
 
   req.end()
-}
-
-const heartBeatUpdate = (status, response) => {
-  log.info('HeartBeat response: ' + status + ' ' + JSON.stringify(response))
-  response.time = Date.now()
-  updateServices(response)
 }
 
 /********************************************************
@@ -162,15 +129,13 @@ const cleanExpiredEntries = () => {
   let rightNow = Date.now()
   log.debug('Cleaning expired entries with TTL: ' + ttl)
 
-  for (const host of Object.keys(servicesList)) {
-    for (const serviceType of Object.keys(servicesList[host])) {
-      let expirationTime = servicesList[host][serviceType].time + ttl
-      let expirationDate = new Date(expirationTime)
+  for (const host of Object.keys(nodesList)) {
+    let expirationTime = nodesList[host].time + ttl
+    let expirationDate = new Date(expirationTime)
 
-      if (rightNow > expirationTime) {
-        log.info('Deleting outdated service ' + serviceType.toUpperCase() + ' at address ' + host + '. Expiration time: ' + expirationDate.toJSON() + '.')
-        deleteService(servicesList[host][serviceType], serviceType)
-      }
+    if (rightNow > expirationTime) {
+      log.info('Deleting outdated node ' + host + '. Expiration time: ' + expirationDate.toJSON() + '.')
+      deleteNode(host)
     }
   }
 }
@@ -191,6 +156,7 @@ const register = (req, res) => {
   addServiceEntry(req)
     .then(getAllServices)
     .then((allServices) => {
+      g.addRemoteServices(allServices.services)
       return res.status(200).jsonp(allServices)
     })
 }
@@ -209,8 +175,8 @@ const removeServiceEntry = (req) => {
 
   return new Promise((resolve, reject) => {
     checkRequestData(req)
-      .then((serviceEntry) => {
-        deleteServices(serviceEntry)
+      .then((node) => {
+        deleteNode(node)
       })
       .then(resolve)
       .catch((e) => {
@@ -225,10 +191,10 @@ const addServiceEntry = (req) => {
 
   return new Promise((resolve, reject) => {
     checkRequestData(req)
-      .then((serviceEntry) => {
-        checkServiceAddress(serviceEntry)
-          .then((serviceEntry) => {
-            addServices(serviceEntry)
+      .then((node) => {
+        checkServiceAddress(node)
+          .then((node) => {
+            updateNode(node)
           })
           .then(resolve)
           .catch((e) => {
@@ -318,25 +284,45 @@ const getAllServices = (detailed) => {
 const listServices = (detailed) => {
   let list = {}
 
-  for (const host of Object.keys(servicesList)) {
-    for (const serviceType of Object.keys(servicesList[host])) {
+  for (const host of Object.keys(nodesList)) {
+    for (let i = 0; i < nodesList[host].service.length; i++) {
+      let serviceType = nodesList[host].service[i]
       if (!list.hasOwnProperty(serviceType)) list[serviceType] = []
 
       let data = {
-        'host': servicesList[host][serviceType].host,
-        'environment': servicesList[host][serviceType].environment,
-        'server': servicesList[host][serviceType].address.server,
-        'port': servicesList[host][serviceType].address.port,
-        'protocol': servicesList[host][serviceType].address.protocol
+        'host': nodesList[host].host,
+        'environment': nodesList[host].environment,
+        'server': nodesList[host].address.server,
+        'port': nodesList[host].address.port,
+        'protocol': nodesList[host].address.protocol
       }
 
       if (detailed) {
-        data.version = servicesList[host][serviceType].version
-        data.time = servicesList[host][serviceType].time
-        data.load = servicesList[host][serviceType].load
+        data.version = nodesList[host].version
+        data.time = nodesList[host].time
+        data.load = nodesList[host].load
       }
-
       list[serviceType].push(data)
+    }
+  }
+  // Add our own services
+  let l = g.getBootServices()
+  for (let i = 0; i < l.length; i++) {
+    if (l[i] !== 'registry') {
+      let data = {
+        'host': g.getConfig().apiHost,
+        'environment': process.env.NODE_ENV || 'dev',
+        'server': g.getConfig().apiHost,
+        'port': g.getConfig().apiPort,
+        'protocol': 'http'
+      }
+      if (detailed) {
+        data.version = '1.0'
+        data.time = ''
+        data.load = '50'
+      }
+      if (!list[l[i]]) list[l[i]] = []
+      list[l[i]].push(data)
     }
   }
   return list
@@ -349,143 +335,19 @@ const listServices = (detailed) => {
  *
  */
 
-/// ////////////////////
-//
-// Host Operations
-//
-/// ////////////////////
-
-const existsHost = (service) => {
-  return servicesList.hasOwnProperty(service.host)
+const deleteNode = (host) => {
+  log.warn('deleteNode on ' + host)
+  delete (nodesList[host])
 }
 
-const addHost = (service) => {
-  if (!existsHost(service)) servicesList[service.host] = {}
-}
-
-const deleteHost = (service) => {
-  if (existsHost(service)) delete (servicesList[service.host])
-}
-
-/// ////////////////////
-//
-//  Service Atomic Operations
-//
-/// ////////////////////
-
-const existService = (host, service) => {
-  if (servicesList.hasOwnProperty(host)) {
-    return servicesList[host].hasOwnProperty(service)
+const updateNode = (node) => {
+  if (nodesList[node.host]) {
+    node.time = nodesList[node.host].time
+    log.debug('updateNode on ' + node.host)
   } else {
-    return false
+    log.debug('addNode on ' + node.host)
   }
-}
-
-const addService = (service, forceType) => {
-  log.debug('addService on ' + service.host + '. Type: ' + service.service + ' Forced: ' + forceType)
-
-  let o = Object.assign({}, service)
-
-  if (forceType) {
-    o.service = forceType
-  }
-  addHost(o)
-  servicesList[o.host][o.service] = o
-}
-
-const deleteService = (service, forceType) => {
-  log.warn('deleteService on ' + service.host + '. Type: ' + service.service + '. Forced: ' + forceType)
-
-  let o = Object.assign({}, service)
-
-  if (forceType) o.service = forceType
-
-  if (existService(o.host, o.service)) {
-    delete (servicesList[o.host][o.service])
-
-    if (Object.keys(servicesList[o.host]).length === 0) deleteHost(o.host)
-  }
-}
-
-const updateService = (service, forceType) => {
-  log.debug('updateService on ' + service.host + '. Type: ' + service.service + '. Forced: ' + forceType)
-
-  let o = Object.assign({}, service)
-  let previousService = {}
-
-  if (forceType) {
-    o.service = forceType
-  }
-
-  if (!existService(o.host, o.service)) {
-    addService(service, o.service)
-  } else {
-    previousService = Object.assign({}, servicesList[o.host][o.service])
-    servicesList[o.host][o.service] = Object.assign({}, previousService, o)
-  }
-}
-
-/// ////////////////////
-//
-// Service Batch Operations
-//
-/// ////////////////////
-
-const existServices = (service) => {
-  let severalServices = (typeof service.service === 'string') ? 0 : 1
-  let existServices = true
-
-  // On an IP:PORT can only be running one instance of a service.
-  if (!severalServices) {
-    existServices = existService(service.host, service.service)
-  } else {
-    for (let serviceType of service.service) {
-      existServices = existService(service.host, serviceType)
-
-      if (!existServices) break  // all or none
-    }
-  }
-
-  return existServices
-}
-
-const addServices = (service) => {
-  let severalServices = (typeof service.service === 'string') ? 0 : 1
-
-  // On an IP:PORT can only be running one instance of a service.
-  if (!severalServices) {
-    addService(service, service.service)
-  } else {
-    for (let serviceType of service.service) {
-      addService(service, serviceType)
-    }
-  }
-}
-
-const deleteServices = (service) => {
-  let severalServices = (typeof service.service === 'string') ? 0 : 1
-
-  if (!severalServices) {
-    deleteService(service, service.service)
-  } else {
-    for (let serviceType of service.service) {
-      deleteService(service, serviceType)
-    }
-  }
-}
-
-const updateServices = (service) => {
-  if (service.hasOwnProperty('service')) {
-    let severalServices = (typeof service.service === 'string') ? 0 : 1
-
-    if (!severalServices) {
-      updateService(service, service.service)
-    } else {
-      for (let serviceType of service.service) {
-        updateService(service, serviceType)
-      }
-    }
-  }
+  nodesList[node.host] = node
 }
 
 /**********************************
@@ -494,10 +356,7 @@ const updateServices = (service) => {
 
 const init = () => {
   return new Promise((resolve, reject) => {
-    let bootServices = g.getBootServices()
-    let bootUpService = (bootServices.length === 0) || (bootServices.includes('registry')) ? 1 : 0
-
-    if (bootUpService) {
+    if (g.isLocalService('registry')) {
       // TESTING force parameters
       // ttl = 1000 * 60 * 60
       // heartBeatInterval = 1000 * 60 * 60
@@ -508,7 +367,6 @@ const init = () => {
         httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
         httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
         httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
-        httpServer.getApi().get('/api/registry/check', (req, res) => responseCheckTest(req, res))
         loadConfig()
         emptyList()
         heartBeat()
@@ -520,5 +378,6 @@ const init = () => {
 }
 
 module.exports = {
-  init
+  init,
+  listServices
 }

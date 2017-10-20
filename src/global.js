@@ -5,7 +5,7 @@
 const request = require('request')
 const events = require('events')
 const logger = require('./utils/log')
-const fs = require('fs')
+// const fs = require('fs')
 
 let log
 let invokeLocal
@@ -29,8 +29,9 @@ const initEvents = () => {
 // CONFIGURATION
 // -------------------------------------------------------------------------------------------
 let _cfg
-const initConfiguration = () => {
+const initConfiguration = (params) => {
   return new Promise((resolve, reject) => {
+    _cfg = params
     // If url argument passed, configuration must be get from server
     // for instance: http://server:port/api/nodes/:id/services
     if (process.argv.indexOf('--url') !== -1) {
@@ -44,11 +45,11 @@ const initConfiguration = () => {
         .catch(reject)
     } else {
       try {
-        let home = process.env.HOME
+        /* let home = process.env.HOME
         let routeCfg = home
         log.debug(`Using config file ${routeCfg}`)
         let strConfig = applyEnvVars(fs.readFileSync(routeCfg + '/config.json', 'utf8'))
-        _cfg = JSON.parse(strConfig)
+        _cfg = JSON.parse(strConfig) */
         resolve()
       } catch (err) {
         console.log('ERROR: cannot start Lemuria: ' + err.message)
@@ -85,6 +86,7 @@ const getRemoteConfiguration = (url, apiKey) => {
   })
 }
 
+/*
 const applyEnvVars = (str) => {
   const REGEXP_VAR = /\$[A-Za-z_][A-Za-z_0-9]*\$/g
   let getValForKey = (key) => {
@@ -94,18 +96,18 @@ const applyEnvVars = (str) => {
   }
   str = str.replace(REGEXP_VAR, getValForKey)
   return str
-}
+} */
 
-const init = (invokeLocalFunction) => {
+const init = (params, invokeLocalFunction) => {
   log = logger.getLogger('global')
   log.debug('>> global.init()')
   return new Promise((resolve, reject) => {
-    initConfiguration()
+    initConfiguration(params)
       .then(() => {
         initEvents()
         invokeLocal = invokeLocalFunction
-        addLocalService('global').then(resolve())
-        // resolve()
+        appServices.local = getBootServices()
+        resolve()
       })
       .catch(reject)
   })
@@ -141,12 +143,14 @@ const initJobReloadServicesList = () => {
   }, taskTimeInterval)
 }
 
+/* Asks registry service for a list of available lemuria services. */
 const getServicesRegistry = () => {
   return new Promise((resolve, reject) => {
-    if (_cfg.hasOwnProperty('registry_url') && _cfg.registry_url.length > 0) {
+    if (isLocalService('registry')) resolve()
+    else if (_cfg.registry && _cfg.registry.length > 0) {
       let options = {
         'method': 'GET',
-        'url': 'http://' + _cfg.registry_url + '/api/registry/services',
+        'url': _cfg.registry + '/api/registry/services',
         'headers': {
           'Authorization': 'APIKEY 123' // + apiKey
         },
@@ -162,6 +166,7 @@ const getServicesRegistry = () => {
           reject(err)
         } else {
           addRemoteServices(body.services)
+          taskTimeInterval = parseInt(body.refresh)
           resolve()
         }
       })
@@ -172,34 +177,24 @@ const getServicesRegistry = () => {
   })
 }
 
+/* Call to registry service, to inform which services we give. */
 const registerHostedServices = () => {
   return new Promise((resolve, reject) => {
     log.info('Registering services booted.')
-    if (_cfg.hasOwnProperty('registry_url') && _cfg.registry_url.length > 0) {
-      let bootedServices = appServices.local
-
-      // The registration service is not registered. ^^
-      if (bootedServices.includes('registry')) {
-        let index = bootedServices.indexOf('registry')
-        if (index !== -1) {
-          bootedServices.splice(index, 1)
-        }
-      }
-
-      // TODO: generic API_KEY , needed?
-
+    if (isLocalService('registry')) resolve()
+    else if (_cfg.registry && _cfg.registry.length > 0) {
       let options = {
         'method': 'POST',
-        'url': 'http://' + _cfg.registry_url + '/api/registry/register',
-        'headers': {
+        'url': _cfg.registry + '/api/registry/register',
+        'headers': {// TODO: generic API_KEY , needed?
           'Authorization': 'APIKEY 123' // + apiKey
         },
         'body': {
-          'service': bootedServices,
+          'service': getBootServices(),
           'address': {
             'protocol': 'http',
-            'port': _cfg.api_listen.port || '8081',
-            'server': _cfg.api_listen.host || '127.0.0.1'
+            'port': _cfg.apiPort || '8081',
+            'server': _cfg.apiHost || '127.0.0.1'
           },
           'environment': process.env.NODE_ENV || 'dev',
           'version': '1.0',
@@ -256,7 +251,9 @@ const loadBalancer = (serviceArray, avoidHost) => {
 
 const getUrlService = (serviceName, avoidHost) => {
   let _url = null
-  if (appServices.remote.hasOwnProperty(serviceName)) {
+  if (serviceName === 'global') {
+    return _cfg.registry
+  } else if (appServices.remote.hasOwnProperty(serviceName)) {
     console.log('appServices.remote[serviceName]  ' + JSON.stringify(appServices.remote[serviceName]))
     _url = loadBalancer(appServices.remote[serviceName], avoidHost)
   }
@@ -296,8 +293,17 @@ const getMethodRoute = (serviceName, methodName) => {
       default:
         throw new Error('Invalid method name: ' + serviceName + '.' + methodName)
     }
-  } else if (serviceName === 'foo') {
-
+  } else if (serviceName === 'global') {
+    switch (methodName) {
+      case 'getCustomers':
+        foo.method = 'GET'
+        foo.route = '/api/global/customers'
+        break
+      case 'getDevices':
+        foo.method = 'GET'
+        foo.route = '/api/global/devices'
+        break
+    }
   } else {
     throw new Error('Invalid service name: ' + serviceName)
   }
@@ -311,17 +317,9 @@ const getMethodRoute = (serviceName, methodName) => {
  *  this function will call the corresponding endPoint by returning a promise with the result.
  */
 const invokeService = (service, methodName, session, parameters) => {
-  return new Promise((resolve, reject) => {
-    if (isLocalService(service)) {
-      log.trace('invokeService ' + service.toUpperCase() + '.' + methodName.toUpperCase() + ' as LOCAL service.')
-
-      invokeLocal(service, methodName, session, parameters)
-        .then((result) => {
-          resolve(result)
-        })
-    } else {
-      log.trace('invokeService ' + service.toUpperCase() + '.' + methodName.toUpperCase() + ' as REMOTE service.')
-
+  if (isLocalService(service)) return invokeLocal(service, methodName, session, parameters)
+  else {
+    return new Promise((resolve, reject) => {
       let error = {}; let done = false; let attempts = 0; let hostUrl = ''
       let attemptedUrls = []  // List of requested hosts to resolve invoke method
       let param = getMethodRoute(service, methodName)
@@ -329,10 +327,12 @@ const invokeService = (service, methodName, session, parameters) => {
       // Define type of params
       let paramType = (typeof parameters)
 
-      if (paramType === 'function') reject(new Error('Type function parameter on invoke request.'))  // main promise
-
-      // null && undefined
-      if (paramType === 'undefined') {
+      if (paramType === 'function') {
+        // Nothing to do with functions through HTTP
+        reject(new Error('Type function parameter on invoke request.'))
+        return
+      } else if (paramType === 'undefined') {
+        // Better empty string than null or undefined
         parameters = ''
       }
 
@@ -353,18 +353,15 @@ const invokeService = (service, methodName, session, parameters) => {
             }
             attemptedUrls.push(hostUrl)
 
-            // TODO: no tengo APIKEY en session
             log.info('********** INVOKED METHOD DATA SENDED ************')
             log.info('dataType -> ' + paramType)
             log.info('data     -> ' + JSON.stringify(parameters))
-            log.info('sessin   -> ' + JSON.stringify(session))
+            log.info('session   -> ' + JSON.stringify(session))
 
             let options = {
               'method': param.method,
               'url': hostUrl + param.route,
-              'headers': {
-                'Authorization': 'APIKEY ' + session.apikey
-              },
+              'headers': {},
               'body': {
                 'dataType': paramType,
                 'data': parameters
@@ -372,6 +369,7 @@ const invokeService = (service, methodName, session, parameters) => {
               'encoding': 'utf8',
               'json': true
             }
+            if (session) options.headers.Authorization = 'APIKEY ' + session.apikey
 
             request(options, (err, res, body) => {
               if (err) {
@@ -385,42 +383,38 @@ const invokeService = (service, methodName, session, parameters) => {
               }
             })
           })
-          .then((invokeResult) => {
-            log.debug('resilientInvoke ENDS attempt(' + attempts + ')')
-            log.info('********** INVOKED METHOD DATA RECEIVED ************')
-            log.info('dataType -> ' + invokeResult.dataType)
-            log.info('data     -> ' + JSON.stringify(invokeResult.data))
+            .then((invokeResult) => {
+              log.debug('resilientInvoke ENDS attempt(' + attempts + ')')
+              log.info('********** INVOKED METHOD DATA RECEIVED ************')
+              log.info('dataType -> ' + invokeResult.dataType)
+              log.info('data     -> ' + JSON.stringify(invokeResult.data))
 
-            if (done) {
-              let functionResult
-              switch (invokeResult.dataType) {
-                case 'undefined':
-                  functionResult = null
-                  break
-                case 'number':
-                  functionResult = parseInt(invokeResult.data)
-                  break
-                default:
-                  functionResult = invokeResult.data  // string or object
-              }
-              resolve(functionResult) // outer promise
-            } else {
-              resilientInvoke(done, attempts)
-            }
-          })
-          .catch((e) => {
-            log.error('resilientInvoke ' + service.toUpperCase() + ' ERROR: ' + JSON.stringify(e))
-          })
+              if (done) {
+                let functionResult
+                switch (invokeResult.dataType) {
+                  case 'undefined':
+                    functionResult = null
+                    break
+                  case 'number':
+                    functionResult = parseInt(invokeResult.data)
+                    break
+                  default:
+                    functionResult = invokeResult.data  // string or object
+                }
+                resolve(functionResult) // outer promise
+              } else resilientInvoke(done, attempts)
+            })
+            .catch((e) => {
+              log.error('resilientInvoke ' + service.toUpperCase() + ' ERROR: ' + JSON.stringify(e))
+            })
         })
       }
       // Ends function forceInvoke
       resilientInvoke(done, attempts).then((result) => {
         resolve(result) // main promise
       })
-    }
-  // Ends main promise
-  })
-  // Ends if
+    })
+  }
 }
 
 /// /////////////////////
@@ -436,9 +430,11 @@ module.exports = {
   getConfig: () => _cfg,
   /// Services
   addLocalService,
+  addRemoteServices,
   invokeService,
   getServicesRegistry,
   getBootServices,
+  isLocalService,
   registerHostedServices,
   initJobReloadServicesList
 }

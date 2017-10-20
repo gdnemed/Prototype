@@ -276,7 +276,7 @@ let prepPutClocking = {
 }
 
 const init = (sessions, state, coms) => {
-  if (g.getConfig().api_listen) {
+  if (g.isLocalService('logic')) {
     log = logger.getLogger('logic')
     log.debug('>> logic.init()')
     sessionService = sessions

@@ -8,7 +8,6 @@
 const moment = require('moment-timezone')
 const logger = require('../utils/log')
 const migrations = require('../migrations')
-const request = require('request')
 const g = require('../global')
 
 let mapCustomers
@@ -50,41 +49,65 @@ const initializeCustomer = (customersList, i) => {
   })
 }
 
+/*
+ *  Wrapper to manage remote service request data types
+ */
+const invokeWrapper = (req, res, f) => {
+  manageSession(req, res, (req, res, session) => {
+    log.info('*******  INVOKE WRAPPER RECEIVED **************')
+    log.info('dataType -> ' + req.body.dataType)
+    log.info('data     -> ' + JSON.stringify(req.body.data))
+
+    let param
+
+    switch (req.body.dataType) {
+      case 'undefined':
+        param = null
+        break
+      case 'number':
+        param = parseInt(req.body.data)
+        break
+      default:
+        param = req.body.data  // string or object
+    }
+
+    f(session, param)
+      .then((result) => {
+        let response = {
+          'dataType': (typeof result),
+          'data': result
+        }
+        log.info('*******  INVOKE WRAPPER SENDED **************')
+        log.info('response -> ' + JSON.stringify(response))
+        res.status(200).send(response)
+      })
+      .catch((err) => res.status(500).end(err.message))
+  })
+}
+
 const init = () => {
-  /* dbGlobal = process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test'
-  ? {
-    customers: {k123: {name: 'SPEC'}, k124: {name: 'OCTIME'}},
-    devices: {t123: 'SPEC', t1105: 'SPEC', t1101: 'SPEC'}
-  }
-  : {customers: {k123: {name: 'SPEC'}}, devices: {t123: 'SPEC', t1101: 'SPEC'}}
-  */
   return new Promise((resolve, reject) => {
     log = logger.getLogger('session')
-    log.debug('session: init() env: ' + process.env.NODE_ENV)
+    log.debug('session: init()')
     let cfg = g.getConfig()
     // If we serve an API, we are not a simple exporter or importer, and we need global database
-    if (cfg.api_listen) {
-      // Ask for customers
-      let url = 'http://127.0.0.1:' + cfg.api_listen.port + '/api/global/'
-      let data = {method: 'GET', url: url + 'customers'}
-      request(data, (error, response, body) => {
-        if (error) reject(error)
-        else {
-          mapCustomers = JSON.parse(response.body)
-          // Ask for devices
-          data.url = url + 'devices'
-          request(data, (error, response, body) => {
-            if (error) reject(error)
-            else {
-              mapDevices = JSON.parse(response.body)
-              initializeCustomer(getCustomersList(), 0)
-                .then(g.addLocalService('sessions'))
-                .then(resolve)
-                .catch(reject)
-            }
-          })
-        }
-      })
+    if (cfg.apiPort) {
+      let session = {
+        name: 'internal',
+        apikey: '123'
+      }
+      g.invokeService('global', 'getCustomers', session)
+        .then((customers) => {
+          mapCustomers = customers
+          return g.invokeService('global', 'getDevices', session)
+        })
+        .then((devices) => {
+          mapDevices = devices
+          return initializeCustomer(getCustomersList(), 0)
+        })
+        .then(() => g.addLocalService('sessions'))
+        .then(resolve)
+        .catch(reject)
     } else resolve()
   })
 }
@@ -154,5 +177,6 @@ module.exports = {
   manageSession,
   checkSerial,
   getDatabases,
-  setAuthorization
+  setAuthorization,
+  invokeWrapper
 }

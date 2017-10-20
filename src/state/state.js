@@ -182,10 +182,7 @@ const apiCall = (req, res, f) => {
 
 const init = () => {
   return new Promise((resolve, reject) => {
-    let bootServices = g.getBootServices()
-    let bootUpService = (bootServices.length === 0) || (bootServices.includes('state')) ? 1 : 0
-
-    if (bootUpService) {
+    if (g.isLocalService('state')) {
       log = logger.getLogger('state')
       log.debug('>> state init()')
       // Get inputs id for every customer
@@ -194,53 +191,17 @@ const init = () => {
       }))
       .then(() => {
         g.addLocalService('state').then(() => {
-          httpServer.getApi().post('/api/state/settings', (req, res) => /* apiCall */ invokeWrapper(req, res, postSettings))
-          httpServer.getApi().get('/api/state/settings', (req, res) => /* apiCall */ invokeWrapper(req, res, getSettings))
-          httpServer.getApi().get('/api/state/newId', (req, res) => invokeWrapper(req, res, newId))
-          httpServer.getApi().get('/api/state/newInputId', (req, res) => invokeWrapper(req, res, newInputId))
-          httpServer.getApi().get('/api/state/blockType', (req, res) => invokeWrapper(req, res, blockType))
-          httpServer.getApi().get('/api/state/releaseType', (req, res) => invokeWrapper(req, res, releaseType))
+          httpServer.getApi().post('/api/state/settings', (req, res) => sessions.invokeWrapper(req, res, postSettings))
+          httpServer.getApi().get('/api/state/settings', (req, res) => sessions.invokeWrapper(req, res, getSettings))
+          httpServer.getApi().get('/api/state/newId', (req, res) => sessions.invokeWrapper(req, res, newId))
+          httpServer.getApi().get('/api/state/newInputId', (req, res) => sessions.invokeWrapper(req, res, newInputId))
+          httpServer.getApi().get('/api/state/blockType', (req, res) => sessions.invokeWrapper(req, res, blockType))
+          httpServer.getApi().get('/api/state/releaseType', (req, res) => sessions.invokeWrapper(req, res, releaseType))
           resolve()
         })
       })
       .catch(reject)
     } else resolve()
-  })
-}
-
-/*
- *  Wrapper to manage remote service request data types
- */
-const invokeWrapper = (req, res, f) => {
-  sessions.manageSession(req, res, (req, res, session) => {
-    log.info('*******  INVOKE WRAPPER RECEIVED **************')
-    log.info('dataType -> ' + req.body.dataType)
-    log.info('data     -> ' + JSON.stringify(req.body.data))
-
-    let param
-
-    switch (req.body.dataType) {
-      case 'undefined':
-        param = null
-        break
-      case 'number':
-        param = parseInt(req.body.data)
-        break
-      default:
-        param = req.body.data  // string or object
-    }
-
-    f(session, param)
-      .then((result) => {
-        let response = {
-          'dataType': (typeof result),
-          'data': result
-        }
-        log.info('*******  INVOKE WRAPPER SENDED **************')
-        log.info('response -> ' + JSON.stringify(response))
-        res.status(200).send(response)
-      })
-      .catch((err) => res.status(500).end(err.message))
   })
 }
 

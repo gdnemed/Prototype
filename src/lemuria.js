@@ -24,11 +24,14 @@ let log
 const invokeLocal = (service, methodName, session, parameters) => {
   return new Promise((resolve, reject) => {
     log.debug('LEMURIA invokeLocal: ' + service + '.' + methodName)
-    let fName
     switch (service) {
       case 'state':
-        fName = (methodName === 'settings') ? 'postSettings' : methodName
-        resolve(state[fName](session, parameters))
+        state[methodName](session, parameters)
+          .then(resolve).catch(reject)
+        break
+      case 'global':
+        globalServer[methodName](session, parameters)
+          .then(resolve).catch(reject)
         break
       default:
         reject(new Error('Invoked service method does not exists: ' + service + '.' + methodName))
@@ -36,33 +39,26 @@ const invokeLocal = (service, methodName, session, parameters) => {
   })
 }
 
-const init = () => {
+const init = (params) => {
   // logger initialization
   log = logger.getLogger('Main')
   return new Promise((resolve, reject) => {
     let startService = process.argv.indexOf('-i') !== -1
     let endService = process.argv.indexOf('-u') !== -1
-    if ((!startService && !endService) || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') {
+    if ((!startService && !endService)) {
       console.log('Starting lemuria as application')
       // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
-      g.init(invokeLocal)
+      g.init(params, invokeLocal)
         .then(httpServer.init)
         .then(globalServer.init)
         .then(registry.init)
         .then(sessions.init)
         .then(initServices)
-        .then(() => {
-          log.info('>> Services started. Application ready...')
-          resolve()
-        })
-        .then(() => {
-          log.info('>> Updating services registration...')
-          g.registerHostedServices().then(() => {
-            g.getServicesRegistry().then(resolve())
-          })
-        })
+        .then(g.registerHostedServices)
+        .then(g.getServicesRegistry)
         .then(() => {
           g.initJobReloadServicesList()
+          log.info('Application ready...')
           resolve()
         })
         .catch((err) => {
@@ -124,9 +120,4 @@ const serviceFunctions = (startService) => {
 
 module.exports = {
   init
-}
-
-// Start Lemuria when not testing (tests start Lemuria by themselves)
-if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'stress_test') {
-  init()
 }

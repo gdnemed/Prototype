@@ -1,4 +1,0 @@
-{
-  "server": {"host":"$LEMURIA_HOST_SERVER$","port":$LEMURIA_PORT_COMS$},
-  "api":{"host":"", "port": $LEMURIA_PORT_API_EMULATOR$}
-}

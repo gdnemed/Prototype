@@ -13,7 +13,7 @@ Initial logging configuration, from a file.
 */
 const configure = () => {
   try {
-    log4js.configure(JSON.parse(fs.readFileSync(process.env.HOME + '/logging.json', 'utf8')))
+    log4js.configure(JSON.parse(fs.readFileSync(process.env.LEMURIA_HOME + '/logging.json', 'utf8')))
     customized = true
   } catch (err) {
     console.log('logging.json not found, log messages sent to stdout.')

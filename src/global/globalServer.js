@@ -7,6 +7,7 @@
 const logger = require('../utils/log')
 const fs = require('fs')
 const httpServer = require('../httpServer')
+const sessions = require('../session/sessions')
 const g = require('../global')
 
 let log
@@ -23,33 +24,35 @@ const loadGlobalJsonFile = (path) => {
 
 const init = () => {
   return new Promise((resolve, reject) => {
-    if (g.getConfig().globalDB === 'local') {
-      log = logger.getLogger('global')
-      log.debug('>> global init()')
+    if (g.isLocalService('global')) {
+      log = logger.getLogger('globalServer')
+      log.debug('>> globalServer init()')
       // If a spcecific 'global.json' file exists in HOME dir, loads it
       // Otherwise, the default, located at cwd must be loaded
-      if (!(dbGlobal = loadGlobalJsonFile(process.env.HOME + '/'))) {
+      if (!(dbGlobal = loadGlobalJsonFile(g.getConfig().home + '/'))) {
         dbGlobal = loadGlobalJsonFile('')
       }
       if (!dbGlobal) {
         console.log('ERROR: cannot start Lemuria: global.json not found')
         process.exit()
       }
-      httpServer.getApi().get('/api/global/customers', getCustomers)
-      httpServer.getApi().get('/api/global/devices', getDevices)
+      httpServer.getApi().get('/api/global/customers', (req, res) => sessions.invokeWrapper(req, res, getCustomers))
+      httpServer.getApi().get('/api/global/devices', (req, res) => sessions.invokeWrapper(req, res, getDevices))
       resolve()
     } else resolve()
   })
 }
 
-const getCustomers = (req, res) => {
-  res.status(200).jsonp(dbGlobal.customers)
+const getCustomers = () => {
+  return Promise.resolve(dbGlobal.customers)
 }
 
-const getDevices = (req, res) => {
-  res.status(200).jsonp(dbGlobal.devices)
+const getDevices = () => {
+  return Promise.resolve(dbGlobal.devices)
 }
 
 module.exports = {
-  init
+  init,
+  getCustomers,
+  getDevices
 }

@@ -21,7 +21,7 @@ let yearMigration
 // In testing cases, sqlite db files location is forced to the HOME dir (where the configuration is)
 const _testGetDirForSqliteDB = (customerName) => {
   // Checking: Path: test/scenarios/[SCENARIO_NAME]/db/
-  let sqlitePartialPath = process.env.HOME + '/db/'
+  let sqlitePartialPath = g.getConfig().home + '/db/'
   try {
     if (!fs.existsSync(sqlitePartialPath)) {
       log.debug(`Creating directory for SQlite db : ${sqlitePartialPath}`)
@@ -47,7 +47,7 @@ const getDirForSqliteDB = (customerName) => {
   // Test mode
   if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'stress_test') { return _testGetDirForSqliteDB(customerName) }
   // Development or production modes
-  let dir = g.getConfig().db.dir
+  let dir = process.env.LEMURIA_DIR_DB
   let sqlitePath = dir + '/' + customerName + '/'
   try {
     if (!fs.existsSync(sqlitePath)) {
@@ -65,20 +65,23 @@ const migrateSection = (customer, section, dbs, year) => {
   return new Promise((resolve, reject) => {
     connect(true, customer, section, dbs, year)
       .then((sec) => {
-        log.debug(`Invoking knex.migrate.latest() for ${sec}`)
-        dbs[sec].migrate.latest()
-          .then((result) => {
-            log.trace(`${sec} migration done: ${result}`)
-            // resolve()
-          })
-          .then(() => {
-            log.trace(`${sec} post-migration cleaning metadata ...`)
-            cleanMigrationMetadata(customer.name, sec, dbs)
-          })
-          .then(() => {
-            resolve()
-          })
-          .catch(reject)
+        // Global service must do migrations
+        if (g.isLocalService('global')) {
+          log.debug(`Invoking knex.migrate.latest() for ${sec}`)
+          dbs[sec].migrate.latest()
+            .then((result) => {
+              log.trace(`${sec} migration done: ${result}`)
+              // resolve()
+            })
+            .then(() => {
+              log.trace(`${sec} post-migration cleaning metadata ...`)
+              cleanMigrationMetadata(customer.name, sec, dbs)
+            })
+            .then(() => {
+              resolve()
+            })
+            .catch(reject)
+        } else resolve()
       })
       .catch(reject)
   })

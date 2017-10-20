@@ -7,16 +7,15 @@
 
 const express = require('express')
 const bodyParser = require('body-parser')
-const squeries = require('./objects/squeries')
 const logger = require('./utils/log')
 const g = require('./global')
-const sessions = require('./session/sessions')
 
 let _api
 let lg
 
 const init = () => {
-  if (g.getConfig().api_listen) {
+  let port = g.getConfig().apiPort
+  if (port) {
     lg = logger.getLogger('httpServer')
     lg.debug('>> httpServer: init()')
     return new Promise((resolve, reject) => {
@@ -30,16 +29,44 @@ const init = () => {
       // })
 
       // Run http server
-      let httpServer = _api.listen(g.getConfig().api_listen.port, (err) => {
+      let httpServer = _api.listen(port, (err) => {
         if (err) reject(err)
         else {
           let address = httpServer.address()
           lg.info('API listening at port ' + address.port)
+          // Every node should be checked
+          _api.get('/api/registry/check', (req, res) => responseCheckTest(req, res))
           resolve()
         }
       })
     })
   } else return Promise.resolve()
+}
+
+// TESTING
+// Checking heartbeat testing function
+const responseCheckTest = (req, res) => {
+  let response = {
+    'host': '127.0.0.1:8081',
+    'service': ['logic', 'com', 'test'],
+    'environment': 'dev',
+    'address': {
+      'protocol': 'http',
+      'server': '127.0.0.1',
+      'port': '8081'
+    },
+    'request': {
+      'protocol': 'http',
+      'server': '127.0.0.1',
+      'port': '8081'
+    },
+    'version': '1.1',
+    'time': '',
+    'load': '75'
+  }
+
+  // res.jsonp(response)
+  res.jsonp({'service': []})
 }
 
 module.exports = {

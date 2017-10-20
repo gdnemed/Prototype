@@ -23,7 +23,7 @@ describe('clockings.spec.js', () => {
     })
   })
 
-  it('After posting a record {User,Card}, a simulated cloking of "Card" via terminal emulator creates an input that is checked via /api/coms/clockings', (done) => {
+  it('After posting a record {User,Card}, a simulated clocking of "Card" via terminal emulator creates an input that is checked via /api/coms/clockings', (done) => {
     t.sendPOST('/api/coms/records', oneUserOneCard)
       .then((res) => {
         // Needed to synchronize info terminal & database

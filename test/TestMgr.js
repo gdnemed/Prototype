@@ -10,7 +10,7 @@
 // -------------------------------------------------------------------------------------------
 require('dotenv').config()
 require('../src/defaults').addDefaults()
-process.env.HOME = process.env.HOME || './test/scenarios/basic'
+process.env.LEMURIA_HOME = process.env.LEMURIA_HOME || './test/scenarios/basic'
 
 const chai = require('chai')
 const chaiHttp = require('chai-http')
@@ -29,21 +29,44 @@ let _lemuriaInitialized = false
 let terminal
 let _terminalInitialized = false
 
+const loadJsonFile = () => {
+  let fileName = process.env.LEMURIA_HOME + '/config.json'
+  try {
+    console.log(`Using file ${fileName}`)
+    return fs.readFileSync(fileName, 'utf8')
+  } catch (err) {
+    console.log(`File not found ${fileName}`)
+  }
+}
+
 const startLemuria = () => {
   return new Promise((resolve, reject) => {
-    lemuria.init()
+    // getting config to know Ports, Urls, etc
+    t.config = JSON.parse(applyEnvVars(loadJsonFile()))
+    if (t.config.files) {
+      t.config.files.dir = process.env.ROOT_TEST + '/' + t.config.files.dir
+      t.config.files.workdir = process.env.ROOT_TEST + '/' + t.config.files.workdir
+      t.config.files.sources = process.env.ROOT_TEST + '/' + t.config.files.sources
+    }
+    if (t.config.clockings) {
+      t.config.clockings.dir = process.env.ROOT_TEST + '/' + t.config.clockings.dir
+    }
+    lemuria.init({
+      apiPort: t.config.api_listen.port,
+      comsListen: t.config.coms_listen,
+      home: process.env.LEMURIA_HOME,
+      localServices: t.config.localServices,
+      files: t.config.files,
+      clockings: t.config.clockings,
+      server: t.config.server
+    })
       .then(() => {
         // stores refences to knex objects
         t.dbs = sessions.getDatabases('SPEC')
         t.eventEmitter = g.getEventEmitter()
         console.log('TestMgr: lemuria.init() invoked OK')
-        // getting config to know Ports, Urls, etc
-        t.config = g.getConfig()
         let port = t.config.api_listen.port
         t.lemuriaAPI = `localhost:${port}`
-        let termEmulport = 5052
-        if (t.config.terminal_emulator) termEmulport = t.config.terminal_emulator.api.port
-        t.terminalEmulatorAPI = `localhost:${termEmulport}`
         console.log(`TestMgr: lemuriaAPI for testing is: ${t.lemuriaAPI}`)
         resolve()
       })
@@ -75,12 +98,27 @@ const get = (env = 'test') => {
   })
 }
 
+const applyEnvVars = (str) => {
+  const REGEXP_VAR = /\$[A-Za-z_][A-Za-z_0-9]*\$/g
+  let getValForKey = (key) => {
+    let newVal = process.env[key.replace(/\$/g, '')]
+    if (newVal !== undefined) return newVal
+    else return key
+  }
+  str = str.replace(REGEXP_VAR, getValForKey)
+  return str
+}
+
 const startTerminalEmulator = () => {
+  let termEmulport = 5052
+  if (t.config.terminal_emulator.api.port) termEmulport = t.config.terminal_emulator.api.port
+  t.terminalEmulatorAPI = `localhost:${termEmulport}`
   terminal = require('./emulators/terminal.js')
   console.log('>> TestMgr: startTerminalEmulator')
   return new Promise((resolve, reject) => {
     if (!_terminalInitialized) {
-      terminal.init('/test/emulators') // SubPath is needed, because cwd where all testa are executed is  /LEMURIA/Prototype/
+      terminal.init(termEmulport, t.config.coms_listen.host, t.config.coms_listen.port)
+      // terminal.init('/test/emulators') // SubPath is needed, because cwd where all testa are executed is  /LEMURIA/Prototype/
       console.log('TestMgr: terminal init() was called')
       _terminalInitialized = true
       resolve()
