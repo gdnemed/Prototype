@@ -22,8 +22,6 @@ let log
 let nodesList = {}
 let heartBeatInterval = 1000 * 60 * 5    // Interval pulse to request status on listed services
 let clientSideInterval = 1000 * 60 * 5   // Parameter sent to the services.
-let ttl = 1000 * 60 * 5                  // Time to live of service entries in registry list.
-let forceHostClean = true                // If it's true, on heartbeat request error, clean all services entries on that host.
 
 const serviceType = {
   'host': '',              // IP:PORT
@@ -37,22 +35,6 @@ const serviceType = {
   'version': '',           // Service Version
   'time': '',              // Service entry creation timestamp
   'load': ''               // Service server workload data
-}
-
-/**********************************
- Service Configuration
- **********************************/
-
-const loadConfig = (cfg) => {
-  if (cfg) {
-    heartBeatInterval = cfg.heartBeatInterval || heartBeatInterval
-    clientSideInterval = cfg.clientSideInterval || clientSideInterval
-    ttl = cfg.ttl || ttl
-  }
-}
-
-const emptyList = () => {
-  nodesList = {}
 }
 
 /*************************************************
@@ -106,38 +88,10 @@ const heartBeatCheck = (node) => {
 
   req.on('error', (err) => {
     log.error('Heartbeat ' + options.host + ' ERROR: ' + err + '. DELETING ENTRY !!!')
-    if (forceHostClean) {
-      deleteNode(options.host)
-    }
+    deleteNode(options.host)
   })
 
   req.end()
-}
-
-/********************************************************
- Clean expired entries on service list.
- ********************************************************/
-
-const cleanListJob = () => {
-  setTimeout(() => {
-    cleanExpiredEntries()
-    cleanListJob()
-  }, ttl)
-}
-
-const cleanExpiredEntries = () => {
-  let rightNow = Date.now()
-  log.debug('Cleaning expired entries with TTL: ' + ttl)
-
-  for (const host of Object.keys(nodesList)) {
-    let expirationTime = nodesList[host].time + ttl
-    let expirationDate = new Date(expirationTime)
-
-    if (rightNow > expirationTime) {
-      log.info('Deleting outdated node ' + host + '. Expiration time: ' + expirationDate.toJSON() + '.')
-      deleteNode(host)
-    }
-  }
 }
 
 /**********************************
@@ -357,20 +311,13 @@ const updateNode = (node) => {
 const init = () => {
   return new Promise((resolve, reject) => {
     if (g.isLocalService('registry')) {
-      // TESTING force parameters
-      // ttl = 1000 * 60 * 60
-      // heartBeatInterval = 1000 * 60 * 60
-
       log = logger.getLogger('registry')
       log.debug('>> registry init()')
       g.addLocalService('registry').then(() => {
         httpServer.getApi().post('/api/registry/register', (req, res) => register(req, res))
         httpServer.getApi().delete('/api/registry/unregister', (req, res) => unRegister(req, res))
         httpServer.getApi().get('/api/registry/services', (req, res) => listAll(req, res))
-        loadConfig()
-        emptyList()
         heartBeat()
-        cleanListJob()
         resolve()
       })
     } else resolve()
@@ -378,6 +325,5 @@ const init = () => {
 }
 
 module.exports = {
-  init,
-  listServices
+  init
 }
