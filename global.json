@@ -2,38 +2,59 @@
   "customers": {
     "123": {
       "name": "SPEC",
-      "db": {
+      "db":
+      {
         "state": {
-          "client": "sqlite3",
+          "client": "mssql",
+          "connection": {
+            "host": "172.18.6.201",
+            "port": "1433",
+            "user": "pau_spec_state",
+            "password": "manager",
+            "database": "pau_spec"
+          },
           "useNullAsDefault": true
         },
         "objects": {
-          "client": "sqlite3",
+          "client": "mssql",
+          "connection": {
+            "host": "172.18.6.201",
+            "port": "1433",
+            "user": "pau_spec_objects",
+            "password": "manager",
+            "database": "pau_spec"
+          },
           "useNullAsDefault": true
         },
         "inputs": {
-          "client": "sqlite3",
+          "client": "mssql",
+          "connection": {
+            "host": "172.18.6.201",
+            "port": "1433",
+            "user": "pau_spec_inputs",
+            "password": "manager",
+            "database": "pau_spec"
+          },
           "useNullAsDefault": true
+        }
+      },
+      "124": {
+        "name": "OCTIME",
+        "db": {
+          "state": {
+            "client": "sqlite3",
+            "useNullAsDefault": true
+          },
+          "objects": {
+            "client": "sqlite3",
+            "useNullAsDefault": true
+          },
+          "inputs": {
+            "client": "sqlite3",
+            "useNullAsDefault": true
+          }
         }
       }
     },
-    "124": {
-      "name": "OCTIME",
-      "db": {
-        "state": {
-          "client": "sqlite3",
-          "useNullAsDefault": true
-        },
-        "objects": {
-          "client": "sqlite3",
-          "useNullAsDefault": true
-        },
-        "inputs": {
-          "client": "sqlite3",
-          "useNullAsDefault": true
-        }
-      }
-    }
-  },
-  "devices": {"123": "SPEC", "1105": "SPEC", "1101": "SPEC"}
-}
+    "devices": {"123": "SPEC", "1105": "SPEC", "1101": "SPEC"}
+  }
