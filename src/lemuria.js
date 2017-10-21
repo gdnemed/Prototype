@@ -19,6 +19,7 @@ const sessions = require('./session/sessions')
 const globalServer = require('./global/globalServer')
 const registry = require('./registry/registry')
 
+//console.log('da')
 let log
 
 const invokeLocal = (service, methodName, session, parameters) => {
