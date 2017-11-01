@@ -2,9 +2,9 @@
 // Service for clockings export. Calls Lemuria API and puts them into a text file.
 // -------------------------------------------------------------------------------------------
 
-var os = require('os')
-var path = require('path')
-var json2csv = require('json2csv')
+let os = require('os')
+let path = require('path')
+let json2csv = require('json2csv')
 const fs = require('fs')
 const request = require('request')
 const logger = require('../utils/log')
@@ -25,7 +25,7 @@ let headers = ['id', 'record', 'code', 'card', 'date', 'time', 'dir', 'ttype', '
 const init = () => {
   let params = g.getConfig().clockings
   if (!params) return Promise.resolve()
-  else {
+  else if (params && g.isLocalService('clockings')) {
     log = logger.getLogger('clockings')
     log.debug('>> clockings.init()')
     remoteService = g.getConfig().server
@@ -35,7 +35,7 @@ const init = () => {
     apiKey = '123'
     period = params.period !== undefined ? 60000 * params.period : 60000
     if (period === 0) { // As soon as possible
-      var eventSourceInitDict = {headers: {'Authorization': 'APIKEY ' + apiKey}}
+      let eventSourceInitDict = {headers: {'Authorization': 'APIKEY ' + apiKey}}
       let eventSource = new EventSource('http://' + remoteService.host + ':' + remoteService.port + '/api/coms/asap', eventSourceInitDict)
       eventSource.addEventListener('clocking', (e) => {
         writeClockings([JSON.parse(e.data)])
@@ -85,13 +85,13 @@ const writeClockings = (json) => {
   let filepath = path.join(remoteDir, fileName || ('clk' + utils.now() + '.csv'))
   fs.stat(filepath, function (err, stat) {
     let hasCSVColumnTitle = false
-    if (err != null) {
+    if (err !== null) {
       // If file doesn't exists, write headers if configured
       if (err.code !== 'ENOENT') throw err
       hasCSVColumnTitle = hasHeaders
     }
     // append csv row
-    var csv = json2csv({data: json, fields: headers, hasCSVColumnTitle: hasCSVColumnTitle})
+    let csv = json2csv({data: json, fields: headers, hasCSVColumnTitle: hasCSVColumnTitle})
     fs.appendFile(filepath, csv + (os.EOL || '\n'), function (err) {
       if (err) throw err
     })

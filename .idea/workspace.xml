@@ -2,13 +2,49 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="60065250-8683-47b5-baaa-027e62a1bbf9" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/Prototype.iml" afterPath="$PROJECT_DIR$/.idea/Prototype.iml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/OCTIME/M_inputs_2016.db" afterPath="$PROJECT_DIR$/Databases/OCTIME/M_inputs_2016.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/OCTIME/M_inputs_2017.db" afterPath="$PROJECT_DIR$/Databases/OCTIME/M_inputs_2017.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/OCTIME/M_inputs_2018.db" afterPath="$PROJECT_DIR$/Databases/OCTIME/M_inputs_2018.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/OCTIME/M_objects.db" afterPath="$PROJECT_DIR$/Databases/OCTIME/M_objects.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/OCTIME/M_state.db" afterPath="$PROJECT_DIR$/Databases/OCTIME/M_state.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/SPEC/M_inputs_2016.db" afterPath="$PROJECT_DIR$/Databases/SPEC/M_inputs_2016.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/SPEC/M_inputs_2017.db" afterPath="$PROJECT_DIR$/Databases/SPEC/M_inputs_2017.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/SPEC/M_inputs_2018.db" afterPath="$PROJECT_DIR$/Databases/SPEC/M_inputs_2018.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/SPEC/M_objects.db" afterPath="$PROJECT_DIR$/Databases/SPEC/M_objects.db" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Databases/SPEC/M_state.db" afterPath="$PROJECT_DIR$/Databases/SPEC/M_state.db" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/global.json" afterPath="$PROJECT_DIR$/global.json" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/index.js" afterPath="$PROJECT_DIR$/index.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/package.json" afterPath="$PROJECT_DIR$/package.json" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/coms/coms.js" afterPath="$PROJECT_DIR$/src/coms/coms.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/coms/idsense.js" afterPath="$PROJECT_DIR$/src/coms/idsense.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/exchange/clockings.js" afterPath="$PROJECT_DIR$/src/exchange/clockings.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/exchange/files.js" afterPath="$PROJECT_DIR$/src/exchange/files.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/global.js" afterPath="$PROJECT_DIR$/src/global.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/global/globalServer.js" afterPath="$PROJECT_DIR$/src/global/globalServer.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/httpServer.js" afterPath="$PROJECT_DIR$/src/httpServer.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/lemuria.js" afterPath="$PROJECT_DIR$/src/lemuria.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/logic.js" afterPath="$PROJECT_DIR$/src/logic.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/migrations.js" afterPath="$PROJECT_DIR$/src/migrations.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/objects/model.js" afterPath="$PROJECT_DIR$/src/objects/model.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/objects/modify.js" afterPath="$PROJECT_DIR$/src/objects/modify.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/objects/recursive.js" afterPath="$PROJECT_DIR$/src/objects/recursive.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/objects/selects.js" afterPath="$PROJECT_DIR$/src/objects/selects.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/registry/registry.js" afterPath="$PROJECT_DIR$/src/registry/registry.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/session/sessions.js" afterPath="$PROJECT_DIR$/src/session/sessions.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/state/state.js" afterPath="$PROJECT_DIR$/src/state/state.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/test/TestMgr.js" afterPath="$PROJECT_DIR$/test/TestMgr.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/test/scenarios/basic/clockings.spec.js" afterPath="$PROJECT_DIR$/test/scenarios/basic/clockings.spec.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/test/scenarios/basic/config.json" afterPath="$PROJECT_DIR$/test/scenarios/basic/config.json" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/test/scenarios/basic/export.spec.js" afterPath="$PROJECT_DIR$/test/scenarios/basic/export.spec.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/test/scenarios/basic/records.spec.js" afterPath="$PROJECT_DIR$/test/scenarios/basic/records.spec.js" />
     </list>
     <ignored path="$PROJECT_DIR$/.tmp/" />
     <ignored path="$PROJECT_DIR$/temp/" />
     <ignored path="$PROJECT_DIR$/tmp/" />
     <ignored path="Databases/" />
+    <ignored path="test/exchange_workdir/" />
+    <ignored path="test/export_clockings/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -19,6 +55,21 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300" />
   </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>TEST</find>
+      <find>_TEST</find>
+      <find>console.log.error</find>
+      <find>init</find>
+      <find>t.eventEmitter</find>
+      <find>connect</find>
+      <find>.connect</find>
+      <find>initializeCustomer</find>
+      <find>Prototype\test\scenarios\basic/db/</find>
+      <find>C:\Users\jdominguez\WebstormProjects</find>
+      <find>globalDB</find>
+    </findStrings>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -27,6 +78,15 @@
       <list>
         <option value="$PROJECT_DIR$/Prototype/src/session/trash.js" />
         <option value="$PROJECT_DIR$/.env" />
+        <option value="$PROJECT_DIR$/src/lemuria.js" />
+        <option value="$PROJECT_DIR$/test/scenarios/basic/clockings.spec.js" />
+        <option value="$PROJECT_DIR$/test/scenarios/basic/export.spec.js" />
+        <option value="$PROJECT_DIR$/test/scenarios/basic/records.spec.js" />
+        <option value="$PROJECT_DIR$/src/global/globalServer.js" />
+        <option value="$PROJECT_DIR$/src/session/sessions.js" />
+        <option value="$PROJECT_DIR$/test/TestMgr.js" />
+        <option value="$PROJECT_DIR$/test/scenarios/basic/lemuriaNodes.json" />
+        <option value="$PROJECT_DIR$/test/scenarios/basic/testWalk.js" />
       </list>
     </option>
   </component>
@@ -61,19 +121,12 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
-      <pane id="Scratches" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
             <path>
               <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
               <item name="Prototype" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
-              <item name="config" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
@@ -89,20 +142,84 @@
               <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
               <item name="Prototype" type="462c0819:PsiDirectoryNode" />
               <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="exchange" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
               <item name="global" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="session" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="state" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+              <item name="exchange_sources" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+              <item name="exchange_workdir" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+              <item name="export_clockings" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+              <item name="scenarios" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Prototype" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Prototype" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+              <item name="scenarios" type="462c0819:PsiDirectoryNode" />
+              <item name="basic" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
+      <pane id="Scratches" />
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/Databases" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/test/export_clockings" />
     <property name="nodejs_interpreter_path" value="/usr/bin/node" />
     <property name="HbShouldOpenHtmlAsHb" value="" />
-    <property name="settings.editor.selected.configurable" value="project.propVCSSupport.Mappings" />
+    <property name="settings.editor.selected.configurable" value="preferences.sourceCode.JavaScript" />
+    <property name="node.js.path.for.package.eslint" value="project" />
+    <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.selected.package.eslint" value="$PROJECT_DIR$/node_modules/eslint" />
+    <property name="nodejs.mocha.mocha_node_package_dir" value="$PROJECT_DIR$/node_modules/mocha" />
+    <property name="node.js.path.for.package.standard" value="project" />
+    <property name="node.js.detected.package.standard" value="true" />
+    <property name="node.js.selected.package.standard" value="$PROJECT_DIR$/node_modules/standard" />
+    <property name="standardjs.codestyle.accepted" value="true" />
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
@@ -117,7 +234,7 @@
     </option>
   </component>
   <component name="RunManager" selected="Node.js.Lemuria">
-    <configuration name="Lemuria" type="NodeJSConfigurationType" factoryName="Node.js" path-to-node="project" path-to-js-file="index.js" application-parameters="--home /home/xhose/Work/Prototype/config/lemuria --bootUp global,registry,logic,coms --ip 127.0.0.1 --port 8081 --registry 127.0.0.1:8081" working-dir="$PROJECT_DIR$">
+    <configuration name="Lemuria" type="NodeJSConfigurationType" factoryName="Node.js" path-to-node="project" path-to-js-file="index.js" application-parameters="--home /home/xhose/Work/Prototype/config/lemuria --bootUp global,registry,state,logic,coms,files,clockings,migrations --ip 127.0.0.1 --port 8081 --registry 127.0.0.1:8081" working-dir="$PROJECT_DIR$">
       <EXTENSION ID="com.jetbrains.nodejs.remote.docker.NodeJSDockerRunConfigurationExtension">
         <option name="envVars">
           <list />
@@ -140,6 +257,23 @@
         </option>
       </EXTENSION>
     </configuration>
+    <configuration name="Test" type="mocha-javascript-test-runner" factoryName="Mocha">
+      <node-interpreter>project</node-interpreter>
+      <node-options />
+      <working-directory>$PROJECT_DIR$</working-directory>
+      <pass-parent-env>true</pass-parent-env>
+      <envs>
+        <env name="ROOT_TEST" value="/home/xhose/Work/Prototype/test" />
+      </envs>
+      <ui>bdd</ui>
+      <extra-mocha-options>--timeout 10000</extra-mocha-options>
+      <test-kind>PATTERN</test-kind>
+      <test-pattern>./test/scenarios/basic/*clockings.spec.js</test-pattern>
+    </configuration>
+    <list size="2">
+      <item index="0" class="java.lang.String" itemvalue="Mocha.Test" />
+      <item index="1" class="java.lang.String" itemvalue="Node.js.Lemuria" />
+    </list>
   </component>
   <component name="ShelveChangesManager" show_recycled="false">
     <option name="remove_strategy" value="false" />
@@ -154,21 +288,67 @@
       <workItem from="1505065425533" duration="222000" />
       <workItem from="1507486066662" duration="30000" />
       <workItem from="1508088598009" duration="52000" />
-      <workItem from="1508601738107" duration="1658000" />
+      <workItem from="1508601738107" duration="2492000" />
+      <workItem from="1508958152940" duration="45000" />
+      <workItem from="1508958448158" duration="5220000" />
+      <workItem from="1508964071740" duration="293000" />
+      <workItem from="1509044048151" duration="6053000" />
+      <workItem from="1509556435265" duration="18000" />
+      <workItem from="1509556534802" duration="325000" />
     </task>
+    <task id="LOCAL-00001" summary="b">
+      <created>1508603607133</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1508603607133</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
+  <component name="TestHistory">
+    <history-entry file="Test - 2017.10.25 at 22h 32m 39s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.25 at 22h 32m 51s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.25 at 22h 33m 04s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.25 at 22h 38m 55s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.25 at 22h 39m 33s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.25 at 22h 40m 28s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.25 at 22h 40m 50s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.25 at 22h 41m 27s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.26 at 20h 54m 32s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+    <history-entry file="Test - 2017.10.26 at 20h 57m 50s.xml">
+      <configuration name="Test" configurationId="mocha-javascript-test-runner" />
+    </history-entry>
+  </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="1962000" />
+    <option name="totallyTimeSpent" value="14750000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="0" y="27" width="1920" height="1020" extended-state="6" />
+    <frame x="260" y="47" width="1920" height="1020" extended-state="6" />
     <layout>
-      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.18229167" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24895833" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.4032967" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.71428573" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
@@ -192,57 +372,311 @@
     <ignored-roots>
       <path value="$PROJECT_DIR$/Prototype" />
     </ignored-roots>
+    <MESSAGE value="b" />
+    <option name="LAST_COMMIT_MESSAGE" value="b" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager />
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/Prototype/src/httpServer.js">
+    <entry file="file://$PROJECT_DIR$/src/logic.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="486">
-          <caret line="27" column="32" lean-forward="false" selection-start-line="27" selection-start-column="32" selection-end-line="27" selection-end-column="32" />
+        <state relative-caret-position="12996">
+          <caret line="722" column="18" lean-forward="false" selection-start-line="722" selection-start-column="18" selection-end-line="722" selection-end-column="18" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Prototype/src/session/trash.js">
+    <entry file="file://$PROJECT_DIR$/test/TestMgr.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="234">
-          <caret line="25" column="20" lean-forward="false" selection-start-line="25" selection-start-column="20" selection-end-line="25" selection-end-column="20" />
+        <state relative-caret-position="324">
+          <caret line="18" column="0" lean-forward="false" selection-start-line="18" selection-start-column="0" selection-end-line="19" selection-end-column="28" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="23515:23705" ph="{&quot;chai&quot;: chai...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/testWalk.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="270">
+          <caret line="15" column="62" lean-forward="true" selection-start-line="0" selection-start-column="0" selection-end-line="34" selection-end-column="20" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Prototype/src/httpServer.js">
+    <entry file="file://$PROJECT_DIR$/src/global/globalServer.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="684">
+          <caret line="42" column="2" lean-forward="false" selection-start-line="42" selection-start-column="2" selection-end-line="42" selection-end-column="2" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1786:1825" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/session/sessions.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1728">
+          <caret line="96" column="27" lean-forward="true" selection-start-line="96" selection-start-column="27" selection-end-line="96" selection-end-column="27" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+            <marker date="1509469426000" expanded="true" signature="11333:11335" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/.env">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="144">
+          <caret line="8" column="0" lean-forward="true" selection-start-line="8" selection-start-column="0" selection-end-line="8" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="414">
+          <caret line="23" column="0" lean-forward="true" selection-start-line="23" selection-start-column="0" selection-end-line="23" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/lemuriaNodes.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="342">
+          <caret line="19" column="7" lean-forward="true" selection-start-line="0" selection-start-column="0" selection-end-line="41" selection-end-column="1" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/lemuria.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1350">
+          <caret line="75" column="27" lean-forward="false" selection-start-line="70" selection-start-column="4" selection-end-line="75" selection-end-column="27" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1368:2007" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="1680:1790" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2013:2186" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2222:2635" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2266:2275" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2546:2618" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2637:2772" ph="/*...*/" />
+            <marker date="1509469426000" expanded="true" signature="2816:3405" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2908:3134" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2971:3086" ph="{&quot;name&quot;: 'Lemuria'...}" />
+            <marker date="1509469426000" expanded="true" signature="3249:3264" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="3424:3434" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/state/state.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="162">
+          <caret line="9" column="43" lean-forward="false" selection-start-line="9" selection-start-column="0" selection-end-line="9" selection-end-column="43" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/migrations.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3726">
+          <caret line="207" column="29" lean-forward="false" selection-start-line="207" selection-start-column="21" selection-end-line="207" selection-end-column="29" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/clockings.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1890">
+          <caret line="105" column="24" lean-forward="false" selection-start-line="105" selection-start-column="24" selection-end-line="105" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/logic.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13014">
+          <caret line="723" column="18" lean-forward="false" selection-start-line="723" selection-start-column="18" selection-end-line="723" selection-end-column="18" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/export.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1494">
+          <caret line="83" column="24" lean-forward="false" selection-start-line="83" selection-start-column="24" selection-end-line="83" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/records.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2034">
+          <caret line="113" column="24" lean-forward="false" selection-start-line="113" selection-start-column="24" selection-end-line="113" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/TestMgr.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2736">
+          <caret line="152" column="8" lean-forward="false" selection-start-line="152" selection-start-column="8" selection-end-line="152" selection-end-column="8" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="23515:23705" ph="{&quot;chai&quot;: chai...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/global/globalServer.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="756">
+          <caret line="46" column="2" lean-forward="false" selection-start-line="46" selection-start-column="2" selection-end-line="46" selection-end-column="2" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1786:1825" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/session/sessions.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1638">
+          <caret line="91" column="23" lean-forward="true" selection-start-line="41" selection-start-column="6" selection-end-line="41" selection-end-column="24" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+            <marker date="1509469426000" expanded="true" signature="11333:11335" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/lemuria.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1350">
+          <caret line="75" column="27" lean-forward="false" selection-start-line="70" selection-start-column="4" selection-end-line="75" selection-end-column="27" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1368:2007" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="1680:1790" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2013:2186" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2222:2635" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2266:2275" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2546:2618" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2637:2772" ph="/*...*/" />
+            <marker date="1509469426000" expanded="true" signature="2816:3405" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2908:3134" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2971:3086" ph="{&quot;name&quot;: 'Lemuria'...}" />
+            <marker date="1509469426000" expanded="true" signature="3249:3264" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="3424:3434" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/state/state.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="162">
+          <caret line="9" column="43" lean-forward="false" selection-start-line="9" selection-start-column="0" selection-end-line="9" selection-end-column="43" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/logic.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13014">
+          <caret line="723" column="18" lean-forward="false" selection-start-line="723" selection-start-column="18" selection-end-line="723" selection-end-column="18" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/migrations.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3726">
+          <caret line="207" column="29" lean-forward="false" selection-start-line="207" selection-start-column="21" selection-end-line="207" selection-end-column="29" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/clockings.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1890">
+          <caret line="105" column="24" lean-forward="false" selection-start-line="105" selection-start-column="24" selection-end-line="105" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/export.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1494">
+          <caret line="83" column="24" lean-forward="false" selection-start-line="83" selection-start-column="24" selection-end-line="83" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/records.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2034">
+          <caret line="113" column="24" lean-forward="false" selection-start-line="113" selection-start-column="24" selection-end-line="113" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/global/globalServer.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="756">
+          <caret line="46" column="2" lean-forward="false" selection-start-line="46" selection-start-column="2" selection-end-line="46" selection-end-column="2" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1786:1825" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/session/sessions.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="738">
+          <caret line="41" column="24" lean-forward="false" selection-start-line="41" selection-start-column="6" selection-end-line="41" selection-end-column="24" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+            <marker date="1509469426000" expanded="true" signature="11333:11335" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/TestMgr.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2736">
+          <caret line="152" column="8" lean-forward="false" selection-start-line="152" selection-start-column="8" selection-end-line="152" selection-end-column="8" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="23515:23705" ph="{&quot;chai&quot;: chai...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/lemuria.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1368:2007" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="1680:1790" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2013:2186" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2222:2635" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2266:2275" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2546:2618" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2637:2772" ph="/*...*/" />
+            <marker date="1509469426000" expanded="true" signature="2816:3405" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2908:3134" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2971:3086" ph="{&quot;name&quot;: 'Lemuria'...}" />
+            <marker date="1509469426000" expanded="true" signature="3249:3264" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="3424:3434" ph="{&quot;init&quot;: init...}" />
+          </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Prototype/src/session/trash.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="18">
-          <caret line="25" column="20" lean-forward="false" selection-start-line="25" selection-start-column="20" selection-end-line="25" selection-end-column="20" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/Prototype/src/httpServer.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="134">
-          <caret line="27" column="32" lean-forward="false" selection-start-line="27" selection-start-column="32" selection-end-line="27" selection-end-column="32" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/Prototype/src/httpServer.js" />
+    <entry file="file://$PROJECT_DIR$/Prototype/src/session/trash.js" />
+    <entry file="file://$PROJECT_DIR$/Prototype/src/httpServer.js" />
+    <entry file="file://$PROJECT_DIR$/Prototype/src/session/trash.js" />
+    <entry file="file://$PROJECT_DIR$/Prototype/src/httpServer.js" />
     <entry file="file://$PROJECT_DIR$/config/lemuria/config.json">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="180">
           <caret line="10" column="0" lean-forward="true" selection-start-line="10" selection-start-column="0" selection-end-line="10" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -250,7 +684,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="111">
           <caret line="129" column="40" lean-forward="false" selection-start-line="129" selection-start-column="40" selection-end-line="129" selection-end-column="40" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -258,15 +691,120 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/clockings.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1890">
+          <caret line="105" column="24" lean-forward="false" selection-start-line="105" selection-start-column="24" selection-end-line="105" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/export.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1494">
+          <caret line="83" column="24" lean-forward="false" selection-start-line="83" selection-start-column="24" selection-end-line="83" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/records.spec.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2034">
+          <caret line="113" column="24" lean-forward="false" selection-start-line="113" selection-start-column="24" selection-end-line="113" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/state/state.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="162">
+          <caret line="9" column="43" lean-forward="false" selection-start-line="9" selection-start-column="0" selection-end-line="9" selection-end-column="43" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/lemuria.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="666">
+          <caret line="37" column="27" lean-forward="false" selection-start-line="37" selection-start-column="27" selection-end-line="37" selection-end-column="27" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1368:2007" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="1680:1790" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2013:2186" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2222:2635" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2266:2275" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2546:2618" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2637:2772" ph="/*...*/" />
+            <marker date="1509469426000" expanded="true" signature="2816:3405" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2908:3134" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="2971:3086" ph="{&quot;name&quot;: 'Lemuria'...}" />
+            <marker date="1509469426000" expanded="true" signature="3249:3264" ph="{...}" />
+            <marker date="1509469426000" expanded="true" signature="3424:3434" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/migrations.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="818">
+          <caret line="207" column="29" lean-forward="false" selection-start-line="207" selection-start-column="21" selection-end-line="207" selection-end-column="29" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/logic.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="18">
+          <caret line="851" column="18" lean-forward="false" selection-start-line="851" selection-start-column="18" selection-end-line="851" selection-end-column="18" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/TestMgr.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="324">
+          <caret line="18" column="0" lean-forward="false" selection-start-line="18" selection-start-column="0" selection-end-line="19" selection-end-column="28" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="23515:23705" ph="{&quot;chai&quot;: chai...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/lemuriaNodes.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="342">
+          <caret line="19" column="7" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="41" selection-end-column="1" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/testWalk.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="270">
+          <caret line="15" column="62" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="34" selection-end-column="20" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/global/globalServer.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="378">
-          <caret line="43" column="1" lean-forward="false" selection-start-line="43" selection-start-column="1" selection-end-line="43" selection-end-column="1" />
-          <folding />
+        <state relative-caret-position="738">
+          <caret line="45" column="2" lean-forward="false" selection-start-line="45" selection-start-column="2" selection-end-line="45" selection-end-column="2" />
+          <folding>
+            <marker date="1509469426000" expanded="true" signature="1786:1825" ph="{&quot;init&quot;: init...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/session/sessions.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="818">
+          <caret line="250" column="27" lean-forward="false" selection-start-line="250" selection-start-column="27" selection-end-line="250" selection-end-column="27" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+            <marker date="1509469426000" expanded="true" signature="11333:11335" ph="{&quot;init&quot;: init...}" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -274,6 +812,14 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="144">
           <caret line="8" column="0" lean-forward="false" selection-start-line="8" selection-start-column="0" selection-end-line="8" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/scenarios/basic/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="414">
+          <caret line="23" column="0" lean-forward="false" selection-start-line="23" selection-start-column="0" selection-end-line="23" selection-end-column="0" />
           <folding />
         </state>
       </provider>

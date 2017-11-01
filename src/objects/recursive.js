@@ -78,10 +78,17 @@ const getObjectProperty = (modelProperty, property, squery, elem, isEntity, id) 
         if (squery[p]) r.t1 = typeof elem[p] === 'string' ? parseInt(elem[p]) : elem[p]
       } else if (squery[p] === 't2') {
         if (squery[p]) r.t2 = typeof elem[p] === 'string' ? parseInt(elem[p]) : elem[p]
-      } else if (squery[p] === 'value') r.value = elem[p]
+      } if (squery[p] === 'value') {
+        if (modelProperty.type === 'json') {
+          r.value = JSON.stringify(elem[p])
+        } else r.value = elem[p]
+      }
     }
   }
-  if (typeof elem === 'string' || typeof elem === 'number') r.value = elem
+  if (modelProperty.type === 'json') r.value = JSON.stringify(elem)
+  else if (modelProperty.type === 'binary') r.value = elem
+  else if (typeof elem === 'string' || typeof elem === 'number') r.value = elem
+
   // For entities (not inputs), time counts
   if (isEntity) {
     r.entity = id
@@ -348,20 +355,20 @@ squery, data, extraFunction) => {
     let relDataList = isArray ? data : [data]
     if (squery._total_) prepareTotalHistoric(relDataList, modelRelation.time)
     let parent = variables._parent_
-    putRelationItem(session, stateService, relDataList, 0,
+    putRelationItem(session, stateService, variables, relDataList, 0,
 newStr, squery, relation, modelRelation, forward, parent)
       .then(resolve).catch(reject)
   })
 }
 
-const putRelationItem = (session, stateService, relDataList, i,
+const putRelationItem = (session, stateService, variables, relDataList, i,
 newStr, relObj, relation, modelRelation, forward, parent) => {
   return new Promise((resolve, reject) => {
-    if (i >= relDataList.length) resolve()
+    if (i >= relDataList.length) resolve(i)
     else {
-      putElemRelation(session, stateService, newStr, relObj,
+      putElemRelation(session, stateService, variables, newStr, relObj,
 relation, modelRelation, relDataList[i], forward, parent)
-        .then(() => putRelationItem(session, stateService, relDataList, i + 1,
+        .then(() => putRelationItem(session, stateService, variables, relDataList, i + 1,
 newStr, relObj, relation, modelRelation, forward, parent))
         .then(resolve).catch(reject)
     }
@@ -371,21 +378,20 @@ newStr, relObj, relation, modelRelation, forward, parent))
 /*
 Treats every single element related with the main entity to put
 */
-const putElemRelation = (session, stateService, newStr, relObj,
+const putElemRelation = (session, stateService, variables, newStr, relObj,
 relation, modelRelation, relData, forward, parent) => {
   return new Promise((resolve, reject) => {
     let t1, t2
     for (let p in relObj) {
-      if (relObj.hasOwnProperty(p)) {
+      if (relObj.hasOwnProperty(p) && p.charAt(0) !== '_') {
         switch (p) {
-          case '_relation_':
+          case 't1':
+            if (relData[p]) t1 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
             break
-          default:
-            if (relObj[p] === 't1') {
-              if (relData[p]) t1 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
-            } else if (relObj[p] === 't2') {
-              if (relData[p]) t2 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
-            } else newStr[p] = relObj[p]
+          case 't2':
+            if (relData[p]) t2 = typeof relData[p] === 'string' ? parseInt(relData[p]) : relData[p]
+            break
+          default:newStr[p] = relObj[p]
         }
       }
     }
@@ -395,7 +401,7 @@ relation, modelRelation, relData, forward, parent) => {
       if (!t2) t2 = modelRelation.time ? CT.END_OF_TIME : CT.END_OF_DAYS
     }
     // Recursively call put
-    parent.put(session, stateService, {}, newStr, relData, null)
+    parent.put(session, stateService, variables, newStr, relData, null)
       .then((id) => {
         let table
         let db = session.dbs['objects']

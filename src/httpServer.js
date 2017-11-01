@@ -9,6 +9,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const logger = require('./utils/log')
 const g = require('./global')
+const perf = require('./performance')
 
 let _api
 let lg
@@ -34,39 +35,23 @@ const init = () => {
         else {
           let address = httpServer.address()
           lg.info('API listening at port ' + address.port)
+          // Statistics treatment
+          _api.use((req, res, next) => {
+            let start = Date.now()
+            res.on('finish', () => {
+              let end = Date.now()
+              let t = end - start
+              perf.updateStatistics(req.url, end, t)
+            })
+            next()
+          })
           // Every node should be checked
-          _api.get('/api/registry/check', (req, res) => responseCheckTest(req, res))
+          _api.get('/api/registry/check', (req, res) => res.jsonp(perf.getStatistics()))
           resolve()
         }
       })
     })
   } else return Promise.resolve()
-}
-
-// TESTING
-// Checking heartbeat testing function
-const responseCheckTest = (req, res) => {
-  let response = {
-    'host': '127.0.0.1:8081',
-    'service': ['logic', 'com', 'test'],
-    'environment': 'dev',
-    'address': {
-      'protocol': 'http',
-      'server': '127.0.0.1',
-      'port': '8081'
-    },
-    'request': {
-      'protocol': 'http',
-      'server': '127.0.0.1',
-      'port': '8081'
-    },
-    'version': '1.1',
-    'time': '',
-    'load': '75'
-  }
-
-  // res.jsonp(response)
-  res.jsonp({'service': []})
 }
 
 module.exports = {

@@ -3,13 +3,28 @@
 // -------------------------------------------------------------------------------------------
 
 const ENTITIES = {
+  'terminal': {
+    keysList: [
+      {
+        fields: [{field: 'name'}]
+      }
+    ],
+    required: ['name']
+  },
+  'location': {
+    keysList: [
+      {
+        fields: [{field: 'name'}]
+      }
+    ],
+    required: ['name']
+  },
   'card': {
     keysList: [
       {
         fields: [{field: 'code'}]
       }
     ],
-    keys: [['code']],
     required: ['code']
   },
   'record': {
@@ -21,7 +36,6 @@ const ENTITIES = {
         fields: [{field: 'code'}]
       }
     ],
-    keys: [['document'], ['code']],
     required: ['code', 'document', 'name'],
     related_from: {identifies: 'card'}
   },
@@ -31,7 +45,6 @@ const ENTITIES = {
         fields: [{field: 'code'}]
       }
     ],
-    keys: [['code']],
     required: ['code', 'intname']
   },
   'node': {
@@ -40,7 +53,6 @@ const ENTITIES = {
         fields: [{field: 'code'}]
       }
     ],
-    keys: [['code']],
     required: ['code'],
     related_from: {runsIn: 'service'}
   },
@@ -52,7 +64,6 @@ const ENTITIES = {
       }
     ],
     keyDependence: 'runsIn->',
-    keys: [['code']],
     required: ['code']
   }
 }
@@ -60,7 +71,7 @@ const ENTITIES = {
 const PROPERTIES = {
   'language': {type: 'string', time: false},
   'info': {type: 'string', time: false},
-  'enroll': {type: 'datetime', time: true},
+  'enroll': {type: 'string', time: false},
   'validity': {type: 'datetime', time: false},
   'ttgroup': {type: 'string', time: false},
   'revision': {type: 'number', time: true},
@@ -76,7 +87,9 @@ const PROPERTIES = {
   'output': {type: 'boolean'},
   'period': {type: 'number'},
   'fileName': {type: 'string'},
-  'deleteFile': {type: 'boolean'}
+  'deleteFile': {type: 'boolean'},
+  'config': {type: 'json'},
+  'fingerprint': {type: 'binary'}
 }
 
 const INPUTS = {
@@ -86,7 +99,9 @@ const INPUTS = {
 
 const RELATIONS = {
   'identifies': {type: 'N->1', time: false},
-  'runsIn': {type: 'N->1', time: false}
+  'runsIn': {type: 'N->1', time: false},
+  'locatedIn': {type: 'N->1', time: true},
+  'installedIn': {type: 'N->1', time: true}
 }
 
 const getTypeProperty = (p) => {
@@ -97,7 +112,8 @@ const getType = (t) => {
   switch (t) {
     case 'string': return 'str'
     case 'number': return 'num'
-    case 'blob': return 'bin'
+    case 'json': return 'bin'
+    case 'binary': return 'bin'
     case 'boolean': return 'num'
     case 'date': return 'num'
     case 'datetime': return 'num'

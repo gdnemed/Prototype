@@ -19,26 +19,7 @@ const sessions = require('./session/sessions')
 const globalServer = require('./global/globalServer')
 const registry = require('./registry/registry')
 
-//console.log('da')
 let log
-
-const invokeLocal = (service, methodName, session, parameters) => {
-  return new Promise((resolve, reject) => {
-    log.debug('LEMURIA invokeLocal: ' + service + '.' + methodName)
-    switch (service) {
-      case 'state':
-        state[methodName](session, parameters)
-          .then(resolve).catch(reject)
-        break
-      case 'global':
-        globalServer[methodName](session, parameters)
-          .then(resolve).catch(reject)
-        break
-      default:
-        reject(new Error('Invoked service method does not exists: ' + service + '.' + methodName))
-    }
-  })
-}
 
 const init = (params) => {
   // logger initialization
@@ -49,16 +30,19 @@ const init = (params) => {
     if ((!startService && !endService)) {
       console.log('Starting lemuria as application')
       // Initialization of global module (so far, sync). If sometimes becomes async, promise.then() will be needed to use
-      g.init(params, invokeLocal)
+      g.init(params)
         .then(httpServer.init)
         .then(globalServer.init)
         .then(registry.init)
         .then(sessions.init)
         .then(initServices)
         .then(g.registerHostedServices)
-        .then(g.getServicesRegistry)
         .then(() => {
-          g.initJobReloadServicesList()
+          // If is a forked proccess, send INIT message
+          if (process.send !== undefined) {
+            let msg = {'init': 'Started: ' + g.getConfig().nodeId}
+            process.send(msg)
+          }
           log.info('Application ready...')
           resolve()
         })

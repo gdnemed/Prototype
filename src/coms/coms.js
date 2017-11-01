@@ -221,7 +221,7 @@ const refreshClocks = () => {
 }
 
 module.exports = {
-
+  serviceName: 'coms',
   init: init,
   send: send,
   globalSend: globalSend

@@ -66,7 +66,7 @@ const migrateSection = (customer, section, dbs, year) => {
     connect(true, customer, section, dbs, year)
       .then((sec) => {
         // Global service must do migrations
-        if (g.isLocalService('global')) {
+        if (g.isLocalService('migrations')) { // global
           log.debug(`Invoking knex.migrate.latest() for ${sec}`)
           dbs[sec].migrate.latest()
             .then((result) => {

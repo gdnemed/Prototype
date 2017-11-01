@@ -38,6 +38,16 @@ if (process.argv.indexOf('--coms') !== -1) {
   params.comsListen = {host: s[0], port: parseInt(s[1])}
 }
 
+if (process.argv.indexOf('--nodeId') !== -1) {
+  params.nodeId = process.argv[process.argv.indexOf('--nodeId') + 1]
+  console.log('Lemuria NODE_ID: ' + params.nodeId)
+}
+
+if (process.argv.indexOf('--env') !== -1) {
+  params.environment = process.argv[process.argv.indexOf('--env') + 1]
+  console.log('Lemuria NODE_ENV: ' + params.environment)
+}
+
 let lemuria = require('./src/lemuria')
 lemuria.init(params)
 module.exports = lemuria

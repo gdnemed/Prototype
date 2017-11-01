@@ -20,9 +20,9 @@ let nodeId = 1
 - squery: Structured query, which tells the program how to build the result
 
 Returns an object (or array) following the description in squery. */
-const get = (session, data, squery) => {
+const get = (session, data, squery, parentId, queryType) => {
   return new Promise((resolve, reject) => {
-    let guide = createGuide(squery)
+    let guide = createGuide(squery, parentId, queryType)
     let db = getDB(session, squery, guide)
     let statement = getStatement(session, db, squery, guide, data)
     // Everything prepared, let's do the work
@@ -61,18 +61,22 @@ const getStatement = (session, db, squery, guide, data) => {
   // Let's get fields
   for (let property in squery) {
     if (squery.hasOwnProperty(property)) {
-      processGuideField(guide, property, squery[property])
+      processGuideField(squery, guide, property, squery[property])
     }
   }
   let initialStatement = getInitialStatement(guide, db, session)
   // Additional conditions
-  addFilter(db, initialStatement, squery._filter_, data)
+  addFilter(db, initialStatement, guide, squery._filter_, data)
   // Build statement with its joins, etc
   let statement = buildStatement(initialStatement, db, guide, session)
   setOrder(statement, data)
-  let sql = statement.toSQL()
-  log.trace(sql)
-  return statement
+  try {
+    /* let sql = statement.toSQL()
+    log.trace(sql) */
+    return statement
+  } catch (exc) {
+    log.error(exc)
+  }
 }
 
 /* Selects simple properties or directly related data (not arrays) */
@@ -114,6 +118,14 @@ const getInitialStatement = (guide, db, session) => {
   return statement.as('t0')
 }
 
+const lookBrackets = (guide, field) => {
+  // Array or object
+  if (field && field.charAt(0) === '[') {
+    guide.isArray = true
+    return field.substring(1, field.length - 1)
+  } else return field
+}
+
 /* Creates a guide object from the squery structure, which contains information about
 * how the sentence should be created. Returns the guide, which contains:
 * - type: Constant which says if it's a query over entities or over inputs, and if its id-based or type-based.
@@ -125,11 +137,13 @@ const getInitialStatement = (guide, db, session) => {
 *   (not hidden fields like _id_, _entity_, etc.) which map data from DB to object.
 * - timeFields: Fields containing time values.
 * - dateFields: Fields containing time values.
+* - binaryField: Fields stored as binary objects.
 * - parseNeeded: Field which need to be parsed to JSON.
 * - forward: In relation, is true if relation must assume _id_ as id1, to get id2, or otherwise.
+* - entityRelated: If relation, it's possible to specify which type must be related to.
 * The rest of fields are described in processGuideField()
 */
-const createGuide = (squery) => {
+const createGuide = (squery, parentId, queryType) => {
   let guide = {
     simpleProps: [],
     properties: [],
@@ -140,31 +154,34 @@ const createGuide = (squery) => {
     dateFields: [],
     numberFields: [],
     parseNeeded: [],
+    binaryFields: [],
     isArray: false,
     directFields: false,
     type: FROM_ENTITY
   }
+
   // Type of query
   if (squery._inputs_) {
     guide.type = FROM_INPUTS
     guide.value = squery._inputs_
     if (squery._inputs_ === 'now') {
-      guide.period = utils.momentNow().format('YYYYMM')
-    } else guide.period = squery._inputs_
+      guide.period = lookBrackets(guide, utils.momentNow().format('YYYYMM'))
+    } else guide.period = lookBrackets(guide, squery._inputs_)
     guide.value = guide.period
   } else if (squery._entity_) {
     guide.type = FROM_ENTITY
-    guide.value = squery._entity_
+    guide.value = lookBrackets(guide, squery._entity_)
   } else if (squery._property_) {
     guide.type = FROM_PROPERTY
-    guide.value = squery._property_
-    guide.id = squery._id_
+    guide.value = lookBrackets(guide, squery._property_)
+    guide.id = parentId
   } else if (squery._relation_) {
     guide.type = FROM_RELATION
-    guide.value = squery._relation_
-    guide.id = squery._id_
+    guide.value = lookBrackets(guide, squery._relation_)
+    guide.id = parentId
     guide.relationFields = []
     guide.entityFields = []
+    // Get direction and recursion
     let arrow = guide.value.indexOf('->')
     if (arrow >= 0) {
       guide.forward = true
@@ -172,16 +189,21 @@ const createGuide = (squery) => {
       guide.forward = false
       arrow = guide.value.indexOf('<-')
     }
-    guide.value = guide.value.substring(0, arrow) + guide.value.substring(arrow + 2)
-  } else if (squery._id_) {
+    if (arrow < guide.value.length - 1) {
+      guide.entityRelated = guide.value.substring(arrow + 2)
+    }
+    guide.value = guide.value.substring(0, arrow)
+  } else if (parentId) {
     guide.type = FROM_ID
-    guide.id = squery._id_
+    guide.id = parentId
   }
-  // Array or object
-  if (guide.value && guide.value.charAt(0) === '[') {
-    guide.isArray = true
-    guide.value = guide.value.substring(1, guide.value.length - 1)
+  // If we descend throug relations, it's useful to know if we come from entities or inputs
+  if (queryType) guide.origin = queryType
+  else if (squery._filter_) {
+    if (squery._filter_.entity) guide.origin = FROM_ENTITY
+    else guide.origin = FROM_INPUTS
   }
+
   return guide
 }
 
@@ -194,10 +216,10 @@ const createGuide = (squery) => {
  * - withEntity: true if information from entity must be get.
  * - linkOwner: true if a subquery over entities must be done, with the owner of the input.
  */
-const processGuideField = (guide, property, val) => {
+const processGuideField = (squery, guide, property, val) => {
   if (property.charAt(0) !== '_' || property === '_field_') {
     if (typeof val === 'string') {
-      processSimpleField(guide, property, val)
+      processSimpleField(squery, guide, property, val)
     } else {
       // Related properties and objects
       if (val._property_) {
@@ -207,13 +229,19 @@ const processGuideField = (guide, property, val) => {
           let str = {real: val._property_, visual: property, fields: getDirectFields(val)}
           if (MODEL.getTypeProperty(val._property_) === 'num') guide.numberFields.push(property)
           guide.properties.push(str)
+          // If binary, mark it
+          switch (MODEL.PROPERTIES[val._property_].type) {
+            case 'binary':guide.binaryFields.push(property)
+              break
+            case 'json':guide.parseNeeded.push(property)
+          }
         }
       } else if (val._relation_) {
         if (val._relation_.charAt(0) === '[') {
           guide.relations.push({squery: val, visual: property})
         } else if (val._relation_ === 'owner') {
           // Input owner
-          processSimpleField(guide, '_owner_', 'owner')
+          processSimpleField(squery, guide, '_owner_', 'owner')
           let cloned = JSON.parse(JSON.stringify(val))
           delete cloned._relation_
           guide.linkOwner = {squery: cloned, visual: property}
@@ -239,37 +267,49 @@ const processGuideField = (guide, property, val) => {
 }
 
 /* User fields (visible) treatment */
-const processSimpleField = (guide, property, val) => {
-  let f = {real: val, visual: property}
-  // basic fields treatment
-  guide.simpleProps.push(f)
-  guide.directFields = true
-  switch (val) {
-    case 'intname': guide.parseNeeded.push(property)
-      break
-    case 't1': case 't2':
-      let time
-      if (guide.type === FROM_RELATION) {
-        let r = MODEL.RELATIONS[guide.value]
-        time = r.time
-        guide.relationFields.push(f)
-      } else {
-        let r = MODEL.PROPERTIES[guide.value]
-        time = r.time
-      }
-      if (time) guide.timeFields.push(property)
-      else guide.dateFields.push(property)
-      guide.numberFields.push(property)
-      break
-    default:
-      if (guide.type === FROM_RELATION) {
-        guide.entityFields.push(f)
-      }
-      switch (val) {
-        case 'id': case 'result': case 'source': case 'owner':
-        case 'tmp': case 'gmt': case 'reception':
-          guide.numberFields.push(property)
-      }
+const processSimpleField = (squery, guide, property, val) => {
+  if (val === 'recursive') {
+    guide.recursive = true
+    guide.relations.push({squery: squery, recursive: true, visual: property})
+  } else {
+    let f = {real: val, visual: property}
+    // basic fields treatment
+    guide.simpleProps.push(f)
+    guide.directFields = true
+    switch (val) {
+      case 'intname':
+        guide.parseNeeded.push(property)
+        break
+      case 't1':
+      case 't2':
+        let time
+        if (guide.type === FROM_RELATION) {
+          let r = MODEL.RELATIONS[guide.value]
+          time = r.time
+          guide.relationFields.push(f)
+        } else {
+          let r = MODEL.PROPERTIES[guide.value]
+          time = r.time
+        }
+        if (time) guide.timeFields.push(property)
+        else guide.dateFields.push(property)
+        guide.numberFields.push(property)
+        break
+      default:
+        if (guide.type === FROM_RELATION) {
+          guide.entityFields.push(f)
+        }
+        switch (val) {
+          case 'id':
+          case 'result':
+          case 'source':
+          case 'owner':
+          case 'tmp':
+          case 'gmt':
+          case 'reception':
+            guide.numberFields.push(property)
+        }
+    }
   }
 }
 
@@ -355,27 +395,47 @@ const getProperty = (parent, guide) => {
   }
   let query = parent.from(table)
   if (typeof guide.id === 'string') guide.id = parseInt(guide.id)
-  if (!guide.directFields) query.column('value as _field_')
+  if (!guide.directFields) {
+    query.column('value as _field_')
+    switch (MODEL.PROPERTIES[guide.value].type) {
+      case 'binary': guide.binaryFields.push('_field_')
+        break
+      case 'json': guide.parseNeeded.push('_field_')
+        break
+    }
+  }
   query.where(link, guide.id)
   query.where('property', guide.value)
   return query
 }
 
 const getRelation = (parent, guide, session) => {
+  let query
   let rt = 'relation_' + nodeId
-  let query = parent.from(rt)
-  if (typeof guide.id === 'string') guide.id = parseInt(guide.id)
-  let related = guide.forward ? 'id2' : 'id1'
-  query.column(`${related} as _id_`)
-  // let rel = MODEL.RELATIONS[guide.value]
-  // selectFields(query, guide.relationFields, rel.time, guide)
-  query.where(guide.forward ? 'id1' : 'id2', guide.id)
-  query.whereIn('relation', [guide.value])
-  // If there are fields of the related entity, join it
-  if (guide.entityFields) {
-    let et = 'entity_' + nodeId
-    query.join(et, 'id', related)
-    // selectFields(query, guide.entityFields, rel.time, guide)
+  if (guide.recursive && !guide.id) {
+    // Another posibility: root level of a recursive relation
+    query = parent.from('entity_' + nodeId).where('type', guide.entityRelated)
+    query.column('id as _id_')
+    query.whereNotIn('id', (sq) => {
+      sq.column(guide.forward ? 'id2' : 'id1').from(rt).where('relation', guide.value)
+      // TODO: add entity if relation is restricted to a type
+    })
+  } else {
+    query = parent.from(rt)
+    let related = guide.forward ? 'id2' : 'id1'
+    query.column(`${related} as _id_`)
+    // Typical way: filter by previous id
+    if (guide.id) {
+      if (typeof guide.id === 'string') guide.id = parseInt(guide.id)
+      query.where(guide.forward ? 'id1' : 'id2', guide.id)
+    }
+    query.whereIn('relation', [guide.value])
+    // If there are fields of the related entity, join it
+    if (guide.entityFields) {
+      let et = 'entity_' + nodeId
+      query.join(et, 'id', related)
+      // selectFields(query, guide.entityFields, rel.time, guide)
+    }
   }
   let sql = query.toSQL()
   log.trace(sql)
@@ -385,7 +445,7 @@ const getRelation = (parent, guide, session) => {
 // ///////////////////////////////////////////////////// //
 
 /* Adds a 'where' condition */
-const addFilter = (db, statement, f, data) => {
+const addFilter = (db, statement, guide, f, data) => {
   if (f) {
     let value
     if (f.variable) value = data[f.variable]
@@ -395,9 +455,18 @@ const addFilter = (db, statement, f, data) => {
       switch (f.field) {
         case 'name': case 'name2': case 'intname':
         case 'code': case 'document': case 'id':
-          // Condition over simple field
-          if (f.condition) statement.where(f.field, f.condition, value)
-          else statement.where(f.field, value)
+          if (guide.type === FROM_RELATION) {
+            // Subquery for relations
+            statement.whereIn(guide.forward ? 'id1' : 'id2', (st) => {
+              st.column('id').from('entity_' + nodeId).where('type', f.entity)
+              if (f.condition) st.where(f.field, f.condition, value)
+              else st.where(f.field, value)
+            })
+          } else {
+            // Condition over simple field
+            if (f.condition) statement.where(f.field, f.condition, value)
+            else statement.where(f.field, value)
+          }
           break
         default: // Condition over property
           let type = MODEL.getTypeProperty(f.field)
@@ -432,7 +501,7 @@ fields, index, mandatory) => {
   let type = MODEL.getTypeProperty(property)
   let prop = MODEL.PROPERTIES[property]
   let pt, link
-  if (guide.type === FROM_ENTITY) {
+  if (guide.type === FROM_ENTITY || guide.origin === FROM_ENTITY) {
     pt = `property_${type}_${nodeId}`
     link = 'p' + (index + 1) + '.entity'
   } else {
@@ -455,6 +524,7 @@ fields, index, mandatory) => {
     // Rare, but possible: someone could want to get also dates
     if (fields.length > 0) selectFields(q, fields, prop.time, guide)
     else q.column('value as ' + visible)
+    // Alias for query
     q.as(tableName)
   }
   return newJoin
@@ -522,9 +592,9 @@ const addSimpleRelation = (parent, session, guide, relation, index) => {
 /* Makes recursive calls for every related array, that is, an historic property or a complete relation */
 const includeRelatedArrays = (session, data, guide, row) => {
   return new Promise((resolve, reject) => {
-    addHistProperty(session, data, guide.histProps, row, 0)
+    addHistProperty(session, guide, data, guide.histProps, row, 0)
       .then(() => {
-        addRelation(session, data, guide.relations, row, 0)
+        addRelation(session, guide, data, guide.relations, row, 0)
           .then(() => linkOwner(session, guide, data, row))
           .then(resolve).catch(reject)
       })
@@ -540,8 +610,7 @@ const linkOwner = (session, guide, data, row) => {
     if (guide.linkOwner) {
       if (row._owner_ !== null && row._owner_ !== undefined) {
 // Link previous entity with query
-        guide.linkOwner.squery._id_ = row._owner_
-        get(session, data, guide.linkOwner.squery)
+        get(session, data, guide.linkOwner.squery, row._owner_, guide.type)
           .then((result) => {
             // change hidden field _owner_ with result
             delete row._owner_
@@ -566,17 +635,16 @@ const linkOwner = (session, guide, data, row) => {
  - n: Index into the list
  - row: parent row
 */
-const addHistProperty = (session, data, list, row, n) => {
+const addHistProperty = (session, guide, data, list, row, n) => {
   return new Promise((resolve, reject) => {
     if (n >= list.length) resolve()
     else {
       let e = list[n]
       // Link previous entity with query
-      e.squery._id_ = row._id_
-      get(session, data, e.squery)
+      get(session, data, e.squery, row._id_, guide.type)
         .then((result) => {
           row[e.visual] = result
-          addHistProperty(session, data, list, row, n + 1)
+          addHistProperty(session, guide, data, list, row, n + 1)
             .then(resolve).catch(reject)
         })
         .catch(reject)
@@ -589,17 +657,18 @@ const addHistProperty = (session, data, list, row, n) => {
  - n: Index into the list
  - row: parent row
 */
-const addRelation = (session, data, list, row, n) => {
+const addRelation = (session, guide, data, list, row, n) => {
   return new Promise((resolve, reject) => {
     if (n >= list.length) resolve()
     else {
       let e = list[n]
       // Link previous entity with query
-      e.squery._id_ = row._id_
-      get(session, data, e.squery)
+      get(session, data, e.squery, row._id_, guide.type)
         .then((result) => {
-          row[e.visual] = result
-          addRelation(session, data, list, row, n + 1)
+          if (e.recursive) {
+            if (result != null && result.length > 0) row[e.visual] = result
+          } else row[e.visual] = result
+          addRelation(session, guide, data, list, row, n + 1)
             .then(resolve).catch(reject)
         })
         .catch(reject)
@@ -655,6 +724,13 @@ const cleanResult = (row, squery, guide) => {
   for (let j = 0; j < r.length; j++) {
     if (row[r[j]] !== undefined && row[r[j]] !== null) {
       row[r[j]] = JSON.parse(row[r[j]])
+    }
+  }
+  // Binary fields
+  r = guide.binaryFields
+  for (let j = 0; j < r.length; j++) {
+    if (row[r[j]] !== undefined && row[r[j]] !== null) {
+      // TODO
     }
   }
   // Post transformations

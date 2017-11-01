@@ -21,6 +21,7 @@ const path = require('path')
 const g = require('../src/global')
 const sessions = require('../src/session/sessions')
 const migrations = require('../src/migrations.js')
+const cp = require('child_process')
 // -------------------------------------------------------------------------------------------
 // "Lemuria" services creation. "get()" procedure using '_t' as a cache
 // -------------------------------------------------------------------------------------------
@@ -28,21 +29,47 @@ let lemuria
 let _lemuriaInitialized = false
 let terminal
 let _terminalInitialized = false
+let forksReady = 0
+let remotesReady = 0
 
-const loadJsonFile = () => {
-  let fileName = process.env.LEMURIA_HOME + '/config.json'
+const loadJsonFile = (file) => {
+  let fileName = process.env.LEMURIA_HOME + '/' + file
   try {
-    console.log(`Using file ${fileName}`)
+    console.log(`Using config file ${fileName}`)
     return fs.readFileSync(fileName, 'utf8')
   } catch (err) {
     console.log(`File not found ${fileName}`)
   }
 }
 
-const startLemuria = () => {
+/*
+ *  Function to iterate config json properties of lemuria nodes and convert them into an array of args
+ *  Needed to fork lemuria processes
+ */
+const walkRecursive = (node, args, parentProperties) => {
+  for (let prop in node) {
+    if (typeof node[prop] === 'object' && node[prop] !== null) {
+      let parentProperty = (parentProperties) ? parentProperties.concat([prop]) : [prop]
+      walkRecursive(node[prop], args, parentProperty)
+    } else {
+      // Leaf node, do whatever with it...
+      let arg = []
+      let nodePos = (parentProperties) ? parentProperties[0] : null
+      if (node !== null) {
+        args[nodePos] = (args[nodePos]) ? args[nodePos] : []  // Init node array
+        arg.push('--' + prop)
+        arg.push(node[prop])
+        args[nodePos] = args[nodePos].concat(arg)
+      }
+    }
+  }
+}
+
+const startTestEnvironment = () => {
   return new Promise((resolve, reject) => {
-    // getting config to know Ports, Urls, etc
-    t.config = JSON.parse(applyEnvVars(loadJsonFile()))
+    t.config = JSON.parse(applyEnvVars(loadJsonFile('config.json')))
+    t.config.global = JSON.parse(loadJsonFile('global.json'))
+
     if (t.config.files) {
       t.config.files.dir = process.env.ROOT_TEST + '/' + t.config.files.dir
       t.config.files.workdir = process.env.ROOT_TEST + '/' + t.config.files.workdir
@@ -51,6 +78,122 @@ const startLemuria = () => {
     if (t.config.clockings) {
       t.config.clockings.dir = process.env.ROOT_TEST + '/' + t.config.clockings.dir
     }
+
+    if (t.config.api_listen) {
+      t.config.api_listen.host = t.config.api_listen.host || '127.0.0.1'
+    }
+
+    if (t.config.nodeid) {
+      t.config.api_listen.host = t.config.api_listen.host || '127.0.0.1'
+    }
+
+    let configBase = {
+      home: process.env.LEMURIA_HOME,
+      localServices: 'global,session,migrations', // t.config.localServices, // necesita de global para que arranque las importaciones
+      apiHost: t.config.api_listen.host,
+      apiPort: t.config.api_listen.port,
+      comsListen: t.config.coms_listen,
+      logic: t.config.logic,
+      server: t.config.server,
+      files: t.config.files,
+      clockings: t.config.clockings
+    }
+
+    const foo = () => { console.log('We have a problem!!!') }
+
+    g.init(configBase, foo)
+      .then(() => {
+        console.log('Global config Test initiated.')
+        sessions.initTest(t.config.global.customers, t.config.global.devices).then(() => {
+          console.log('Sessions Test initiated.')
+          t.eventEmitter = g.getEventEmitter()
+          t.dbs = sessions.getDatabases('SPEC')
+          t.lemuriaAPI = t.config.api_listen.host + ':' + t.config.api_listen.port
+          resolve()
+        })
+      })
+  })
+}
+
+const startLemuriaNodes = () => {
+  let map = {}
+  let args = []
+  let env = Object.create(process.env)                                   // Clone current environment
+  let nodes = JSON.parse(loadJsonFile('configNodes.json')).nodes
+  let numNodes = Object.keys(nodes).length
+
+  walkRecursive(nodes, args)                                             // Load json config data on args array.
+  return new Promise((resolve, reject) => {
+    for (let i = 0; i < numNodes; i++) {
+      let fork = 'node' + i
+      map[fork] = cp.fork('index.js', args[i], env)
+
+      map[fork].on('message', (msg) => {
+        console.log('(msg) worker -> master: ' + JSON.stringify(msg))
+        if (msg.event) {
+          console.log('(event) worker -> master: ', msg.event)
+          let eventData = (msg.eventData) ? msg.eventData : {}
+          t.eventEmitter.emit(msg.event, eventData)
+        }
+        if (msg.init) {
+          forksReady++
+          map[fork].send({ init: 'Ok worker, Master got the message! Over and out!' })
+          if (forksReady === numNodes) {
+            console.log('All forks ready !!!')
+            resolve()
+          }
+        }
+      })
+    }
+  })
+}
+
+const startRemoteClients = () => {
+  let map = {}
+  let args = []
+  let env = Object.create(process.env)                                   // Clone current environment
+  let remotes = JSON.parse(loadJsonFile('configNodes.json')).remotes
+  let numRemotes = Object.keys(remotes).length
+
+  walkRecursive(remotes, args)                                           // Load json config data on args array.
+  return new Promise((resolve, reject) => {
+    for (let i = 0; i < numRemotes; i++) {
+      let remote = 'remote' + i
+      map[remote] = cp.fork('index.js', args[i], env)
+
+      map[remote].on('message', (msg) => {
+        console.log('(msg) worker -> master: ' + JSON.stringify(msg))
+        if (msg.event) {
+          console.log('(event) worker -> master: ', msg.event)
+          let eventData = (msg.eventData) ? msg.eventData : {}
+          t.eventEmitter.emit(msg.event, eventData)
+        }
+        if (msg.init) {
+          remotesReady++
+          map[remote].send({ init: 'Ok worker, Master got the message! Over and out!' })
+          if (remotesReady === numRemotes) {
+            console.log('All remotes ready !!!')
+            resolve()
+          }
+        }
+      })
+    }
+  })
+}
+
+const startLemuria = () => {
+  return new Promise((resolve, reject) => {
+    // getting config to know Ports, Urls, etc
+    t.config = JSON.parse(applyEnvVars(loadJsonFile('config.json')))
+    if (t.config.files) {
+      t.config.files.dir = process.env.ROOT_TEST + '/' + t.config.files.dir
+      t.config.files.workdir = process.env.ROOT_TEST + '/' + t.config.files.workdir
+      t.config.files.sources = process.env.ROOT_TEST + '/' + t.config.files.sources
+    }
+    if (t.config.clockings) {
+      t.config.clockings.dir = process.env.ROOT_TEST + '/' + t.config.clockings.dir
+    }
+
     lemuria.init({
       apiPort: t.config.api_listen.port,
       comsListen: t.config.coms_listen,
@@ -75,7 +218,7 @@ const startLemuria = () => {
 
 // Returns a promise with Lemura services, dbs, config, lemuriaAPI, etc
 // Initially, if Lemuria is not started, starts it. On every call, returns _t cached copy
-const get = (env = 'test') => {
+const getOLD = (env = 'test') => {
   process.env.NODE_ENV = env
   lemuria = require('../src/lemuria.js') // IMPORTANT: require lemuria after setting 'NODE_ENV'!
   console.log('>> TestMgr: config = ' + env)
@@ -86,6 +229,37 @@ const get = (env = 'test') => {
       startLemuria().then(() => {
         _lemuriaInitialized = true
         resolve(t)
+      })
+    } else {
+      // the other times, _t has everything...
+      console.log('TestMgr: reusing _t')
+      // IMPORTANT: lemuria was created, but the database was polluted from other tests data
+      //            thus, a rollback() + migration() for all sections is needed in other to have
+      //            the database cleaned before every it(...) sentence
+      resolve(t)
+    }
+  })
+}
+
+const get = (env = 'test') => {
+  process.env.NODE_ENV = env
+  console.log('>> TestMgr: config = ' + env)
+  return new Promise((resolve, reject) => {
+    if (!_lemuriaInitialized) {
+      // At first, lemuria infrastructure needs to be created
+      console.log('TestMgr: starting Lemuria nodes...')
+
+      startTestEnvironment().then(() => {                  // Load Test Manager Data
+        startLemuriaNodes().then(() => {                   // Fork Lemuria Instances
+          addRemoteConfigData().then(() => {               // Load data for remote clients (migrations & files)
+            startRemoteClients().then(() => {              // Fork remote clients
+              rollbackAndMigrateDatabases().then(() => {   // Clean data
+                _lemuriaInitialized = true
+                resolve(t)
+              })
+            })
+          })
+        })
       })
     } else {
       // the other times, _t has everything...
@@ -165,6 +339,7 @@ const handleFileImport = (fileNameDest, fileNameSrc) => {
     // when a 'onEndImport' event is received, the event needs to be removed (to not interfere
     // other tests that also are listening to the event), and the promise can be resolved
     const handler = (importResult) => {
+      console.log(JSON.stringify(importResult))
       t.eventEmitter.removeListener(g.EVT.onEndImport, handler)
       resolve(importResult)
     }
@@ -281,6 +456,50 @@ const rollbackAndMigrateDatabases = () => {
     // Cleaned STATE
 }
 
+/*
+ * Populate data config of export & import services after clean db.
+ * One node & two services inside it
+ *
+ */
+const addRemoteConfigData = () => {
+  let kObjects = t.dbs['objects']
+  return new Promise((resolve, reject) => {
+    kObjects.insert({id: '1', type: 'node', code: 'remote'}).into('entity_1')
+      .then(kObjects.insert({id: '2', type: 'service', code: 'files'}).into('entity_1')
+        .then(kObjects.insert({id: '3', type: 'service', code: 'clockings'}).into('entity_1')
+          .then(() => { console.log('Created node and services entities') })
+        )
+      )
+    // Set relation
+    kObjects.insert({relation: 'runsIn', id1: '2', id2: '1', t1: 19900101, t2: 99991231, ord: 1, node: '1'}).into('relation_1')
+      .then(kObjects.insert({relation: 'runsIn', id1: '3', id2: '1', t1: 19900101, t2: 99991231, ord: 1, node: '1'}).into('relation_1')
+        .then(() => { console.log('relation_1 UPDATED!') })
+      )
+    // C:\Users\jdominguez\WebstormProjects\Prototype\test\exchange_workdir\remote
+    // Files & Clockings config
+    let root = process.env.ROOT_TEST
+    console.log('ROOT: ' + root)
+    kObjects.insert({entity: '2', property: 'dir', t1: 19900101, t2: 99991231, value: root + '/exchange_workdir/remote'}).into('property_str_1')
+      .then(kObjects.insert({entity: '2', property: 'workdir', t1: 19900101, t2: 99991231, value: root + '/exchange_workdir'}).into('property_str_1')
+        .then(kObjects.insert({entity: '2', property: 'sources', t1: 19900101, t2: 99991231, value: root + '/exchange_sources'}).into('property_str_1')
+          .then(kObjects.insert({entity: '2', property: 'output', t1: 19900101, t2: 99991231, value: 'true'}).into('property_str_1')
+            .then(() => { console.log('property_str_1 UPDATED!') })
+          )
+        )
+      )
+    kObjects.insert({entity: '3', property: 'dir', t1: 19900101, t2: 99991231, value: root + '/export_clockings'}).into('property_str_1')
+      .then(kObjects.insert({entity: '3', property: 'fileName', t1: 19900101, t2: 99991231, value: 'export_clockings.txt'}).into('property_str_1')
+        .then(() => { console.log('property_str_1 UPDATED!') })
+      )
+    kObjects.insert({entity: '2', property: 'output', t1: 19900101, t2: 99991231, value: 1}).into('property_num_1')
+      .then(() => {
+        kObjects.insert({entity: '3', property: 'period', t1: 19900101, t2: 99991231, value: 0}).into('property_num_1')
+          .then(() => { console.log('property_num_1 UPDATED!') })
+      })
+    resolve()
+  })
+}
+
 const expectProps = (realObj, expectedObj) => {
   for (let k in expectedObj) {
     if (expectedObj.hasOwnProperty(k)) {
@@ -356,6 +575,7 @@ let t = {
   verifyExportClockings,
   removeExportClockingsFile,
   rollbackAndMigrateDatabases,
+  addRemoteConfigData,
   handleFileImport,
   cleanImportFiles,
   terminalEmulatorSendGET,

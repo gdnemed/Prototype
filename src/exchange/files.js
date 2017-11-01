@@ -29,8 +29,9 @@ Initialize variables and watching import files.
 */
 const init = () => {
   let params = g.getConfig().files
-  if (!params) return Promise.resolve()
-  else {
+  if (!params) {
+    return Promise.resolve()
+  } else {
     log = logger.getLogger('files')
     log.debug('>> files.init()')
     remoteService = g.getConfig().server
@@ -38,11 +39,12 @@ const init = () => {
     remoteDir = params.dir
     workDir = params.workdir
     createOutput = params.output
-    deleteFile = params.deleteFile === undefined || params.deleteFile //true by default
+    deleteFile = params.deleteFile === undefined || params.deleteFile // true by default
     apiKey = '123'
     watch('per', processRecord, 'records', 'records', 'records')
     watch('tty', processTtype, 'timetypes', 'timetypes', 'timetypes')
     watch('inf', processInfo, 'infos', 'records/@/info', 'records/@/info')
+    watch('enr', processEnroll, 'enrolls', 'records/@/enroll', 'records/@/enroll')
     g.addLocalService('files').then(() => {
       return Promise.resolve()
     })
@@ -138,7 +140,9 @@ const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDel
   if (partial) {
     elems = []
     elemsToDelete = []
-  } else elems = {}
+  } else {
+    elems = []
+  }
   let yesterday = moment.tz(new Date().getTime() - ONE_DAY, timeZone).format('YYYYMMDD')
   csvtojson().fromFile(path)
   .on('json', (jsonObj) => fJson(jsonObj, yesterday, elems, partial, elemsToDelete))
@@ -151,7 +155,7 @@ const importProcess = (elemsToDelete, path, importType, fJson, pathPost, pathDel
       sendOrders(pathPost, elems, elemsToDelete, output, partial, (nObjects, nErrors) => {
         if (output) outPut(output, nObjects + ' lines processed. ' + nErrors + ' errors.')
         deleteOrders(pathDelete, elemsToDelete, output, partial,
-          () => endImport(path, importType, output, now, nErrors == 0, partial))
+          () => endImport(path, importType, output, now, nErrors === 0, partial))
       })
     }
   })
@@ -200,9 +204,9 @@ Moves records to "done" directories.
 */
 const endImport = (path, importType, output, now, ok, partial) => {
   if (fs.existsSync(path)) {
-    if(deleteFile){
+    if (deleteFile) {
       fs.unlink(path, (err) => { if (err) log.error(err) })
-    }else {
+    } else {
       let newPath = workDir + '/' + (ok ? 'done' : 'error') + '/' + importType + (partial ? '_INC_' : '_') + now + '.DWN'
       fs.rename(path, newPath, (err) => { if (err) log.error(err) })
     }
@@ -341,12 +345,32 @@ const processInfo = (r, yesterday, infos, partial, elemsToDelete) => {
   if (r.HEADER && r.HEADER !== '') info.value = r.HEADER
   if (r.TEXT && r.TEXT !== '') info.value += ',' + r.TEXT
   if (r.DATE && r.DATE !== '') info.date = r.DATE
-  if (infos[info.id] == null) {
+  if (infos[info.id] === null) {
     infos[info.id] = info
   } else {
     let info2 = infos[info.id]
     info2.value += ';' + info.value
   }
+}
+
+const processEnroll = (r, yesterday, enrolls, partial, elemsToDelete) => {
+  // ID,ELEMS,DEVICE,DATE
+  let enroll = {id: r.ID}
+  enroll.value = '{'
+  if (r.IDENTIFIERS && r.IDENTIFIERS !== '') enroll.value += ' "identifiers":' + r.IDENTIFIERS
+  if (r.DEVICE && r.DEVICE !== '') enroll.value += ', "devices":' + r.DEVICE
+  enroll.value += '}'
+  enroll.t1 = 19900101
+  if (r.DATE && r.DATE !== '') enroll.t2 = parseInt(r.DATE)
+  else enroll.t2 = 99991231
+  let enr = enrolls[enroll.id]
+  if (!enr) {
+    enrolls[enroll.id] = enroll
+  }
+  /* else {
+    let enroll2 = enrolls[enroll.id]
+    enroll2.value += ';' + info.value
+  } */
 }
 
 /*
@@ -408,7 +432,7 @@ const call = (method, path, content, callback) => {
   let data = {method: method, url: url}
   // if (headers) data.headers = headers
   data.headers = {'Authorization': 'APIKEY ' + apiKey}
-  if (content != null) {
+  if (content !== null) {
     data.json = true
     data.body = content
   }
@@ -419,7 +443,7 @@ const call = (method, path, content, callback) => {
 Iterates over recordsToDelete to send deletes
 */
 const deleteOrders = (apiPath, elemsToDelete, output, partial, callback) => {
-  if (elemsToDelete == null) callback()
+  if (elemsToDelete === null) callback()
   else {
     let l = []
     if (partial) l = elemsToDelete
@@ -461,6 +485,11 @@ const deleteOrder = (l, i, apiPath, output, callback) => {
 const notifyEndImport = (path, importType, output, now, ok, partial) => {
   log.debug('notifyEndImport: ' + path + '  ' + importType + '  ' + ok)
   g.getEventEmitter().emit(g.EVT.onEndImport, {path, importType, ok})
+  // Forked process
+  if (process.send !== undefined) {
+    let msg = {'event': g.EVT.onEndImport, 'eventData': {path, importType, ok}}
+    process.send(msg)
+  }
 }
 
 module.exports = {

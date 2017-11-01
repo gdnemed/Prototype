@@ -6,14 +6,168 @@
 // -------------------------------------------------------------------------------------------
 
 const moment = require('moment-timezone')
+const request = require('request')
 const logger = require('../utils/log')
 const migrations = require('../migrations')
 const g = require('../global')
+const httpServer = require('../httpServer')
 
 let mapCustomers
 let mapDevices
 let _customers = {}
 let log
+
+/* Registers an API method, to be used in local or remote invokes.
+- service: module.exports object from service, for getting functions and name.
+- functionName: name of the local function.
+- operation: HTTP operation (GET, PUT, etc.)
+- url: Path in HTTP API.
+- remoteFunction:
+If functionName is defined, remoteFunction not required.
+If functionName is null, then remoteFunction is registered as is, without wrapper.
+*/
+const registerMethod = (service, functionName, operation, url, remoteFunction, middleware) => {
+  let f
+  // If local and remote (it has a name), put it in map
+  if (functionName) {
+    let methods = g.getMethods()
+    let reg = methods[service.serviceName]
+    if (!reg) {
+      reg = {}
+      methods[service.serviceName] = reg
+    }
+    let m = reg[functionName]
+    if (!m) {
+      m = {}
+      reg[functionName] = m
+    }
+    m.route = url
+    m.method = operation
+    m.localFunction = service[functionName]
+    f = (req, res) => invokeWrapper(req, res, m.localFunction)
+  } else f = remoteFunction // If only remote, just assign it
+  // Add it to HTTP API
+  let api = httpServer.getApi()
+
+  if (api) {
+    switch (operation) {
+      case 'GET':
+        if (middleware) api.get(url, middleware, f)
+        else api.get(url, f)
+        break
+      case 'POST':api.post(url, f)
+        break
+      case 'DELETE':api.delete(url, f)
+        break
+      case 'PUT':api.put(url, f)
+        break
+    }
+  }
+}
+
+/*
+ *  All service calls are executed using this method.
+ *  Depending on whether the service is available locally, or if it is an external service,
+ *  this function will call the corresponding endPoint by returning a promise with the result.
+ */
+const invokeService = (service, methodName, session, parameters) => {
+  log.warn('NEW invokeService ' + service + '.' + methodName)
+  if (g.isLocalService(service)) return g.invokeLocal(service, methodName, session, parameters)
+  else {
+    return new Promise((resolve, reject) => {
+      let error = {}; let done = false; let attempts = 0; let hostUrl = ''
+      let attemptedUrls = []  // List of requested hosts to resolve invoke method
+      let param = g.getMethodRoute(service, methodName)
+
+      // Define type of params
+      let paramType = (typeof parameters)
+
+      if (paramType === 'function') {
+        // Nothing to do with functions through HTTP
+        reject(new Error('Type function parameter on invoke request.'))
+        return
+      } else if (paramType === 'undefined') {
+        // Better empty string than null or undefined
+        parameters = ''
+      }
+
+      /*
+       *  Function requests a resource to the first service on list that respond properly.
+       */
+      const resilientInvoke = (done, attempts) => {
+        return new Promise((resolve, reject) => {  // outer promise
+          // Inner promise to iterate host services response on error
+          if (!done) new Promise((resolve, reject) => {  // inner promise
+            attempts++
+            log.debug('resilientInvoke START attempt(' + attempts + ')')
+
+            hostUrl = g.getUrlService(service, attemptedUrls)
+            if (attemptedUrls.includes(hostUrl)) {
+              log.debug('resilientInvoke REJECT(' + attempts + ') all host services.')
+              reject(new Error('No service has responded to the request.'))  // inner promise
+            }
+            attemptedUrls.push(hostUrl)
+
+            log.info('********** INVOKED METHOD DATA SENDED ************')
+            log.info('dataType -> ' + paramType)
+            log.info('data     -> ' + JSON.stringify(parameters))
+            log.info('session   -> ' + JSON.stringify(session))
+
+            let options = {
+              'method': param.method,
+              'url': hostUrl + param.route,
+              'headers': {},
+              'body': {
+                'dataType': paramType,
+                'data': parameters
+              },
+              'encoding': 'utf8',
+              'json': true
+            }
+            if (session) options.headers.Authorization = 'APIKEY ' + session.apikey
+
+            request(options, (err, res, body) => {
+              if (err) {
+                log.error('resilientInvoke CALL ' + service.toUpperCase() + ' on host ' + hostUrl + ' - attempt(' + attempts + ') ERROR: ' + err)
+                error = err
+                resolve(error)  // inner promise
+              } else {
+                log.debug('resilientInvoke CALL ' + service.toUpperCase() + ' on host ' + hostUrl + ' - attempt(' + attempts + ') RESULT: ' + JSON.stringify(body))
+                done = true
+                resolve(body)  // inner promise
+              }
+            })
+          })
+            .then((invokeResult) => {
+              log.debug('resilientInvoke ENDS attempt(' + attempts + ') done? ' + done)
+
+              if (done) {
+                let functionResult
+                switch (invokeResult.dataType) {
+                  case 'undefined':
+                    functionResult = null
+                    break
+                  case 'number':
+                    functionResult = parseInt(invokeResult.data)
+                    break
+                  default:
+                    functionResult = invokeResult.data  // string or object
+                }
+                resolve(functionResult) // outer promise
+              } else resilientInvoke(done, attempts)
+            })
+            .catch((e) => {
+              log.error('resilientInvoke ' + service.toUpperCase() + ' ERROR: ' + JSON.stringify(e))
+            })
+        })
+      }
+      // Ends function forceInvoke
+      resilientInvoke(done, attempts).then((result) => {
+        resolve(result) // main promise
+      })
+    })
+  }
+}
 
 const getCustomersList = () => {
   let l = []
@@ -62,16 +216,21 @@ const invokeWrapper = (req, res, f) => {
 
     switch (req.body.dataType) {
       case 'undefined':
-        param = null
+        param = []
         break
       case 'number':
-        param = parseInt(req.body.data)
+        param = [parseInt(req.body.data)]
+        break
+      case 'object':
+        param = Object.keys(req.body.data).map(val => req.body.data[val])
         break
       default:
-        param = req.body.data  // string or object
+        param = [req.body.data]// string or object
     }
 
-    f(session, param)
+    param.unshift(session) // add session as first param
+
+    f.apply(null, param)
       .then((result) => {
         let response = {
           'dataType': (typeof result),
@@ -96,10 +255,10 @@ const init = () => {
         name: 'internal',
         apikey: '123'
       }
-      g.invokeService('global', 'getCustomers', session)
+      invokeService('global', 'getCustomers', session)
         .then((customers) => {
           mapCustomers = customers
-          return g.invokeService('global', 'getDevices', session)
+          return invokeService('global', 'getDevices', session)
         })
         .then((devices) => {
           mapDevices = devices
@@ -170,6 +329,19 @@ const setAuthorization = (customer, data) => {
   } else return false
 }
 
+const initTest = (customers, devices) => {
+  return new Promise((resolve, reject) => {
+    log = logger.getLogger('session')
+    log.debug('session: initTest()')
+    mapCustomers = customers
+    mapDevices = devices
+    let customerTest = getCustomersList()
+    initializeCustomer(customerTest, 0).then(() => {
+      resolve()
+    })
+  })
+}
+
 module.exports = {
   init,
   getSession,
@@ -178,5 +350,10 @@ module.exports = {
   checkSerial,
   getDatabases,
   setAuthorization,
-  invokeWrapper
+  invokeWrapper,
+  // Added for testings
+  initTest,
+  invokeWrapper,
+  registerMethod,
+  invokeService
 }

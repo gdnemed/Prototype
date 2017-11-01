@@ -20,8 +20,8 @@ const g = require('../global')
 
 let log
 let nodesList = {}
-let heartBeatInterval = 1000 * 60 * 5    // Interval pulse to request status on listed services
-let clientSideInterval = 1000 * 60 * 5   // Parameter sent to the services.
+let heartBeatInterval = 1000 * 10    // Interval pulse to request status on listed services
+let clientSideInterval = 1000 * 7   // Parameter sent to the services.
 
 const serviceType = {
   'host': '',              // IP:PORT
@@ -34,7 +34,7 @@ const serviceType = {
   },
   'version': '',           // Service Version
   'time': '',              // Service entry creation timestamp
-  'load': ''               // Service server workload data
+  'load': {}               // Service server workload data
 }
 
 /*************************************************
@@ -48,7 +48,7 @@ const serviceType = {
 const heartBeat = () => {
   setTimeout(() => {
     for (const host of Object.keys(nodesList)) {
-      log.info('Heartbeat: ' + host)
+      log.info('Heartbeat: ' + host + ' ' + g.getConfig().nodeId)
       heartBeatCheck(nodesList[host])
     }
     heartBeat()
@@ -57,12 +57,10 @@ const heartBeat = () => {
 
 const heartBeatCheck = (node) => {
   let protocol = node.address.protocol === 'https' ? https : http
-  let IP = node.address.server
-  let PORT = node.address.port
 
   let options = {
-    'host': IP,
-    'port': PORT,
+    'host': node.address.server,
+    'port': node.address.port,
     'path': '/api/registry/check',
     'method': 'GET',
     'headers': {
@@ -80,15 +78,17 @@ const heartBeatCheck = (node) => {
     })
 
     res.on('end', () => {
-      // let obj = JSON.parse(output)
-      log.info('HeartBeat ok for ' + node.host)
+      if (output && output.length > 0 && output.charAt(0) === '{') {
+        node.load = JSON.parse(output)
+        log.debug('HeartBeat ok for ' + node.host)
+      }
       node.time = Date.now()
     })
   })
 
   req.on('error', (err) => {
     log.error('Heartbeat ' + options.host + ' ERROR: ' + err + '. DELETING ENTRY !!!')
-    deleteNode(options.host)
+    deleteNode(node.address.server + ':' + node.address.port)
   })
 
   req.end()
@@ -141,21 +141,11 @@ const removeServiceEntry = (req) => {
 }
 
 const addServiceEntry = (req) => {
-  log.debug('addService')
-
   return new Promise((resolve, reject) => {
     checkRequestData(req)
-      .then((node) => {
-        checkServiceAddress(node)
-          .then((node) => {
-            updateNode(node)
-          })
-          .then(resolve)
-          .catch((e) => {
-            log.error(e.message)
-            reject(e)
-          })
-      })
+      // .then((node) => checkServiceAddress(node))
+      .then((node) => updateNode(node))
+      .then(resolve)
       .catch((e) => {
         log.error(e.message)
         reject(e)
@@ -165,8 +155,6 @@ const addServiceEntry = (req) => {
 
 const checkRequestData = (req) => {
   return new Promise((resolve, reject) => {
-    log.debug('checking request data...')
-
     if ((!req.body.hasOwnProperty('services')) && (!req.body.hasOwnProperty('service'))) reject(new Error('Missing SERVICE(s) property'))
     if (!req.body.hasOwnProperty('environment')) reject(new Error('Missing ENV property'))
     if (!req.body.hasOwnProperty('address')) reject(new Error('Missing ADDRESS property'))
@@ -180,7 +168,8 @@ const checkRequestData = (req) => {
     serviceEntry.environment = req.body.environment || 'dev'
     serviceEntry.version = req.body.version || '1.0'
     serviceEntry.time = Date.now()
-    serviceEntry.load = req.body.load || '50'
+    serviceEntry.load = req.body.load
+    serviceEntry.address = {}
     serviceEntry.address.protocol = req.body.address.protocol
     serviceEntry.address.server = req.body.address.server
     serviceEntry.address.port = req.body.address.port
@@ -195,14 +184,18 @@ const checkRequestData = (req) => {
 
 const checkServiceAddress = (service) => {
   return new Promise((resolve, reject) => {
-    log.debug('check request address...')
-
     if (!service) reject(new Error('Missing service object to test'))
 
     let protocol = service.address.protocol === 'https' ? https : http
     protocol.get({
       host: service.address.server,
-      port: service.address.port
+      port: service.address.port,
+      path: '/api/registry/check',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'APIKEY 123'
+      }
     }, (res) => {
       resolve(service)
     }).on('error', (err) => {
@@ -264,7 +257,7 @@ const listServices = (detailed) => {
   for (let i = 0; i < l.length; i++) {
     if (l[i] !== 'registry') {
       let data = {
-        'host': g.getConfig().apiHost,
+        'host': g.getConfig().apiHost || ':' || g.getConfig().apiPort,
         'environment': process.env.NODE_ENV || 'dev',
         'server': g.getConfig().apiHost,
         'port': g.getConfig().apiPort,
@@ -273,7 +266,7 @@ const listServices = (detailed) => {
       if (detailed) {
         data.version = '1.0'
         data.time = ''
-        data.load = '50'
+        data.load = {}
       }
       if (!list[l[i]]) list[l[i]] = []
       list[l[i]].push(data)
@@ -301,7 +294,7 @@ const updateNode = (node) => {
   } else {
     log.debug('addNode on ' + node.host)
   }
-  nodesList[node.host] = node
+  nodesList[node.host] = Object.assign({}, node)
 }
 
 /**********************************

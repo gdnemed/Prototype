@@ -6,7 +6,6 @@
 
 const logger = require('../utils/log')
 const fs = require('fs')
-const httpServer = require('../httpServer')
 const sessions = require('../session/sessions')
 const g = require('../global')
 
@@ -24,6 +23,12 @@ const loadGlobalJsonFile = (path) => {
 
 const init = () => {
   return new Promise((resolve, reject) => {
+    // Init API
+    sessions.registerMethod(module.exports, 'getCustomers',
+      'GET', '/api/global/customers')
+    sessions.registerMethod(module.exports, 'getDevices',
+      'GET', '/api/global/devices')
+    // Init service
     if (g.isLocalService('global')) {
       log = logger.getLogger('globalServer')
       log.debug('>> globalServer init()')
@@ -36,8 +41,6 @@ const init = () => {
         console.log('ERROR: cannot start Lemuria: global.json not found')
         process.exit()
       }
-      httpServer.getApi().get('/api/global/customers', (req, res) => sessions.invokeWrapper(req, res, getCustomers))
-      httpServer.getApi().get('/api/global/devices', (req, res) => sessions.invokeWrapper(req, res, getDevices))
       resolve()
     } else resolve()
   })
@@ -52,6 +55,7 @@ const getDevices = () => {
 }
 
 module.exports = {
+  serviceName: 'global',
   init,
   getCustomers,
   getDevices

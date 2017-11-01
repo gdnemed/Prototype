@@ -2,13 +2,14 @@
 // -------------------------------------------------------------------------------------------
 // global file (holds all global objects required by any module, ex: api, cfg, eventEmitter, dbs, etc)
 // -------------------------------------------------------------------------------------------
-const request = require('request')
+
 const events = require('events')
+const request = require('request')
 const logger = require('./utils/log')
-// const fs = require('fs')
+const perf = require('./performance')
 
 let log
-let invokeLocal
+const methods = {}
 
 // -------------------------------------------------------------------------------------------
 // EVENTS
@@ -32,6 +33,7 @@ let _cfg
 const initConfiguration = (params) => {
   return new Promise((resolve, reject) => {
     _cfg = params
+    _cfg.nodeId = _cfg.nodeId || (_cfg.apiHost + ':' + _cfg.apiPort)
     // If url argument passed, configuration must be get from server
     // for instance: http://server:port/api/nodes/:id/services
     if (process.argv.indexOf('--url') !== -1) {
@@ -67,7 +69,7 @@ const getRemoteConfiguration = (url, apiKey) => {
       if (error) reject(error)
       else {
         let cfg = JSON.parse(body)
-        _cfg = {node_id: 1}
+        // _cfg = {node_id: 1} Do not replace all config data... only required.
         _cfg.id = cfg.id
         for (let i = 0; i < cfg.services.length; i++) {
           _cfg[cfg.services[i].id] = cfg.services[i]
@@ -86,26 +88,13 @@ const getRemoteConfiguration = (url, apiKey) => {
   })
 }
 
-/*
-const applyEnvVars = (str) => {
-  const REGEXP_VAR = /\$[A-Za-z_][A-Za-z_0-9]*\$/g
-  let getValForKey = (key) => {
-    let newVal = process.env[key.replace(/\$/g, '')]
-    if (newVal !== undefined) return newVal
-    else return key
-  }
-  str = str.replace(REGEXP_VAR, getValForKey)
-  return str
-} */
-
-const init = (params, invokeLocalFunction) => {
+const init = (params) => {
   log = logger.getLogger('global')
   log.debug('>> global.init()')
   return new Promise((resolve, reject) => {
     initConfiguration(params)
       .then(() => {
         initEvents()
-        invokeLocal = invokeLocalFunction
         appServices.local = getBootServices()
         resolve()
       })
@@ -113,11 +102,61 @@ const init = (params, invokeLocalFunction) => {
   })
 }
 
+const invokeLocal = (service, methodName, session, parameters) => {
+  return new Promise((resolve, reject) => {
+    log.debug('LEMURIA invokeLocal: ' + service + '.' + methodName)
+
+    let param
+    switch (typeof (parameters)) {
+      case 'undefined':
+        param = []
+        break
+      case 'number':
+        param = [parseInt(parameters)]
+        break
+      case 'object':
+        param = Object.keys(parameters).map(val => parameters[val])
+        break
+      default:
+        param = [parameters]// string or object
+    }
+
+    param.unshift(session) // add session as first param
+
+    let f = getLocalMethod(service, methodName)
+    if (f) {
+      f.apply(null, param)
+        .then(resolve).catch(reject)
+    } else {
+      reject(new Error('Invoked service method does not exists: ' + service + '.' + methodName))
+    }
+  })
+}
+
+const getLocalMethod = (serviceName, functionName) => {
+  let s = methods[serviceName]
+  if (s) {
+    let f = s[functionName]
+    if (f) return f.localFunction
+  }
+}
+
+/*
+ *  Returns an object with the correct route and operation on the REST request.
+ */
+const getMethodRoute = (serviceName, functionName) => {
+  let s = methods[serviceName]
+  if (s) {
+    let f = s[functionName]
+    if (f) return f
+    else throw new Error('Invalid method name: ' + serviceName + '.' + functionName)
+  } else throw new Error('Invalid service name: ' + serviceName)
+}
+
 /// /////////////////////
 /// Services
 /// /////////////////////
 
-let taskTimeInterval = 1000 * 5
 let appServices = {
   local: [],
   remote: {}
@@ -127,20 +166,10 @@ let appServices = {
  *  List of booted services on the current node process.
  */
 const getBootServices = () => {
+  _cfg.localServices = (typeof _cfg.localServices === 'undefined') ? '' : _cfg.localServices
   let bootServices = _cfg.localServices.split(',')
   if (bootServices[0] === '' && bootServices.length === 1) bootServices = []
   return bootServices
-}
-
-/*
- *  Refresh remote services list task.
- */
-const initJobReloadServicesList = () => {
-  setTimeout(() => {
-    getServicesRegistry().then(() => {
-      initJobReloadServicesList()
-    })
-  }, taskTimeInterval)
 }
 
 /* Asks registry service for a list of available lemuria services. */
@@ -166,7 +195,6 @@ const getServicesRegistry = () => {
           reject(err)
         } else {
           addRemoteServices(body.services)
-          taskTimeInterval = parseInt(body.refresh)
           resolve()
         }
       })
@@ -199,13 +227,20 @@ const registerHostedServices = () => {
           'environment': process.env.NODE_ENV || 'dev',
           'version': '1.0',
           'time': '',
-          'load': '50'
+          'load': perf.getStatistics()
         },
         'encoding': 'utf8',
         'json': true
       }
-
       request(options, (err, res, body) => {
+        let interval = 5000                    // if request error interval
+        if (body && body.refresh) {
+          interval = parseInt(body.refresh)
+        }
+        // Next call to registry, with or without server response
+        setTimeout(() => {
+          registerHostedServices()
+        }, interval)
         if (err) {
           log.error('REGISTRY service response: ' + err)
           reject(err)
@@ -232,7 +267,7 @@ const addLocalService = (serviceName) => {
 
 const addRemoteServices = (serviceList) => {
   if (serviceList) appServices.remote = serviceList
-  log.info('Updated remote services on this instance.')
+  log.info('Updated remote services on this instance. ' + _cfg.nodeId)
 }
 
 const isLocalService = (serviceName) => {
@@ -254,167 +289,9 @@ const getUrlService = (serviceName, avoidHost) => {
   if (serviceName === 'global') {
     return _cfg.registry
   } else if (appServices.remote.hasOwnProperty(serviceName)) {
-    console.log('appServices.remote[serviceName]  ' + JSON.stringify(appServices.remote[serviceName]))
     _url = loadBalancer(appServices.remote[serviceName], avoidHost)
   }
   return _url
-}
-
-/*
- *  Returns an object with the correct route and operation on the REST request.
- */
-const getMethodRoute = (serviceName, methodName) => {
-  let foo = {
-    'route': '',
-    'method': ''
-  }
-  if (serviceName === 'state') {
-    switch (methodName) {
-      case 'newId':
-        foo.method = 'GET'
-        foo.route = '/api/state/newId'
-        break
-      case 'newInputId':
-        foo.method = 'GET'
-        foo.route = '/api/state/newInputId'
-        break
-      case 'blockType':
-        foo.method = 'GET'
-        foo.route = '/api/state/blockType'
-        break
-      case 'releaseType':
-        foo.method = 'GET'
-        foo.route = '/api/state/releaseType'
-        break
-      case 'settings':
-        foo.method = 'GET'
-        foo.route = '/api/state/settings'
-        break
-      default:
-        throw new Error('Invalid method name: ' + serviceName + '.' + methodName)
-    }
-  } else if (serviceName === 'global') {
-    switch (methodName) {
-      case 'getCustomers':
-        foo.method = 'GET'
-        foo.route = '/api/global/customers'
-        break
-      case 'getDevices':
-        foo.method = 'GET'
-        foo.route = '/api/global/devices'
-        break
-    }
-  } else {
-    throw new Error('Invalid service name: ' + serviceName)
-  }
-
-  return foo
-}
-
-/*
- *  All service calls are executed using this method.
- *  Depending on whether the service is available locally, or if it is an external service,
- *  this function will call the corresponding endPoint by returning a promise with the result.
- */
-const invokeService = (service, methodName, session, parameters) => {
-  if (isLocalService(service)) return invokeLocal(service, methodName, session, parameters)
-  else {
-    return new Promise((resolve, reject) => {
-      let error = {}; let done = false; let attempts = 0; let hostUrl = ''
-      let attemptedUrls = []  // List of requested hosts to resolve invoke method
-      let param = getMethodRoute(service, methodName)
-
-      // Define type of params
-      let paramType = (typeof parameters)
-
-      if (paramType === 'function') {
-        // Nothing to do with functions through HTTP
-        reject(new Error('Type function parameter on invoke request.'))
-        return
-      } else if (paramType === 'undefined') {
-        // Better empty string than null or undefined
-        parameters = ''
-      }
-
-      /*
-       *  Function requests a resource to the first service on list that respond properly.
-       */
-      const resilientInvoke = (done, attempts) => {
-        return new Promise((resolve, reject) => {  // outer promise
-          // Inner promise to iterate host services response on error
-          if (!done) new Promise((resolve, reject) => {  // inner promise
-            attempts++
-            log.debug('resilientInvoke START attempt(' + attempts + ')')
-
-            hostUrl = getUrlService(service, attemptedUrls)
-            if (attemptedUrls.includes(hostUrl)) {
-              log.debug('resilientInvoke REJECT(' + attempts + ') all host services.')
-              reject(new Error('No service has responded to the request.'))  // inner promise
-            }
-            attemptedUrls.push(hostUrl)
-
-            log.info('********** INVOKED METHOD DATA SENDED ************')
-            log.info('dataType -> ' + paramType)
-            log.info('data     -> ' + JSON.stringify(parameters))
-            log.info('session   -> ' + JSON.stringify(session))
-
-            let options = {
-              'method': param.method,
-              'url': hostUrl + param.route,
-              'headers': {},
-              'body': {
-                'dataType': paramType,
-                'data': parameters
-              },
-              'encoding': 'utf8',
-              'json': true
-            }
-            if (session) options.headers.Authorization = 'APIKEY ' + session.apikey
-
-            request(options, (err, res, body) => {
-              if (err) {
-                log.error('resilientInvoke CALL ' + service.toUpperCase() + ' on host ' + hostUrl + ' - attempt(' + attempts + ') ERROR: ' + err)
-                error = err
-                resolve(error)  // inner promise
-              } else {
-                log.debug('resilientInvoke CALL ' + service.toUpperCase() + ' on host ' + hostUrl + ' - attempt(' + attempts + ') RESULT: ' + JSON.stringify(body))
-                done = true
-                resolve(body)  // inner promise
-              }
-            })
-          })
-            .then((invokeResult) => {
-              log.debug('resilientInvoke ENDS attempt(' + attempts + ')')
-              log.info('********** INVOKED METHOD DATA RECEIVED ************')
-              log.info('dataType -> ' + invokeResult.dataType)
-              log.info('data     -> ' + JSON.stringify(invokeResult.data))
-
-              if (done) {
-                let functionResult
-                switch (invokeResult.dataType) {
-                  case 'undefined':
-                    functionResult = null
-                    break
-                  case 'number':
-                    functionResult = parseInt(invokeResult.data)
-                    break
-                  default:
-                    functionResult = invokeResult.data  // string or object
-                }
-                resolve(functionResult) // outer promise
-              } else resilientInvoke(done, attempts)
-            })
-            .catch((e) => {
-              log.error('resilientInvoke ' + service.toUpperCase() + ' ERROR: ' + JSON.stringify(e))
-            })
-        })
-      }
-      // Ends function forceInvoke
-      resilientInvoke(done, attempts).then((result) => {
-        resolve(result) // main promise
-      })
-    })
-  }
 }
 
 /// /////////////////////
@@ -431,10 +308,12 @@ module.exports = {
   /// Services
   addLocalService,
   addRemoteServices,
-  invokeService,
   getServicesRegistry,
   getBootServices,
   isLocalService,
   registerHostedServices,
-  initJobReloadServicesList
+  getUrlService,
+  invokeLocal,
+  getMethodRoute,
+  getMethods: () => methods
 }

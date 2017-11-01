@@ -23,6 +23,7 @@ const receive = (data, socket, logicService) => {
     switch (data.cmd) {
       case 4: newClocking(data, socket, logicService); break
       case 20: receiveConfig(data, socket, logicService); break
+      case 21: checkUser(data, socket, logicService); break
     }
   }
 }
@@ -93,6 +94,48 @@ const newClocking = (data, socket, logicService) => {
       log.error(err.message)
       nack(data, socket, 0)
     })
+}
+
+// An idSense terminal asks Lemuria if a given user can proceed to enroll
+const checkUser = (data, socket, logicService) => {
+  var info = socket.specInfo
+  if (data.id === null || data.id === undefined) {
+    // negative answer
+    sendFrame({cmd: data.cmd, id: data.id, resp: 0, reader: 0, msg: 'Invalid identifier'}, data.seq, socket)
+  } else {
+    logicService.checkUserEnroll(data.id, info.customer)
+      .then((record) => {
+        if (record && record.id) {
+          if (record.enroll) {
+            let enroll = JSON.parse(record.enroll)
+            let id2Enroll = '0' // no enroll
+            let message = 'Enroll no permitido'
+            if (enroll.devices && socket.specInfo.serial !== enroll.devices) {
+              message = 'Enroll no permitido en este dispositivo'
+            } else if (enroll.identifiers === 2) {
+              id2Enroll = 'C'
+              message = 'Aproxime la tarjeta al lector'
+            } else if (enroll.identifiers === 1 || enroll.identifiers === 3) {
+              id2Enroll = 'F'
+              message = 'Ponga la huella 1 en el sensor'
+            }
+            sendFrame({
+              cmd: data.cmd,
+              id: data.id,
+              resp: id2Enroll,
+              reader: 0,
+              msg: message
+            }, data.seq, socket)
+          }
+          return
+        }
+        sendFrame({cmd: data.cmd, id: data.id, resp: 0, reader: 0, msg: 'Usuario desconocido'}, data.seq, socket)
+      })
+      .catch((err) => {
+        log.error(err.message)
+        sendFrame({cmd: data.cmd, id: data.id, resp: 0, reader: 0, msg: 'Error al validar usuario'}, data.seq, socket)
+      })
+  }
 }
 
 const receiveConfig = (data, socket, logicService) => {

@@ -19,5 +19,5 @@
 			"period": 0,
 			"fileName": "export_clockings.txt"
 		},
-	    "localServices": "registry,global,logic,coms,state"
+	    "localServices": "registry,global,state,sessions,logic,coms,files,clockings,migrations"
 }

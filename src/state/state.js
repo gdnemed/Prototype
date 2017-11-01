@@ -7,7 +7,6 @@
 // -------------------------------------------------------------------------------------------
 
 const logger = require('../utils/log')
-const httpServer = require('../httpServer')
 const sessions = require('../session/sessions')
 const g = require('../global')
 
@@ -66,7 +65,9 @@ const initInputsId = (session) => {
             db('input_1_' + m).max('id as m')
               .then((rows) => {
                 if (rows.length > 0) {
-                  if (rows[0].m > max) max = rows[0].m
+                  let ma = rows[0].m
+                  if (typeof ma === 'string') ma = parseInt(ma)
+                  if (ma > max) max = rows[0].m
                 }
                 resolve()
               })
@@ -169,19 +170,23 @@ const releaseType = (session, type) => {
   })
 }
 
-/* Get session object and calls required function. */
-const apiCall = (req, res, f) => {
-  sessions.manageSession(req, res, (req, res, session) => {
-    f(session, req.body)
-      .then((result) => {
-        res.status(200).jsonp(result)
-      })
-      .catch((err) => res.status(500).end(err.message))
-  })
-}
-
 const init = () => {
   return new Promise((resolve, reject) => {
+    // Init API
+    sessions.registerMethod(module.exports, 'postSettings',
+      'POST', '/api/state/settings')
+    sessions.registerMethod(module.exports, 'getSettings',
+      'GET', '/api/state/settings')
+    sessions.registerMethod(module.exports, 'newId',
+      'GET', '/api/state/newId')
+    sessions.registerMethod(module.exports, 'newInputId',
+      'GET', '/api/state/newInputId')
+    sessions.registerMethod(module.exports, 'blockType',
+      'GET', '/api/state/blockType')
+    sessions.registerMethod(module.exports, 'releaseType',
+      'GET', '/api/state/releaseType')
+
+    // Init service
     if (g.isLocalService('state')) {
       log = logger.getLogger('state')
       log.debug('>> state init()')
@@ -189,23 +194,15 @@ const init = () => {
       Promise.all(sessions.getCustomersList().map((c) => {
         return initInputsId({name: c.name, dbs: sessions.getDatabases(c.name)})
       }))
-      .then(() => {
-        g.addLocalService('state').then(() => {
-          httpServer.getApi().post('/api/state/settings', (req, res) => sessions.invokeWrapper(req, res, postSettings))
-          httpServer.getApi().get('/api/state/settings', (req, res) => sessions.invokeWrapper(req, res, getSettings))
-          httpServer.getApi().get('/api/state/newId', (req, res) => sessions.invokeWrapper(req, res, newId))
-          httpServer.getApi().get('/api/state/newInputId', (req, res) => sessions.invokeWrapper(req, res, newInputId))
-          httpServer.getApi().get('/api/state/blockType', (req, res) => sessions.invokeWrapper(req, res, blockType))
-          httpServer.getApi().get('/api/state/releaseType', (req, res) => sessions.invokeWrapper(req, res, releaseType))
-          resolve()
-        })
-      })
+      .then(() => g.addLocalService('state'))
+      .then(resolve)
       .catch(reject)
     } else resolve()
   })
 }
 
 module.exports = {
+  serviceName: 'state',
   init,
   initInputsId,
   postSettings,

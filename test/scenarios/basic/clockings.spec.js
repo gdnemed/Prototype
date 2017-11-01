@@ -65,7 +65,7 @@ describe('clockings.spec.js', () => {
         })
       }).catch((e) => {
         if (e.response) console.log('ERROR: ' + e.response.status + ' ' + e.response.text)
-        else console.log.error(e)
+        else console.log(e)
       })
   })
 
@@ -103,7 +103,7 @@ describe('clockings.spec.js', () => {
         })
       }).catch((e) => {
         if (e.response) console.log('ERROR: ' + e.response.status + ' ' + e.response.text)
-        else console.log.error(e)
+        else console.log(e)
       })
   })
 

@@ -3,8 +3,8 @@
 // -------------------------------------------------------------------------------------------
 const MODEL = require('./model')
 const recursive = require('./recursive')
-const g = require('../global')
-// let log = require('../utils/log').getLogger('db')
+const sessions = require('../session/sessions')
+let log = require('../utils/log').getLogger('db')
 
 let nodeId = 1
 
@@ -39,7 +39,7 @@ const preparePut = (session, stateService, variables, squery, data, extraFunctio
       execFilter(session, squery._filter_, variables)
         .then((rows) => {
           putSingle(session, stateService, variables, squery,
-            data, extraFunction, putFunction, rows, 0)
+            data, extraFunction, putFunction, rows, 0, 0)
             .then(resolve).catch(reject)
         })
         .catch(reject)
@@ -63,6 +63,8 @@ const execFilter = (session, filter, variables) => {
   }
   if (filter.field) {
     let val = variables[filter.variable]
+    // If filter is not complete, empty result
+    if (val === undefined || val === null) return Promise.resolve([])
     table.where(filter.field, val)
   }
   return table
@@ -70,9 +72,9 @@ const execFilter = (session, filter, variables) => {
 
 /* Executes put of property/relation over a previously filtered object */
 const putSingle = (session, stateService, variables,
-squery, data, extraFunction, putFunction, rows, n) => {
+squery, data, extraFunction, putFunction, rows, n, lastId) => {
   return new Promise((resolve, reject) => {
-    if (n >= rows.length) resolve()
+    if (n >= rows.length) resolve(lastId)
     else {
       variables._parent_ = {
         id: rows[n].id,
@@ -81,8 +83,8 @@ squery, data, extraFunction, putFunction, rows, n) => {
         put: put
       }
       putFunction(session, stateService, variables, squery, data, extraFunction)
-        .then(() => putSingle(session, stateService, variables,
-          squery, data, extraFunction, putFunction, rows, n + 1))
+        .then((newId) => putSingle(session, stateService, variables,
+          squery, data, extraFunction, putFunction, rows, n + 1, newId))
         .then(resolve)
         .catch(reject)
     }
@@ -97,20 +99,22 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
       let entity = squery._entity_
       let insert, e
       // We must block any modification over this type, until we finish
-      g.invokeService('state', 'blockType', session, entity)
+      sessions.invokeService('state', 'blockType', session, entity)
       // Search for entities with same key values
         .then(() => {
           searchEntity(session, keys, squery, data, variables)
             .then((id) => {
-              insert = id !== null && id !== undefined
+              insert = id === 0
               // Create an object for insert/update
               e = getProperFields(squery, entity, data, variables)
               return getSentenceEntity(session, stateService, squery, e, id, variables)
             })
-            .then((sentence) => { return sentence }) // Execute it
+            .then((sentence) => {
+              return sentence
+            }) // Execute it
             .then((result) => {
               // Once the entity is inserted, we can release blocking
-              g.invokeService('state', 'releaseType', session, entity)
+              sessions.invokeService('state', 'releaseType', session, {'entity': entity})
                 .then(() => subPuts(session, stateService, variables, squery, data, e.id))
                 .then(() => {
                   // Extra treatment, if needed
@@ -123,7 +127,7 @@ const putEntity = (session, stateService, variables, squery, data, extraFunction
             })
             .catch((err) => {
               // If execution went wrong, release blocking and reject
-              g.invokeService('state', 'releaseType', session, entity)
+              sessions.invokeService('state', 'releaseType', session, {'entity': entity})
                 .then(() => reject(err)).catch(() => reject(err))
             })
         })
@@ -153,6 +157,7 @@ const getSentenceEntity = (session, stateService, squery, e, id, variables) => {
       }
       e.id = id
       sentence = db('entity_1').where('id', id).update(e)
+      log.trace(sentence.toSQL())
       resolve(sentence)
     } else {
       // Check required fields
@@ -168,7 +173,7 @@ const getSentenceEntity = (session, stateService, squery, e, id, variables) => {
         return
       }
 
-      g.invokeService('state', 'newId', session)
+      sessions.invokeService('state', 'newId', session)
         .then((id) => {
           e.id = id
           sentence = db.insert(e).into('entity_1')
@@ -187,11 +192,26 @@ const getProperFields = (squery, entity, data, variables) => {
     if (squery.hasOwnProperty(p) &&
       p.charAt(0) !== '_' &&
       typeof squery[p] === 'string') {
-      let val = data[p]
-      if (val === undefined || val === null) val = variables[p]
-      if (val !== null && val !== undefined) {
-        if (squery[p] === 'intname') d[squery[p]] = JSON.stringify(val)
-        else d[squery[p]] = val
+      let valid = false
+      if (entity) {
+        switch (squery[p]) {
+          case 'name': case 'name2': case 'intname': case 'code': case 'document':
+            valid = true
+        }
+      } else {
+        switch (squery[p]) {
+          case 'tmp': case 'gmt': case 'reception': case 'owner':
+          case 'result': case 'source': case 'serial':
+            valid = true
+        }
+      }
+      if (valid) {
+        let val = data[p]
+        if (val === undefined || val === null) val = variables[p]
+        if (val !== null && val !== undefined) {
+          if (squery[p] === 'intname') d[squery[p]] = JSON.stringify(val)
+          else d[squery[p]] = val
+        }
       }
     }
   }
@@ -219,8 +239,6 @@ const getKeys = (squery, variables, data) => {
     // clone dependence
     if (k.dependence) {
       e.dependence = JSON.parse(JSON.stringify(k.dependence))
-      e.value = variables.id
-      if (e.value === undefined || e.value === null) e.complete = false
     }
     // Create list for fields, with its values
     for (let j = 0; j < k.fields.length; j++) {
@@ -249,35 +267,55 @@ const findEntry = (squery, f) => {
 
 /* Search for an entity using keys, and returns it */
 const searchEntity = (session, keys, squery, data, variables) => {
-  if (variables._parent_) return Promise.resolve(variables._parent_.id)
-  else {
-    return new Promise((resolve, reject) => {
-      let db = session.dbs['objects']
-      // Try to find a useful key
-      for (let i = 0; i < keys.length; i++) {
-        let k = keys[i]
-        if (k.complete) {
-          // Build sentence
-          let s = db('entity_' + nodeId)
+  return new Promise((resolve, reject) => {
+    let db = session.dbs['objects']
+    // Try to find a useful key
+    for (let i = 0; i < keys.length; i++) {
+      let k = keys[i]
+      if (k.complete) {
+        let s
+        if (k.dependence) {
+          // Key is dependent of another entity
+          let r = k.dependence.relation
+          let f1, f2
+          if (r.endsWith('->')) {
+            r = r.substring(0, r.length - 2)
+            f1 = 'id1'
+            f2 = 'id2'
+          } else {
+            r = r.substring(2, r.length)
+            f1 = 'id2'
+            f2 = 'id1'
+          }
+          // If combined, search into subset of parent
+          s = db('entity_' + nodeId).innerJoin('relation_' + nodeId, 'id', f1)
+            .column(f1 + ' as id')
+            .where('relation', r)
+            .where(f2, variables._parent_.id)
+            .where('type', squery._entity_)
+        } else {
+          // Build sentence oven entity
+          s = db('entity_' + nodeId)
             .column('id')
             .where('type', squery._entity_)
-          // Add key fields
-          for (let j = 0; j < k.fields.length; j++) {
-            s.where(k.fields[j], k.values[j])
-          }
-          // Execute it
-          s.then((rows) => {
-            if (rows !== null && rows.length > 0) {
-              resolve(rows[0].id)
-            } else resolve(0)
-          })
-            .catch(reject)
-          return
         }
+        // Add key fields
+        for (let j = 0; j < k.fields.length; j++) {
+          s.where(k.fields[j], k.values[j])
+        }
+        log.trace(s.toSQL())
+        // Execute it
+        s.then((rows) => {
+          if (rows !== null && rows.length > 0) {
+            resolve(rows[0].id)
+          } else resolve(0)
+        })
+          .catch(reject)
+        return
       }
-      reject(new Error('No key found'))
-    })
-  }
+    }
+    reject(new Error('No key found'))
+  })
 }
 
 /*
@@ -323,7 +361,7 @@ variables, squery, data, id, l, n) => {
 const putInput = (session, stateService, variables, squery, data, extraFunction) => {
   return new Promise((resolve, reject) => {
     // stateService.newInputId(session)
-    g.invokeService('state', 'newInputId', session)
+    sessions.invokeService('state', 'newInputId', session)
       .then((id) => {
         let period = Math.floor(data.tmp / 100000000)
         // We pass every data to a new object d
